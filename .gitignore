@@ -1,0 +1,23 @@
+# Maven
+target/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+
+# Build artifacts
+*.jar
+!gradle-wrapper.jar
+
+# Logs
+*.log
+logs/
+
+# OS
+Thumbs.db
+.DS_Store

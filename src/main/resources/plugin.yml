@@ -1,0 +1,24 @@
+name: MultiverseNets
+version: '${project.version}'
+main: com.chagui68.multiversenets.MultiverseNets
+api-version: '1.21'
+authors: [Chagui68]
+description: Standalone digital logistics networks and massive storage, no Slimefun.
+website: https://github.com/DrakesCraft-Labs
+
+commands:
+  mvnets:
+    description: Main MultiverseNets command.
+    usage: /mvnets [help|info|devices|give|doctor|stats|reload]
+    aliases: [mvn]
+    permission: multiversenets.use
+
+permissions:
+  multiversenets.use:
+    description: Allows using the base /mvnets command.
+    default: true
+  multiversenets.admin:
+    description: Access to administration (give, doctor, stats, reload).
+    default: op
+    children:
+      multiversenets.use: true

@@ -1,0 +1,36 @@
+# ------------------------------------------------------------
+#  MultiverseNets - main configuration
+#  Author: Chagui68
+# ------------------------------------------------------------
+
+debug: false
+language: en
+
+network:
+  # How often (in ticks) each network topology is rescanned.
+  scan-interval-ticks: 20
+  # Max nodes per network (protection against giant loops).
+  max-nodes: 4096
+  op-interval-ticks:
+    transfer: 5
+    vacuum: 10
+    craft: 20
+
+transfer:
+  items-per-op: 64
+  # Speed multiplier for HT (High-Throughput) importers/exporters.
+  ht-multiplier: 8
+
+greedy:
+  # Buffer capacity of a Greedy Cell.
+  capacity: 262144
+
+crafter:
+  max-recipes: 26
+
+vacuum:
+  radius: 4.0
+
+cells:
+  # Capacity per tier (T1..T6).
+  capacities: [65536, 262144, 1048576, 16777216, 268435456, 2000000000]
