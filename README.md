@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/banner.svg" alt="MultiverseNets" width="100%"/>
+
 # 🌌 MultiverseNets
 
 **Redes de logística digital y almacenamiento masivo standalone para Paper — sin Slimefun.**
@@ -92,6 +94,28 @@ Alias: `/mvn`
 5. **Encoder**: click con el resultado en mano → Blueprint → click sobre un Auto-Crafteador para instalarlo.
 6. **Receptor**: shift+click con el ítem del receptor sobre un Transmisor, colócalo en otra base y ábrelo.
 
+## 🔍 En qué se diferencia de Networks
+
+MultiverseNets no es un recorte de Networks: resuelve el mismo problema con otra arquitectura, y
+esa decisión tiene consecuencias concretas.
+
+| | Networks (addon Slimefun) | MultiverseNets |
+|---|---|---|
+| Dependencias | Slimefun + su cadena | Ninguna, solo Paper API |
+| Pertenencia a la red | Cada nodo guarda su raíz | Se recalcula por BFS desde el controlador |
+| Nodos huérfanos | Posibles: un nodo puede quedar apuntando a una raíz que su controlador ya sustituyó | **Estructuralmente imposibles**: cada escaneo rehace la topología entera |
+| Diagnóstico | Añadido después (`/networks doctor`) | `/mvnets doctor` desde el primer día |
+| Ticker | Depende del ciclo de Slimefun | Propio, con intervalos por operación en el config |
+
+La diferencia de fondo está en la tercera fila. En Networks, «lo tengo todo conectado y la máquina
+no trabaja» es un síntoma real que aparece cuando un nodo vuelve al registro pero no a su red;
+llevamos meses persiguiéndolo. Aquí no puede ocurrir, porque no existe estado por nodo que
+sobreviva a un escaneo.
+
+El precio es que el escaneo cuesta: un BFS sobre hasta `max-nodes` bloques cada
+`scan-interval-ticks`. Es un intercambio deliberado — se paga trabajo predecible y acotado a
+cambio de que no haya estado que se pueda corromper.
+
 ## 🛠️ Compilación
 
 ```bash
@@ -110,4 +134,4 @@ El jar se genera en `target/MultiverseNets-v<versión>.jar`.
 
 ---
 
-**Autor:** Chagui68 · Proyecto de [DrakesCraft Labs](https://github.com/DrakesCraft-Labs)
+**Autor:** Chagui68 · Revisión y afinado: Jack · Proyecto de [DrakesCraft Labs](https://github.com/DrakesCraft-Labs)

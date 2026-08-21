@@ -56,10 +56,50 @@ public final class Settings {
         return Math.max(1.0, cfg.getDouble("vacuum.radius", 4.0));
     }
 
+    /**
+     * Capacidad de una celda por nivel, con respaldo si el config no la define.
+     *
+     * El respaldo se calcula ANTES de tocar la lista a proposito. Con la lista vacia,
+     * caps.size() - 1 vale -1 y Math.clamp(valor, 0, -1) lanza IllegalArgumentException por
+     * recibir un minimo mayor que el maximo: el return de respaldo que habia debajo no llegaba
+     * a ejecutarse nunca. Bastaba con que alguien borrara cells.capacities del config para que
+     * cada operacion sobre una celda reventara.
+     *
+     * Si la lista existe pero es mas corta que los niveles declarados, se usa la ultima entrada
+     * y se avisa una sola vez: es mejor una celda con capacidad de menos que una excepcion, pero
+     * conviene que se sepa.
+     */
     public static long cellCapacity(int tier1to6) {
+        int tier = Math.max(1, tier1to6);
+        long respaldo = 65536L * (1L << (tier - 1));
+
         List<Integer> caps = cfg.getIntegerList("cells.capacities");
-        int idx = Math.clamp(tier1to6 - 1, 0, caps.size() - 1);
-        return idx >= 0 && !caps.isEmpty() ? caps.get(idx) : 65536L * (1L << idx);
+        if (caps.isEmpty()) {
+            return respaldo;
+        }
+        if (tier > caps.size()) {
+            avisarNivelSinCapacidad(tier, caps.size());
+            return caps.get(caps.size() - 1);
+        }
+        return caps.get(tier - 1);
+    }
+
+    private static final java.util.Set<Integer> NIVELES_AVISADOS = new java.util.HashSet<>();
+
+    private static void avisarNivelSinCapacidad(int tier, int declaradas) {
+        if (!NIVELES_AVISADOS.add(tier)) {
+            return;
+        }
+        String mensaje = "[MultiverseNets] La celda de nivel " + tier
+                + " no tiene capacidad en cells.capacities, que solo declara " + declaradas
+                + ". Se usa la del ultimo nivel.";
+        // Bukkit.getLogger() explota sin servidor arrancado, y este metodo tambien corre en las
+        // pruebas. Se cae a un logger normal en vez de arrastrar el fallo hasta el test.
+        if (org.bukkit.Bukkit.getServer() == null) {
+            java.util.logging.Logger.getLogger("MultiverseNets").warning(mensaje);
+        } else {
+            org.bukkit.Bukkit.getLogger().warning(mensaje);
+        }
     }
 
     public static boolean debug() {
