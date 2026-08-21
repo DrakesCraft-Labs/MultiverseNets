@@ -5,6 +5,9 @@ api-version: '1.21'
 authors: [Chagui68]
 description: Standalone digital logistics networks and massive storage, no Slimefun.
 website: https://github.com/DrakesCraft-Labs
+# Blanda a proposito: el plugin funciona sin Slimefun. Si esta, se pide que cargue antes para
+# que su registro de bloques este listo cuando el ticker empiece a mover items.
+softdepend: [Slimefun]
 
 commands:
   mvnets:

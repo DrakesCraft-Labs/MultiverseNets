@@ -35,6 +35,9 @@ public final class MultiverseNets extends JavaPlugin {
 
         Keys.init(this);
         Settings.refresh(this);
+        // Se resuelve una sola vez y antes de que arranque el ticker: si Slimefun esta, los
+        // grabbers y pushers podran hablar con sus maquinas; si no, el puente queda inerte.
+        com.chagui68.multiversenets.compat.SlimefunBridge.init(getLogger());
         Items.registerRecipes(this);
         NodeStore.init(this);
 

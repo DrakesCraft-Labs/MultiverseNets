@@ -134,6 +134,14 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
         }
         var manager = plugin.networks();
         manager.rescanAll();
+
+        // Lo primero que se pregunta cuando un pusher "no hace nada" contra una maquina de
+        // Slimefun es si la integracion llego a activarse. Mejor decirlo aqui que adivinarlo.
+        boolean sf = com.chagui68.multiversenets.compat.SlimefunBridge.disponible();
+        sender.sendMessage(Text.msg("Slimefun: " + (sf ? "conectado (grabbers y pushers "
+                + "pueden usar sus maquinas)" : "no disponible (solo contenedores de vanilla)"),
+                sf ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
+
         sender.sendMessage(Text.msg("Diagnosing " + manager.all().size() + " network(s):", NamedTextColor.AQUA));
         for (Network net : manager.all()) {
             long cells = net.nodes().values().stream().filter(DeviceType::isCell).count();

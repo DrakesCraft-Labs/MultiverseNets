@@ -1,6 +1,7 @@
 package com.chagui68.multiversenets.net;
 
 import com.chagui68.multiversenets.MultiverseNets;
+import com.chagui68.multiversenets.compat.SlimefunBridge;
 import com.chagui68.multiversenets.craft.CraftingSupport;
 import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.persist.NodeBlob;
@@ -83,18 +84,31 @@ public class NetworkTicker {
         var pred = NetworkManager.filterPredicate(blob);
         for (BlockFace face : FACES) {
             Block target = net.block(pos).getRelative(face);
-            if (!(target.getState() instanceof InventoryHolder holder)) {
+
+            if (target.getState() instanceof InventoryHolder holder) {
+                Inventory inv = holder.getInventory();
+                ItemStack extracted = NetworkManager.extractFirst(inv, pred, rate);
+                if (extracted == null) {
+                    continue;
+                }
+                int leftover = net.storage().deposit(extracted);
+                if (leftover > 0) {
+                    extracted.setAmount(leftover);
+                    NetworkManager.insertInto(inv, extracted);
+                }
+                return;
+            }
+
+            // Una maquina de Slimefun no es InventoryHolder: su inventario vive en un BlockMenu
+            // aparte. Sin esta rama, la red ve una fundidora electrica como un bloque cualquiera.
+            ItemStack sacado = SlimefunBridge.extraer(target, pred, rate);
+            if (sacado == null) {
                 continue;
             }
-            Inventory inv = holder.getInventory();
-            ItemStack extracted = NetworkManager.extractFirst(inv, pred, rate);
-            if (extracted == null) {
-                continue;
-            }
-            int leftover = net.storage().deposit(extracted);
-            if (leftover > 0) {
-                extracted.setAmount(leftover);
-                NetworkManager.insertInto(inv, extracted);
+            int sobra = net.storage().deposit(sacado);
+            if (sobra > 0) {
+                sacado.setAmount(sobra);
+                SlimefunBridge.insertar(target, sacado);
             }
             return;
         }
@@ -112,12 +126,27 @@ public class NetworkTicker {
         }
         for (BlockFace face : FACES) {
             Block target = net.block(pos).getRelative(face);
-            if (!(target.getState() instanceof InventoryHolder holder)) {
+
+            if (target.getState() instanceof InventoryHolder holder) {
+                int leftover = NetworkManager.insertInto(holder.getInventory(), stack);
+                if (leftover > 0) {
+                    stack.setAmount(leftover);
+                    net.storage().deposit(stack);
+                }
+                return;
+            }
+
+            // Slimefun: se le entrega solo a los huecos que la propia maquina declara de entrada,
+            // no a cualquiera. Meter carbon en la salida de una fundidora la atasca.
+            if (!SlimefunBridge.esMaquina(target)) {
                 continue;
             }
-            int leftover = NetworkManager.insertInto(holder.getInventory(), stack);
-            if (leftover > 0) {
-                stack.setAmount(leftover);
+            int noCupo = SlimefunBridge.insertar(target, stack);
+            if (noCupo >= stack.getAmount()) {
+                continue;
+            }
+            if (noCupo > 0) {
+                stack.setAmount(noCupo);
                 net.storage().deposit(stack);
             }
             return;

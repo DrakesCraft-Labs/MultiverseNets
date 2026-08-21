@@ -94,6 +94,25 @@ Alias: `/mvn`
 5. **Encoder**: click con el resultado en mano → Blueprint → click sobre un Auto-Crafteador para instalarlo.
 6. **Receptor**: shift+click con el ítem del receptor sobre un Transmisor, colócalo en otra base y ábrelo.
 
+## 🔗 Integración con Slimefun (opcional)
+
+MultiverseNets **no depende de Slimefun** y funciona entero sin él. Pero si está instalado, lo
+detecta al arrancar y los **Grabbers, Pushers y Auto-Crafteadores pueden trabajar con máquinas de
+Slimefun** igual que con un cofre: sacar el producto de una fundidora eléctrica, alimentar un
+horno de arco, vaciar un cosechador.
+
+Detalles que importan:
+
+* **No añade dependencia.** Todo se resuelve por reflexión al arrancar. Sin Slimefun, el puente
+  queda inerte y el resto del plugin no se entera.
+* **Sirve para ambos Slimefun.** Reconoce el fork repaquetado de DrakesCraft y el original de
+  thebusybiscuit, así que el mismo jar vale en los dos.
+* **Respeta el diseño de cada máquina.** Se usan sólo los huecos que la propia máquina declara
+  para entrada y salida, no todos los del menú. Meter carbón en la ranura de salida de una
+  fundidora la atasca, y sacar de la entrada le roba lo que estaba procesando.
+
+Para comprobar si la integración está activa: `/mvnets doctor` lo dice en la primera línea.
+
 ## 🔍 En qué se diferencia de Networks
 
 MultiverseNets no es un recorte de Networks: resuelve el mismo problema con otra arquitectura, y
