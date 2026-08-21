@@ -195,6 +195,17 @@ public final class Items {
             r.setIngredient('R', Material.REDSTONE);
             r.setIngredient('H', Material.HOPPER);
         });
+        shaped(plugin, "purger", create(DeviceType.PURGER), r -> {
+            r.shape("ILI", "LHL", "ILI");
+            r.setIngredient('I', Material.IRON_INGOT);
+            r.setIngredient('L', Material.LAVA_BUCKET);
+            r.setIngredient('H', Material.HOPPER);
+        });
+        shaped(plugin, "probe", create(DeviceType.PROBE), r -> {
+            r.shape(" A ", "ASA", " A ");
+            r.setIngredient('A', Material.AMETHYST_SHARD);
+            r.setIngredient('S', Material.SPYGLASS);
+        });
         shaped(plugin, "crafter", create(DeviceType.CRAFTER), r -> {
             r.shape("RCR", "ITI", "RCR");
             r.setIngredient('R', Material.REDSTONE);

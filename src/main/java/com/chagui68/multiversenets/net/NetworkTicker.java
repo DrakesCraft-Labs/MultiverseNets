@@ -70,6 +70,7 @@ public class NetworkTicker {
         net.forEach(DeviceType.PUSHER, (pos, type) -> pushOnce(net, pos, base));
         net.forEach(DeviceType.PUSHER_HT, (pos, type) -> pushOnce(net, pos, ht));
         net.forEach(DeviceType.GREEDY_CELL, (pos, type) -> greedyTick(net, pos));
+        net.forEach(DeviceType.PURGER, (pos, type) -> purgeOnce(net, pos, base));
     }
 
     private NodeBlob blobOf(Network net, long pos) {
@@ -152,6 +153,30 @@ public class NetworkTicker {
             return;
         }
         net.storage().deposit(stack);
+    }
+
+    /**
+     * Saca de la red lo que case con el filtro del purgador y lo descarta.
+     *
+     * Sin esto una red se atasca sola: cualquier maquina que genere un residuo acaba llenando las
+     * celdas y bloqueando lo que si interesa.
+     *
+     * Sin filtro configurado NO hace nada, a proposito. Un purgador que por defecto se lo comiera
+     * todo seria una trituradora de inventarios esperando a que alguien lo coloque sin mirar.
+     */
+    private void purgeOnce(Network net, long pos, int rate) {
+        NodeBlob blob = blobOf(net, pos);
+        if (blob == null || blob.filterMaterials.isEmpty()) {
+            return;
+        }
+        var pred = NetworkManager.filterPredicate(blob);
+        ItemStack sacado = net.storage().withdraw(pred, rate);
+        // withdraw ya lo saco del almacen; no devolverlo es justamente descartarlo.
+        if (sacado != null && Settings.debug()) {
+            plugin.getLogger().info("[Purger] descartadas " + sacado.getAmount() + " de "
+                    + sacado.getType() + " en " + PosUtil.unpackX(pos) + ","
+                    + PosUtil.unpackY(pos) + "," + PosUtil.unpackZ(pos));
+        }
     }
 
     private void greedyTick(Network net, long pos) {

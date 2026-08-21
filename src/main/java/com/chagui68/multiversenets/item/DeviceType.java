@@ -20,6 +20,25 @@ public enum DeviceType {
     PUSHER(Material.TARGET, "Exporter (Pusher)", true, -1),
     PUSHER_HT(Material.PISTON, "HT Exporter (Pusher)", true, -1),
     VACUUM(Material.SPONGE, "Vacuum Catcher", true, -1),
+
+    /*
+     * Purgador. Descarta de la red lo que case con su filtro.
+     *
+     * Sin algo asi una red se atasca sola: cualquier maquina que genere un residuo --grava del
+     * cuarzo, semillas de una cosechadora-- acaba llenando las celdas y bloqueando lo que si
+     * interesa. Networks lo resolvia con dos items distintos, TRASH y PURGER; aqui basta uno,
+     * porque el filtro ya decide que se va.
+     */
+    PURGER(Material.LAVA_BUCKET, "Network Purger", true, -1),
+
+    /*
+     * Sonda. Clic derecho a un bloque y dice de que red es y que tipo tiene.
+     *
+     * /mvnets doctor resume la salud de todas las redes, pero no responde la pregunta que uno se
+     * hace de pie delante de una maquina que no trabaja: "esta esto conectado a algo?". Eso es lo
+     * que contesta la sonda, y es la diferencia entre diagnosticar y adivinar.
+     */
+    PROBE(Material.SPYGLASS, "Network Probe", false, -1),
     CRAFTER(Material.CRAFTING_TABLE, "Auto-Crafter", true, -1),
     ENCODER(Material.SMITHING_TABLE, "Recipe Encoder", true, -1),
     CRAFTING_GRID(Material.CARTOGRAPHY_TABLE, "Crafting Grid", true, -1),
@@ -62,7 +81,7 @@ public enum DeviceType {
 
     public boolean filterable() {
         return switch (this) {
-            case GRABBER, GRABBER_HT, PUSHER, PUSHER_HT, VACUUM, GREEDY_CELL -> true;
+            case GRABBER, GRABBER_HT, PUSHER, PUSHER_HT, VACUUM, GREEDY_CELL, PURGER -> true;
             default -> false;
         };
     }

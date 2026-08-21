@@ -14,6 +14,7 @@ import com.chagui68.multiversenets.net.Network;
 import com.chagui68.multiversenets.net.NetworkManager;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
+import com.chagui68.multiversenets.util.PosUtil;
 import com.chagui68.multiversenets.util.Text;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
@@ -125,6 +126,14 @@ public class BlockListener implements Listener {
             useWirelessInAir(event);
             return;
         }
+        // La sonda se atiende antes de exigir que el bloque sea un nodo: su utilidad esta
+        // precisamente en decirte que NO lo es cuando creias que si.
+        if (Items.typeOf(event.getItem()) == DeviceType.PROBE) {
+            event.setCancelled(true);
+            sondear(event.getPlayer(), block);
+            return;
+        }
+
         NodeBlob blob = NodeStore.get(block);
         if (blob == null) {
             return;
@@ -200,6 +209,41 @@ public class BlockListener implements Listener {
             return;
         }
         new TerminalMenu(plugin, player, net).openMenu();
+    }
+
+    /**
+     * Dice de que red es un bloque, o que no es nada.
+     *
+     * /mvnets doctor resume la salud de todas las redes; esto responde la pregunta concreta que
+     * uno se hace de pie delante de una maquina parada: "esta esto conectado a algo?". Un nodo
+     * que existe pero no pertenece a ninguna red es exactamente el sintoma que en Networks se
+     * reportaba como "lo tengo todo conectado y no saca".
+     */
+    private void sondear(Player player, Block block) {
+        NodeBlob blob = NodeStore.get(block);
+        if (blob == null) {
+            player.sendMessage(Text.msg("Aqui no hay ningun dispositivo de red.", NamedTextColor.GRAY));
+            return;
+        }
+        DeviceType type = DeviceType.parse(blob.typeName);
+        String nombre = type == null ? blob.typeName : type.display();
+
+        Network red = plugin.networks().networkAt(block);
+        if (red == null) {
+            player.sendMessage(Text.msg(nombre + ": SIN RED. No lo alcanza ningun controlador.",
+                    NamedTextColor.RED));
+            player.sendMessage(Text.msg("Revisa que haya cables continuos hasta el controlador.",
+                    NamedTextColor.GRAY));
+            return;
+        }
+        player.sendMessage(Text.msg(nombre + " · red de " + red.size() + " nodo(s)",
+                NamedTextColor.GREEN));
+        player.sendMessage(Text.msg("Controlador en " + PosUtil.unpackX(red.controllerPos()) + ", "
+                + PosUtil.unpackY(red.controllerPos()) + ", " + PosUtil.unpackZ(red.controllerPos()),
+                NamedTextColor.GRAY));
+        if (red.error != null && !red.error.isBlank()) {
+            player.sendMessage(Text.msg("Aviso: " + red.error, NamedTextColor.YELLOW));
+        }
     }
 
     private void useWirelessInAir(PlayerInteractEvent event) {

@@ -94,6 +94,23 @@ Alias: `/mvn`
 5. **Encoder**: click con el resultado en mano → Blueprint → click sobre un Auto-Crafteador para instalarlo.
 6. **Receptor**: shift+click con el ítem del receptor sobre un Transmisor, colócalo en otra base y ábrelo.
 
+## 🧹 Traído de Networks
+
+Lo que las cuatro variantes de Networks tenían y aquí faltaba, escogido por utilidad real y no
+por completar la lista:
+
+* **Network Purger** — descarta de la red lo que case con su filtro. Sin algo así una red se
+  atasca sola: cualquier máquina que genere un residuo (grava del cuarzo, semillas de una
+  cosechadora) acaba llenando las celdas y bloqueando lo que sí interesa. Networks lo repartía
+  entre `TRASH` y `PURGER`; aquí basta uno porque el filtro ya decide qué se va.
+  **Sin filtro configurado no borra nada**, a propósito: un purgador que por defecto se lo comiera
+  todo sería una trituradora de inventarios esperando a que alguien lo coloque sin mirar.
+* **Network Probe** — clic derecho sobre un bloque y te dice a qué red pertenece, cuántos nodos
+  tiene y dónde está su controlador. `/mvnets doctor` resume la salud de todas las redes; la sonda
+  responde la pregunta concreta que uno se hace de pie delante de una máquina parada: *¿esto está
+  conectado a algo?*. Funciona también sobre bloques que **no** son nodos, que es justo cuando más
+  falta hace.
+
 ## 🔗 Integración con Slimefun (opcional)
 
 MultiverseNets **no depende de Slimefun** y funciona entero sin él. Pero si está instalado, lo
