@@ -94,6 +94,34 @@ Alias: `/mvn`
 5. **Encoder**: click con el resultado en mano → Blueprint → click sobre un Auto-Crafteador para instalarlo.
 6. **Receptor**: shift+click con el ítem del receptor sobre un Transmisor, colócalo en otra base y ábrelo.
 
+## 🤝 Convivencia con Networks
+
+**Los dos plugins pueden estar instalados a la vez.** No se pisan en nada:
+
+| | MultiverseNets | NetworksV6-Drake |
+|---|---|---|
+| Nombre del plugin | `MultiverseNets` | `NetworksV6-Drake` |
+| Clase principal | `com.chagui68.multiversenets.…` | `io.github.sefiraat.networks.…` |
+| Comando | `/mvnets` (alias `/mvn`) | `/networks` |
+| Permisos | `multiversenets.*` | `networks.*` |
+| Ítems | propios, por PDC, con recetas de vanilla | de Slimefun (`NTW_*`) |
+
+Networks no registra ninguna receta de vanilla —las suyas van por la mesa de Slimefun— así que
+las 20 de aquí tampoco chocan.
+
+Hay **cinco pruebas** que fijan esto (`ConvivenciaConNetworksTest`). No están por gusto: lo que
+rompe la convivencia no es el código sino los identificadores, y esos se cambian sin querer al
+renombrar algo.
+
+**Una interacción a tener en cuenta.** Con la integración de Slimefun activa, un Grabber de
+MultiverseNets puede sacar de un bloque de Networks, porque son ítems de Slimefun con su propio
+menú. Es interoperabilidad, no un fallo, pero si prefieres que cada red se ocupe solo de lo suyo:
+
+```yaml
+compat:
+  slimefun: false
+```
+
 ## 🧹 Traído de Networks
 
 Lo que las cuatro variantes de Networks tenían y aquí faltaba, escogido por utilidad real y no

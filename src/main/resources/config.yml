@@ -6,6 +6,16 @@
 debug: false
 language: en
 
+# Convivencia con otros plugins.
+compat:
+  # Dejar que grabbers y pushers usen maquinas de Slimefun.
+  #
+  # Ponlo en false si tienes Networks (u otro plugin de logistica) instalado a la vez y prefieres
+  # que cada red se ocupe solo de lo suyo. Los bloques de Networks son items de Slimefun con su
+  # propio menu, asi que con esto en true un grabber de MultiverseNets puede sacar de un
+  # almacenamiento de Networks. Es interoperabilidad, no un fallo, pero conviene poder apagarla.
+  slimefun: true
+
 network:
   # How often (in ticks) each network topology is rescanned.
   scan-interval-ticks: 20

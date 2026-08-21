@@ -57,6 +57,10 @@ public final class SlimefunBridge {
 
     /** Resuelve la API de Slimefun una sola vez. Sin el plugin instalado no hace nada. */
     public static void init(Logger log) {
+        if (!com.chagui68.multiversenets.util.Settings.compatSlimefun()) {
+            log.info("[Compat] Integracion con Slimefun desactivada en el config (compat.slimefun).");
+            return;
+        }
         if (Bukkit.getPluginManager().getPlugin("Slimefun") == null) {
             log.info("[Compat] Slimefun no esta instalado; la red trabajara solo con contenedores de vanilla.");
             return;

@@ -102,6 +102,11 @@ public final class Settings {
         }
     }
 
+    /** Si se permite a la red hablar con maquinas de Slimefun. Ver compat.slimefun en el config. */
+    public static boolean compatSlimefun() {
+        return cfg == null || cfg.getBoolean("compat.slimefun", true);
+    }
+
     public static boolean debug() {
         return cfg.getBoolean("debug", false);
     }
