@@ -10,6 +10,8 @@ public final class Keys {
     public static NamespacedKey RECEIVER_BIND;
     public static NamespacedKey BLUEPRINT_RECIPE;
     public static NamespacedKey CHUNK_HAS_NODES;
+    public static NamespacedKey TERMINAL_DISPLAY;
+    public static NamespacedKey CELL_CARGO;
 
     private Keys() {
     }
@@ -20,5 +22,7 @@ public final class Keys {
         RECEIVER_BIND = new NamespacedKey(plugin, "receiver_bind");
         BLUEPRINT_RECIPE = new NamespacedKey(plugin, "blueprint_recipe");
         CHUNK_HAS_NODES = new NamespacedKey(plugin, "chunk_has_nodes");
+        TERMINAL_DISPLAY = new NamespacedKey(plugin, "terminal_display");
+        CELL_CARGO = new NamespacedKey(plugin, "cell_cargo");
     }
 }

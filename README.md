@@ -47,7 +47,7 @@
 
 ### 🛡️ Fiabilidad
 * Protección contra pistones y explosiones sobre nodos.
-* Al romper una celda se devuelven los contenidos (hasta 8 stacks) y se avisa de pérdidas.
+* Al romper una celda su contenido viaja dentro del ítem (como en Networks): no se derrama nada y al recolocarla recupera su carga.
 * `/mvnets doctor` reescanea y diagnostica todas las redes.
 
 ## 🍳 Recetas
@@ -55,7 +55,7 @@
 | Dispositivo | Receta |
 |---|---|
 | Controlador | 8 bloques de hierro + estrella del Nether |
-| Cable x16 | 8 lana blanca + redstone |
+| Cable x16 | 8 vidrios + redstone |
 | Terminal | beacon + perlas ender + vidrio |
 | Celda T1 | 8 vidrios + diamante |
 | Celda Tn+1 | 8 diamantes + celda anterior |
@@ -89,7 +89,7 @@ Alias: `/mvn`
 
 1. Coloca un **Controlador**, rodea el área con **Cables** y conecta **Celdas**, **Grabbers/Pushers**, etc.
 2. Click derecho en el controlador o en una **Terminal** para abrir la Grid.
-3. En la terminal: click izquierdo retira un stack, deposita clicando tus objetos abajo, botón hopper deposita todo, brújula busca.
+3. En la terminal (mismas convenciones que la grilla de Networks): **izquierdo** saca 1 al cursor, **derecho** un stack, **shift+clic** manda al inventario; **shift+izquierdo** sobre tus items los inserta en la red, o déjalos en el **hueco de entrada** (esquina derecha) y la red los absorbe. Lupa/etiqueta busca (clic derecho limpia), botón azul cambia el orden, flechas paganinan.
 4. Shift+click con **Terminal Inalámbrico** sobre el controlador para vincularlo.
 5. **Encoder**: click con el resultado en mano → Blueprint → click sobre un Auto-Crafteador para instalarlo.
 6. **Receptor**: shift+click con el ítem del receptor sobre un Transmisor, colócalo en otra base y ábrelo.

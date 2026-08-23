@@ -5,15 +5,19 @@ import org.bukkit.Material;
 public enum DeviceType {
 
     CONTROLLER(Material.LODESTONE, "Network Controller", true, -1),
-    CABLE(Material.LIGHT_BLUE_WOOL, "Network Cable", true, -1),
+    CABLE(Material.GLASS, "Network Cable", true, -1),
     TERMINAL(Material.BEACON, "Network Terminal", true, -1),
     MONITOR(Material.RESPAWN_ANCHOR, "Network Monitor", true, -1),
-    CELL_T1(Material.GLOWSTONE, "Quantum Cell T1", true, 1),
-    CELL_T2(Material.SEA_LANTERN, "Quantum Cell T2", true, 2),
-    CELL_T3(Material.SHROOMLIGHT, "Quantum Cell T3", true, 3),
-    CELL_T4(Material.OCHRE_FROGLIGHT, "Quantum Cell T4", true, 4),
-    CELL_T5(Material.VERDANT_FROGLIGHT, "Quantum Cell T5", true, 5),
-    CELL_T6(Material.PEARLESCENT_FROGLIGHT, "Quantum Cell T6", true, 6),
+    /*
+     * Las celdas van en terracota, escalando de color por nivel: se distinguen de un vistazo
+     * entre si y no compiten con bloques luminosos que ya usan otras maquinas.
+     */
+    CELL_T1(Material.TERRACOTTA, "Quantum Cell T1", true, 1),
+    CELL_T2(Material.ORANGE_TERRACOTTA, "Quantum Cell T2", true, 2),
+    CELL_T3(Material.YELLOW_TERRACOTTA, "Quantum Cell T3", true, 3),
+    CELL_T4(Material.LIME_TERRACOTTA, "Quantum Cell T4", true, 4),
+    CELL_T5(Material.CYAN_TERRACOTTA, "Quantum Cell T5", true, 5),
+    CELL_T6(Material.PURPLE_TERRACOTTA, "Quantum Cell T6", true, 6),
     GREEDY_CELL(Material.SLIME_BLOCK, "Greedy Cell", true, -1),
     GRABBER(Material.OBSERVER, "Importer (Grabber)", true, -1),
     GRABBER_HT(Material.STICKY_PISTON, "HT Importer (Grabber)", true, -1),
@@ -28,8 +32,10 @@ public enum DeviceType {
      * cuarzo, semillas de una cosechadora-- acaba llenando las celdas y bloqueando lo que si
      * interesa. Networks lo resolvia con dos items distintos, TRASH y PURGER; aqui basta uno,
      * porque el filtro ya decide que se va.
+     *
+     * Es bloque y no item: nacio como LAVA_BUCKET y colocarlo vertia lava de verdad.
      */
-    PURGER(Material.LAVA_BUCKET, "Network Purger", true, -1),
+    PURGER(Material.MAGMA_BLOCK, "Network Purger", true, -1),
 
     /*
      * Sonda. Clic derecho a un bloque y dice de que red es y que tipo tiene.

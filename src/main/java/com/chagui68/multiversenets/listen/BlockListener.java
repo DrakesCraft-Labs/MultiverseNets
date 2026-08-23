@@ -14,9 +14,12 @@ import com.chagui68.multiversenets.net.Network;
 import com.chagui68.multiversenets.net.NetworkManager;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
+import com.chagui68.multiversenets.util.Keys;
 import com.chagui68.multiversenets.util.PosUtil;
 import com.chagui68.multiversenets.util.Text;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
@@ -33,6 +36,10 @@ import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataType;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class BlockListener implements Listener {
 
@@ -56,6 +63,8 @@ public class BlockListener implements Listener {
             return;
         }
         NodeStore.put(event.getBlockPlaced(), NodeBlob.create(type.name()));
+
+        restaurarCarga(event);
 
         if (type == DeviceType.RECEIVER) {
             NodeBlob blob = NodeStore.get(event.getBlockPlaced());
@@ -87,26 +96,7 @@ public class BlockListener implements Listener {
             return;
         }
         event.setDropItems(false);
-        block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), Items.create(type));
-
-        if (type.isCell() && blob.cellSample != null && blob.cellAmount > 0) {
-            long remaining = blob.cellAmount;
-            int stacks = 0;
-            while (remaining > 0 && stacks < 8) {
-                int amount = (int) Math.min(blob.cellSample.getMaxStackSize(), remaining);
-                ItemStack drop = blob.cellSample.clone();
-                drop.setAmount(amount);
-                block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), drop);
-                remaining -= amount;
-                stacks++;
-            }
-            if (remaining > 0) {
-                plugin.getLogger().warning("Cell broken with " + remaining + " unrecoverable items at "
-                        + block.getX() + "," + block.getY() + "," + block.getZ());
-                event.getPlayer().sendMessage(Text.msg("Lost "
-                        + Items.formatAmount(remaining) + " items from the cell.", NamedTextColor.RED));
-            }
-        }
+        block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), suelto(type, blob));
 
         NodeStore.remove(block);
         if (type == DeviceType.CONTROLLER) {
@@ -114,6 +104,58 @@ public class BlockListener implements Listener {
         } else {
             manager.invalidateNear(block);
         }
+    }
+
+    /**
+     * Lo que suelta romper un nodo. En las celdas con carga, mismo comportamiento que
+     * NetworkQuantumStorage.onBreak en Networks: el contenido viaja DENTRO del item de la celda
+     * y nada se derrama por el suelo.
+     */
+    private ItemStack suelto(DeviceType type, NodeBlob blob) {
+        ItemStack item = Items.create(type);
+        if (!type.isCell() || blob.cellSample == null || blob.cellAmount <= 0) {
+            return item;
+        }
+        var meta = item.getItemMeta();
+        try {
+            meta.getPersistentDataContainer().set(Keys.CELL_CARGO, PersistentDataType.STRING,
+                    NodeStore.encode(blob));
+        } catch (IllegalStateException error) {
+            plugin.getLogger().warning("Could not embed cell cargo: " + error.getMessage());
+            return Items.create(type);
+        }
+        List<Component> lore = new ArrayList<>();
+        if (meta.hasLore()) {
+            lore.addAll(meta.lore());
+        }
+        lore.add(Component.text("Cargo: " + Items.formatAmount(blob.cellAmount) + " x "
+                + blob.cellSample.getType().name(), NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
+        meta.lore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    /** Contraparte de {@link #suelto}: si la celda colocada trae carga embebida, se restaura. */
+    private void restaurarCarga(BlockPlaceEvent event) {
+        var meta = event.getItemInHand().getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        String data = meta.getPersistentDataContainer().get(Keys.CELL_CARGO, PersistentDataType.STRING);
+        if (data == null) {
+            return;
+        }
+        NodeBlob cargada = NodeStore.decode(data);
+        if (cargada == null || cargada.cellSample == null || cargada.cellAmount <= 0) {
+            return;
+        }
+        NodeBlob actual = NodeStore.get(event.getBlockPlaced());
+        if (actual == null) {
+            return;
+        }
+        actual.cellSample = cargada.cellSample;
+        actual.cellAmount = cargada.cellAmount;
+        NodeStore.put(event.getBlockPlaced(), actual);
     }
 
     @EventHandler(priority = EventPriority.LOWEST)

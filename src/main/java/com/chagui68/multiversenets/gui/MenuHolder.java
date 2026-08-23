@@ -42,4 +42,22 @@ public abstract class MenuHolder implements InventoryHolder {
     protected abstract void draw();
 
     protected abstract void click(InventoryClickEvent event);
+
+    /**
+     * Huecos del inventario superior que quedan bajo control vanilla (colocar y sacar de
+     * verdad), vacio si ninguno. La grilla usa uno de entrada y el almacen de celda usa entrada
+     * y salida, igual que un Quantum Storage de Networks.
+     */
+    protected java.util.Set<Integer> vanillaSlots() {
+        return java.util.Set.of();
+    }
+
+    /**
+     * Si los clics sobre el inventario propio se bloquean y derivan a {@link #click}. Los menus
+     * simples lo quieren; el terminal sigue a Networks: shift+izquierdo inserta y el resto pasa
+     * vanilla.
+     */
+    protected boolean cancelarClicsJugador() {
+        return true;
+    }
 }

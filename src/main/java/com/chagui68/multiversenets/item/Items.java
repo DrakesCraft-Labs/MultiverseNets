@@ -152,8 +152,8 @@ public final class Items {
             r.setIngredient('N', Material.NETHER_STAR);
         });
         shaped(plugin, "cable", stackOf(create(DeviceType.CABLE), 16), r -> {
-            r.shape("WWW", "WRW", "WWW");
-            r.setIngredient('W', Material.WHITE_WOOL);
+            r.shape("GGG", "GRG", "GGG");
+            r.setIngredient('G', Material.GLASS);
             r.setIngredient('R', Material.REDSTONE);
         });
         shaped(plugin, "terminal", create(DeviceType.TERMINAL), r -> {
@@ -198,7 +198,7 @@ public final class Items {
         shaped(plugin, "purger", create(DeviceType.PURGER), r -> {
             r.shape("ILI", "LHL", "ILI");
             r.setIngredient('I', Material.IRON_INGOT);
-            r.setIngredient('L', Material.LAVA_BUCKET);
+            r.setIngredient('L', Material.MAGMA_BLOCK);
             r.setIngredient('H', Material.HOPPER);
         });
         shaped(plugin, "probe", create(DeviceType.PROBE), r -> {
