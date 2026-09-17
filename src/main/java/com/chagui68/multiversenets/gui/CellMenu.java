@@ -23,28 +23,27 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Menú de Quantum Storage Cell de Networks:
+ * Menú de Quantum Storage Cell:
  *
- *   [ Input ][ENTRADA][ Input ][ Item ][DISPLAY][ Item ][ Output][SALIDA][ Output ]
- *   [ fondo ][ fondo ][ fondo ][ fondo ][ SET ITEM ][ fondo ][ fondo ][ DEPOSIT ][ EXTRACT ]
+ *   [ fondo ][ fondo ][ fondo ][ fondo ][DISPLAY][ fondo ][ fondo ][ fondo ][ fondo ]
+ *   [ fondo ][ fondo ][DEPOSIT][ fondo ][SET ITEM][ fondo ][EXTRACT][ fondo ][ fondo ]
  *
- *   - ENTRADA (1): hueco real para colocar ítems manualmente o con tolvas.
- *   - DISPLAY (4): ítem guardado; clic izquierdo retira 1, derecho 64, shift llena el inventario.
- *   - SALIDA (7): hueco real de salida.
- *   - SET ITEM (13): fija el tipo con el cursor cuando está vacía; shift alterna vaciado (void).
- *   - QUICK DEPOSIT (16): deposita automáticamente todos los ítems coincidentes del inventario.
- *   - QUICK EXTRACT (17): atajos rápidos para retirar ítems.
+ *   - DISPLAY (4): ítem guardado con monto y porcentaje; clic izquierdo saca 1, derecho 64, shift llena el inventario.
+ *   - SET ITEM (13): registra el tipo con el cursor cuando está vacía; shift alterna vaciado (void).
+ *   - QUICK DEPOSIT (11): deposita automáticamente todos los ítems coincidentes del inventario.
+ *   - QUICK EXTRACT (15): atajos rápidos para retirar ítems.
  */
 public class CellMenu extends MenuHolder {
 
-    public static final int INPUT_SLOT = 1;
     public static final int ITEM_SLOT = 4;
-    public static final int OUTPUT_SLOT = 7;
+    public static final int DEPOSIT_ALL_SLOT = 11;
     public static final int SET_SLOT = 13;
-    public static final int DEPOSIT_ALL_SLOT = 16;
-    public static final int EXTRACT_ALL_SLOT = 17;
+    public static final int EXTRACT_ALL_SLOT = 15;
 
-    private static final int[] FONDO_SLOTS = {9, 10, 11, 12, 14, 15};
+    private static final int[] BACKGROUND_SLOTS = {
+            0, 1, 2, 3, 5, 6, 7, 8,
+            9, 10, 12, 14, 16, 17
+    };
 
     private final Block block;
     private final DeviceType type;
@@ -62,25 +61,14 @@ public class CellMenu extends MenuHolder {
 
     @Override
     protected Set<Integer> vanillaSlots() {
-        return Set.of(INPUT_SLOT, OUTPUT_SLOT);
+        return Set.of();
     }
 
     @Override
     protected void draw() {
-        ItemStack entradaFondo = panel(Material.GREEN_STAINED_GLASS_PANE, "Input");
-        inv.setItem(0, entradaFondo);
-        inv.setItem(2, entradaFondo);
-
-        ItemStack itemFondo = panel(Material.BLUE_STAINED_GLASS_PANE, "Item Stored");
-        inv.setItem(3, itemFondo);
-        inv.setItem(5, itemFondo);
-
-        ItemStack salidaFondo = panel(Material.ORANGE_STAINED_GLASS_PANE, "Output");
-        inv.setItem(6, salidaFondo);
-        inv.setItem(8, salidaFondo);
-
-        for (int slot : FONDO_SLOTS) {
-            inv.setItem(slot, panel(Material.GRAY_STAINED_GLASS_PANE, " "));
+        ItemStack fondo = panel(Material.GRAY_STAINED_GLASS_PANE, " ");
+        for (int slot : BACKGROUND_SLOTS) {
+            inv.setItem(slot, fondo);
         }
 
         ItemStack setItem = new ItemStack(Material.LIME_STAINED_GLASS_PANE);
@@ -131,7 +119,9 @@ public class CellMenu extends MenuHolder {
                     .decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
                     Component.text("Capacity: " + Items.formatAmount(cap), NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                    Component.text("Stores a single item type", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
+                    Component.text("Stores a single item type", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.empty(),
+                    Component.text("Click with item on cursor to set", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false)));
             icono.setItemMeta(meta);
         } else {
             icono = blob.cellSample.clone();
@@ -188,7 +178,7 @@ public class CellMenu extends MenuHolder {
         // 1) Hueco SET_SLOT (13)
         if (raw == SET_SLOT) {
             if (event.getClick() == ClickType.SHIFT_LEFT || event.getClick() == ClickType.SHIFT_RIGHT) {
-                blob.filterBlacklist = !blob.filterBlacklist; // toggle void excess
+                blob.filterBlacklist = !blob.filterBlacklist;
                 NodeStore.put(block, blob);
                 player.sendMessage(Text.msg(blob.filterBlacklist
                         ? "Void excess items: ENABLED" : "Void excess items: DISABLED", NamedTextColor.GREEN));
@@ -210,14 +200,14 @@ public class CellMenu extends MenuHolder {
             return;
         }
 
-        // 2) Hueco QUICK DEPOSIT (16)
+        // 2) Hueco QUICK DEPOSIT (11)
         if (raw == DEPOSIT_ALL_SLOT) {
             realizarQuickDeposit(blob);
             actualizarDisplay();
             return;
         }
 
-        // 3) Hueco QUICK EXTRACT (17)
+        // 3) Hueco QUICK EXTRACT (15)
         if (raw == EXTRACT_ALL_SLOT) {
             realizarQuickExtract(blob, event.getClick());
             actualizarDisplay();
@@ -227,7 +217,6 @@ public class CellMenu extends MenuHolder {
         // 4) Hueco DISPLAY / ITEM_SLOT (4)
         if (raw == ITEM_SLOT) {
             if (blob.cellSample == null || blob.cellAmount <= 0) {
-                // Si la celda está vacía, hacer clic con un ítem en el cursor fija el tipo
                 ItemStack cursor = event.getView().getCursor();
                 if (cursor != null && !cursor.getType().isAir()) {
                     blob.cellSample = StackUtils.getAsQuantity(cursor, 1);
@@ -237,7 +226,6 @@ public class CellMenu extends MenuHolder {
                 }
                 return;
             }
-            // Retiro directo al hacer clic sobre el display
             ClickType click = event.getClick();
             if (click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT) {
                 extraerHaciaInventario(blob, Integer.MAX_VALUE);
@@ -374,7 +362,6 @@ public class CellMenu extends MenuHolder {
             cursor.setAmount(cursor.getAmount() + toTake);
             blob.cellAmount -= toTake;
         } else {
-            // Cursor lleno o incompatible: extraer directo al inventario
             extraerHaciaInventario(blob, want);
             return;
         }
@@ -388,28 +375,13 @@ public class CellMenu extends MenuHolder {
 
     @Override
     protected void onClose(InventoryCloseEvent event) {
-        NodeBlob blob = NodeStore.get(block);
-        // Absorber entrada y salida en la celda al cerrar; lo que no quepa se devuelve al jugador
-        for (int slot : new int[]{INPUT_SLOT, OUTPUT_SLOT}) {
-            ItemStack contenido = inv.getItem(slot);
-            if (contenido == null || contenido.getType().isAir()) {
-                continue;
-            }
-            inv.setItem(slot, null);
-            if (blob != null) {
-                absorberEnCelda(blob, contenido);
-            }
-            if (contenido.getAmount() > 0) {
-                devolverAlJugador(contenido);
-            }
-        }
+        // No hay slots físicos vanilla en el menú
     }
 
     private ItemStack panel(Material material, String nombre) {
         ItemStack item = new ItemStack(material);
         var meta = item.getItemMeta();
-        meta.displayName(Component.text(nombre, material == Material.LIME_STAINED_GLASS_PANE
-                ? NamedTextColor.GREEN : NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+        meta.displayName(Component.text(nombre, NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
         item.setItemMeta(meta);
         return item;
     }

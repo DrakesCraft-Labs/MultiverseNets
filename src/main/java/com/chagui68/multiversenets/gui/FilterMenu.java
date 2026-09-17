@@ -1,9 +1,13 @@
 package com.chagui68.multiversenets.gui;
 
 import com.chagui68.multiversenets.MultiverseNets;
+import com.chagui68.multiversenets.compat.SlimefunBridge;
 import com.chagui68.multiversenets.item.DeviceType;
+import com.chagui68.multiversenets.item.Items;
+import com.chagui68.multiversenets.net.NetworkManager;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
+import com.chagui68.multiversenets.util.StackUtils;
 import com.chagui68.multiversenets.util.Text;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -27,6 +31,7 @@ import java.util.List;
  *   - Hueco 17: botón de alternar modo Whitelist (Permitir solo) / Blacklist (Bloquear lista).
  *   - Hueco 25: botón para limpiar todos los filtros.
  *   - Hueco 26: guía explicativa.
+ *   - Soporta ítems custom (Quantum Cells, Slimefun, etc.) y vanilla.
  *   - Shift-click desde el inventario del jugador registra el ítem sin consumirlo.
  */
 public class FilterMenu extends MenuHolder {
@@ -54,7 +59,25 @@ public class FilterMenu extends MenuHolder {
 
     private NodeBlob blob() {
         NodeBlob blob = NodeStore.get(block);
-        return blob == null ? NodeBlob.create(type.name()) : blob;
+        if (blob == null) {
+            blob = NodeBlob.create(type.name());
+        }
+        if (blob.filterItems == null) {
+            blob.filterItems = new ArrayList<>();
+        }
+        if (blob.filterMaterials == null) {
+            blob.filterMaterials = new ArrayList<>();
+        }
+        // Sincronizar desde filterMaterials si filterItems está vacío
+        if (blob.filterItems.isEmpty() && !blob.filterMaterials.isEmpty()) {
+            for (String matName : blob.filterMaterials) {
+                Material mat = Material.matchMaterial(matName);
+                if (mat != null && mat.isItem()) {
+                    blob.filterItems.add(new ItemStack(mat));
+                }
+            }
+        }
+        return blob;
     }
 
     @Override
@@ -63,19 +86,21 @@ public class FilterMenu extends MenuHolder {
 
         // 1) Dibujar casillas de filtro (0..16)
         for (int i = 0; i < MAX_FILTER_SLOTS; i++) {
-            if (i < blob.filterMaterials.size()) {
-                String matName = blob.filterMaterials.get(i);
-                Material mat = Material.matchMaterial(matName);
-                if (mat != null && mat.isItem()) {
-                    ItemStack icon = new ItemStack(mat);
+            if (i < blob.filterItems.size()) {
+                ItemStack item = blob.filterItems.get(i);
+                if (item != null && !item.getType().isAir()) {
+                    ItemStack icon = item.clone();
+                    icon.setAmount(1);
                     var meta = icon.getItemMeta();
-                    meta.displayName(Component.text(mat.name(), NamedTextColor.AQUA)
-                            .decoration(TextDecoration.ITALIC, false));
-                    meta.lore(List.of(
-                            Component.empty(),
-                            Component.text("Left / Right Click: Remove from filter", NamedTextColor.RED)
-                                    .decoration(TextDecoration.ITALIC, false)));
-                    icon.setItemMeta(meta);
+                    if (meta != null) {
+                        List<Component> lore = meta.hasLore() && meta.lore() != null
+                                ? new ArrayList<>(meta.lore()) : new ArrayList<>();
+                        lore.add(Component.empty());
+                        lore.add(Component.text("Left / Right Click: Remove from filter", NamedTextColor.RED)
+                                .decoration(TextDecoration.ITALIC, false));
+                        meta.lore(lore);
+                        icon.setItemMeta(meta);
+                    }
                     inv.setItem(i, icon);
                     continue;
                 }
@@ -143,23 +168,13 @@ public class FilterMenu extends MenuHolder {
         int raw = event.getRawSlot();
         NodeBlob blob = blob();
 
-        // 1) Shift-click desde el inventario del jugador: añade el material al filtro sin consumirlo
+        // 1) Shift-click desde el inventario del jugador: añade el ítem al filtro sin consumirlo
         if (raw >= inv.getSize()) {
             ItemStack mover = event.getCurrentItem();
             if (mover == null || mover.getType().isAir()) {
                 return;
             }
-            String name = mover.getType().name();
-            if (!blob.filterMaterials.contains(name)) {
-                if (blob.filterMaterials.size() >= MAX_FILTER_SLOTS) {
-                    player.sendMessage(Text.msg("Filter is full (max " + MAX_FILTER_SLOTS + " items).", NamedTextColor.RED));
-                } else {
-                    blob.filterMaterials.add(name);
-                    NodeStore.put(block, blob);
-                    player.sendMessage(Text.msg("Added to filter: " + name, NamedTextColor.GREEN));
-                    draw();
-                }
-            }
+            addFilterItem(blob, mover);
             return;
         }
 
@@ -175,6 +190,7 @@ public class FilterMenu extends MenuHolder {
 
         // 3) Botón de Limpiar Filtro (Slot 25)
         if (raw == CLEAR_SLOT) {
+            blob.filterItems.clear();
             blob.filterMaterials.clear();
             NodeStore.put(block, blob);
             player.sendMessage(Text.msg("Filter cleared.", NamedTextColor.YELLOW));
@@ -190,38 +206,89 @@ public class FilterMenu extends MenuHolder {
 
         // 5) Clic en casillas de filtro (0..16)
         if (raw >= 0 && raw < MAX_FILTER_SLOTS) {
-            if (raw < blob.filterMaterials.size()) {
-                ItemStack cursor = event.getView().getCursor();
-                if (cursor != null && !cursor.getType().isAir()) {
-                    // Si tiene un ítem en cursor, reemplazar o registrar
-                    String name = cursor.getType().name();
-                    if (!blob.filterMaterials.contains(name)) {
-                        blob.filterMaterials.set(raw, name);
+            ItemStack cursor = event.getView().getCursor();
+            boolean hasCursor = cursor != null && !cursor.getType().isAir();
+
+            if (raw < blob.filterItems.size()) {
+                if (hasCursor) {
+                    if (isAlreadyInFilter(blob, cursor)) {
+                        player.sendMessage(Text.msg("This item is already registered in the filter.", NamedTextColor.YELLOW));
+                    } else {
+                        ItemStack template = StackUtils.getAsQuantity(cursor, 1);
+                        blob.filterItems.set(raw, template);
+                        if (raw < blob.filterMaterials.size()) {
+                            blob.filterMaterials.set(raw, template.getType().name());
+                        } else if (!blob.filterMaterials.contains(template.getType().name())) {
+                            blob.filterMaterials.add(template.getType().name());
+                        }
                         NodeStore.put(block, blob);
-                        player.sendMessage(Text.msg("Updated filter slot to: " + name, NamedTextColor.GREEN));
+                        player.sendMessage(Text.msg("Updated filter slot to: " + getItemDisplayName(template), NamedTextColor.GREEN));
                         draw();
                     }
                 } else {
-                    // Sin cursor: quitar el ítem
-                    String removed = blob.filterMaterials.remove(raw);
+                    ItemStack removed = blob.filterItems.remove(raw);
+                    if (raw < blob.filterMaterials.size()) {
+                        blob.filterMaterials.remove(raw);
+                    }
                     NodeStore.put(block, blob);
-                    player.sendMessage(Text.msg("Removed from filter: " + removed, NamedTextColor.YELLOW));
+                    player.sendMessage(Text.msg("Removed from filter: " + getItemDisplayName(removed), NamedTextColor.YELLOW));
                     draw();
                 }
             } else {
-                // Casilla vacía: si el jugador tiene un ítem en el cursor, registrarlo
-                ItemStack cursor = event.getView().getCursor();
-                if (cursor != null && !cursor.getType().isAir()) {
-                    String name = cursor.getType().name();
-                    if (!blob.filterMaterials.contains(name)) {
-                        blob.filterMaterials.add(name);
-                        NodeStore.put(block, blob);
-                        player.sendMessage(Text.msg("Added to filter: " + name, NamedTextColor.GREEN));
-                        draw();
-                    }
+                if (hasCursor) {
+                    addFilterItem(blob, cursor);
                 }
             }
         }
+    }
+
+    private boolean isAlreadyInFilter(NodeBlob blob, ItemStack item) {
+        if (blob.filterItems == null) {
+            return false;
+        }
+        for (ItemStack ft : blob.filterItems) {
+            if (ft != null && NetworkManager.matchesFilter(ft, item)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void addFilterItem(NodeBlob blob, ItemStack item) {
+        if (isAlreadyInFilter(blob, item)) {
+            player.sendMessage(Text.msg("This item is already registered in the filter.", NamedTextColor.YELLOW));
+            return;
+        }
+        if (blob.filterItems.size() >= MAX_FILTER_SLOTS) {
+            player.sendMessage(Text.msg("Filter is full (max " + MAX_FILTER_SLOTS + " items).", NamedTextColor.RED));
+            return;
+        }
+        ItemStack template = StackUtils.getAsQuantity(item, 1);
+        blob.filterItems.add(template);
+        if (!blob.filterMaterials.contains(template.getType().name())) {
+            blob.filterMaterials.add(template.getType().name());
+        }
+        NodeStore.put(block, blob);
+        player.sendMessage(Text.msg("Added to filter: " + getItemDisplayName(template), NamedTextColor.GREEN));
+        draw();
+    }
+
+    private String getItemDisplayName(ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return "Air";
+        }
+        DeviceType dev = Items.typeOf(item);
+        if (dev != null) {
+            return dev.display();
+        }
+        String sfId = SlimefunBridge.idDe(item);
+        if (sfId != null) {
+            return sfId;
+        }
+        if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
+            return item.getItemMeta().getDisplayName();
+        }
+        return item.getType().name();
     }
 
     private ItemStack panel(Material material, String nombre) {

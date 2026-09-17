@@ -24,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -91,17 +92,68 @@ class CellGuiTest {
     }
 
     @Test
-    void cerrarConItemsEnEntradaLosGuardaEnLaCelda() {
+    void quickDepositDepositaItemsDeInventarioEnCelda() {
         Block celda = colocarCelda(0, 64, 0, DeviceType.CELL_T1);
+        NodeBlob blob = NodeStore.get(celda);
+        blob.cellSample = new ItemStack(Material.COBBLESTONE);
+        blob.cellAmount = 0;
+        NodeStore.put(celda, blob);
+
+        player.getInventory().addItem(new ItemStack(Material.COBBLESTONE, 64));
         CellMenu menu = new CellMenu(plugin, player, celda, DeviceType.CELL_T1);
         menu.openMenu();
-        player.getOpenInventory().getTopInventory().setItem(1, new ItemStack(Material.COBBLESTONE, 64));
-        player.closeInventory();
 
+        // Clic en Quick Deposit (Slot 11)
+        InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
+                InventoryType.SlotType.CONTAINER, CellMenu.DEPOSIT_ALL_SLOT, ClickType.LEFT, InventoryAction.PICKUP_ALL);
+        server.getPluginManager().callEvent(click);
+
+        NodeBlob after = NodeStore.get(celda);
+        assertEquals(64, after.cellAmount, "Quick Deposit guarda los items del inventario en la celda");
+        assertFalse(player.getInventory().contains(Material.COBBLESTONE), "los items se retiran del inventario");
+    }
+
+    @Test
+    void storedItemSlotPermiteRetirarItems() {
+        Block celda = colocarCelda(0, 64, 0, DeviceType.CELL_T1);
         NodeBlob blob = NodeStore.get(celda);
-        assertNotNull(blob.cellSample);
-        assertEquals(Material.COBBLESTONE, blob.cellSample.getType());
-        assertEquals(64, blob.cellAmount, "cerrar la celda con items en la entrada los guarda");
+        blob.cellSample = new ItemStack(Material.DIAMOND);
+        blob.cellAmount = 100;
+        NodeStore.put(celda, blob);
+
+        CellMenu menu = new CellMenu(plugin, player, celda, DeviceType.CELL_T1);
+        menu.openMenu();
+
+        // Clic derecho en el item slot (Slot 4): saca 1 stack (64)
+        InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
+                InventoryType.SlotType.CONTAINER, CellMenu.ITEM_SLOT, ClickType.RIGHT, InventoryAction.PICKUP_ALL);
+        server.getPluginManager().callEvent(click);
+
+        NodeBlob after = NodeStore.get(celda);
+        assertEquals(36, after.cellAmount, "se sacaron 64 items de la celda");
+        assertNotNull(player.getItemOnCursor());
+        assertEquals(64, player.getItemOnCursor().getAmount());
+    }
+
+    @Test
+    void storedItemSlotShiftClickExtraeAlInventario() {
+        Block celda = colocarCelda(0, 64, 0, DeviceType.CELL_T1);
+        NodeBlob blob = NodeStore.get(celda);
+        blob.cellSample = new ItemStack(Material.EMERALD);
+        blob.cellAmount = 100;
+        NodeStore.put(celda, blob);
+
+        CellMenu menu = new CellMenu(plugin, player, celda, DeviceType.CELL_T1);
+        menu.openMenu();
+
+        // Shift-clic en el item slot (Slot 4): llena el inventario
+        InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
+                InventoryType.SlotType.CONTAINER, CellMenu.ITEM_SLOT, ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        server.getPluginManager().callEvent(click);
+
+        NodeBlob after = NodeStore.get(celda);
+        assertEquals(0, after.cellAmount, "se vaciaron los 100 items al inventario del jugador");
+        assertTrue(player.getInventory().contains(Material.EMERALD));
     }
 
     @Test

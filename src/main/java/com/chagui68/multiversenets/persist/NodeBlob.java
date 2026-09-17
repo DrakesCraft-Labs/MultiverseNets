@@ -21,6 +21,7 @@ public class NodeBlob implements Serializable {
     public ItemStack cellSample;
     public long cellAmount;
     public List<String> filterMaterials = new ArrayList<>();
+    public List<ItemStack> filterItems = new ArrayList<>();
     /** true = el filtro actua como blacklist; false (defecto) = whitelist. */
     public boolean filterBlacklist;
     public List<String> recipes = new ArrayList<>();

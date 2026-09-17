@@ -89,6 +89,9 @@ public final class NodeStore {
         if (blob.filterMaterials == null) {
             blob.filterMaterials = new ArrayList<>();
         }
+        if (blob.filterItems == null) {
+            blob.filterItems = new ArrayList<>();
+        }
         if (blob.recipes == null) {
             blob.recipes = new ArrayList<>();
         }

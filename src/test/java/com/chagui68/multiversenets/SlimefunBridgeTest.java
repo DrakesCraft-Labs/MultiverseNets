@@ -28,7 +28,9 @@ class SlimefunBridgeTest {
     @Test
     void consultarUnBloqueNuloNoLanza() {
         assertFalse(SlimefunBridge.esMaquina(null));
-        assertNull(SlimefunBridge.idDe(null));
+        assertNull(SlimefunBridge.idDe((org.bukkit.block.Block) null));
+        assertNull(SlimefunBridge.idDe((org.bukkit.inventory.ItemStack) null));
+        assertFalse(SlimefunBridge.esItemSlimefun(null));
     }
 
     @Test

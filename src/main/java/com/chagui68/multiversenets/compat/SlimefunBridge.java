@@ -125,6 +125,29 @@ public final class SlimefunBridge {
         }
     }
 
+    /** El id de Slimefun de un ItemStack, o null. Detecta tags PDC de Slimefun. */
+    public static String idDe(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return null;
+        }
+        var meta = item.getItemMeta();
+        var pdc = meta.getPersistentDataContainer();
+        for (org.bukkit.NamespacedKey key : pdc.getKeys()) {
+            if ("slimefun_item".equalsIgnoreCase(key.getKey())) {
+                String id = pdc.get(key, org.bukkit.persistence.PersistentDataType.STRING);
+                if (id != null && !id.isBlank()) {
+                    return id;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Devuelve true si el ItemStack es un ítem registrado de Slimefun. */
+    public static boolean esItemSlimefun(ItemStack item) {
+        return idDe(item) != null;
+    }
+
     private static Object menuDe(Block block) {
         if (!disponible || block == null) return null;
         try {

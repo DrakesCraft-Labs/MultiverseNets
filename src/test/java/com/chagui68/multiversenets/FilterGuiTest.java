@@ -143,4 +143,56 @@ class FilterGuiTest {
         assertFalse(click.isCancelled(),
                 "los clics sobre el inventario del jugador no se tocan (no mas GUI congelada)");
     }
+
+    @Test
+    void filtroDistingueQuantumCellDeTerracotaVanilla() {
+        ItemStack cellT1 = com.chagui68.multiversenets.item.Items.create(DeviceType.CELL_T1);
+        ItemStack vanillaTerracotta = new ItemStack(Material.CYAN_TERRACOTTA);
+
+        // Comprobar matcher con template de Quantum Cell T1
+        assertTrue(com.chagui68.multiversenets.net.NetworkManager.matchesFilter(cellT1, cellT1.clone()),
+                "Quantum Cell T1 debe coincidir consigo misma");
+        assertFalse(com.chagui68.multiversenets.net.NetworkManager.matchesFilter(cellT1, vanillaTerracotta),
+                "Quantum Cell T1 NO debe coincidir con terracota vanilla");
+
+        // Comprobar matcher con template de terracota vanilla
+        assertTrue(com.chagui68.multiversenets.net.NetworkManager.matchesFilter(vanillaTerracotta, vanillaTerracotta.clone()),
+                "Terracota vanilla debe coincidir con terracota vanilla");
+        assertFalse(com.chagui68.multiversenets.net.NetworkManager.matchesFilter(vanillaTerracotta, cellT1),
+                "Terracota vanilla NO debe coincidir con Quantum Cell T1");
+    }
+
+    @Test
+    void filtroRegistraItemsPersonalizadosConShiftClick() {
+        Block grabber = colocar(DeviceType.GRABBER);
+        ItemStack cellT1 = com.chagui68.multiversenets.item.Items.create(DeviceType.CELL_T1);
+        player.getInventory().setItem(0, cellT1);
+
+        new FilterMenu(plugin, player, grabber, DeviceType.GRABBER).openMenu();
+
+        InventoryClickEvent shift = new InventoryClickEvent(player.getOpenInventory(),
+                InventoryType.SlotType.CONTAINER, 27, ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        server.getPluginManager().callEvent(shift);
+
+        NodeBlob blob = NodeStore.get(grabber);
+        assertFalse(blob.filterItems.isEmpty(), "blob.filterItems debe registrar el item custom");
+        assertEquals(DeviceType.CELL_T1, com.chagui68.multiversenets.item.Items.typeOf(blob.filterItems.get(0)),
+                "el item registrado en filterItems debe ser CELL_T1");
+    }
+
+    @Test
+    void botonClearLimpiaTodosLosFiltros() {
+        Block pusher = colocar(DeviceType.PUSHER);
+        NodeBlob blob = NodeStore.get(pusher);
+        blob.filterItems.add(new ItemStack(Material.IRON_INGOT));
+        blob.filterMaterials.add("IRON_INGOT");
+        NodeStore.put(pusher, blob);
+
+        new FilterMenu(plugin, player, pusher, DeviceType.PUSHER).openMenu();
+        clickTop(FilterMenu.CLEAR_SLOT, ClickType.LEFT, InventoryAction.PICKUP_ALL);
+
+        NodeBlob after = NodeStore.get(pusher);
+        assertTrue(after.filterItems.isEmpty(), "clear debe vaciar filterItems");
+        assertTrue(after.filterMaterials.isEmpty(), "clear debe vaciar filterMaterials");
+    }
 }

@@ -1,11 +1,15 @@
 package com.chagui68.multiversenets.net;
 
 import com.chagui68.multiversenets.MultiverseNets;
+import com.chagui68.multiversenets.compat.SlimefunBridge;
 import com.chagui68.multiversenets.item.DeviceType;
+import com.chagui68.multiversenets.item.Items;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
 import com.chagui68.multiversenets.util.PosUtil;
+import com.chagui68.multiversenets.util.StackUtils;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -141,19 +145,91 @@ public class NetworkManager {
     }
 
     /**
-     * Filtro de un nodo. Sin materiales configuradas pasa todo; con materiales manda el modo:
-     * whitelist (defecto) deja pasar solo lo listado, blacklist lo excluye. Es la version barata
-     * (por material) del par filtro+modo de los dispositivos avanzados de NetworksV6.
+     * Filtro de un nodo. Reconoce ítems vanilla y custom IDs (MultiverseNets DeviceType, Slimefun, etc.).
+     * Whitelist (defecto): solo pasa lo listado. Blacklist: pasa todo excepto lo listado.
      */
     public static Predicate<ItemStack> filterPredicate(NodeBlob blob) {
-        if (blob.filterMaterials.isEmpty()) {
+        if (blob == null) {
             return item -> true;
         }
-        Set<String> mats = new HashSet<>();
-        for (String m : blob.filterMaterials) {
-            mats.add(m.toUpperCase(Locale.ROOT));
+        boolean hasItems = blob.filterItems != null && !blob.filterItems.isEmpty();
+        boolean hasMats = blob.filterMaterials != null && !blob.filterMaterials.isEmpty();
+
+        if (!hasItems && !hasMats) {
+            return item -> true;
         }
-        return item -> blob.filterBlacklist != mats.contains(item.getType().name());
+
+        return item -> {
+            if (item == null || item.getType().isAir()) {
+                return false;
+            }
+            boolean matched = false;
+
+            if (hasItems) {
+                for (ItemStack filterTemplate : blob.filterItems) {
+                    if (filterTemplate != null && !filterTemplate.getType().isAir() && matchesFilter(filterTemplate, item)) {
+                        matched = true;
+                        break;
+                    }
+                }
+            } else {
+                for (String entry : blob.filterMaterials) {
+                    if (matchesMaterialOrId(entry, item)) {
+                        matched = true;
+                        break;
+                    }
+                }
+            }
+
+            return blob.filterBlacklist != matched;
+        };
+    }
+
+    public static boolean matchesFilter(ItemStack filterTemplate, ItemStack candidate) {
+        if (filterTemplate == null || candidate == null) {
+            return filterTemplate == candidate;
+        }
+        // 1) Chequeo por DeviceType de MultiverseNets
+        DeviceType ftType = Items.typeOf(filterTemplate);
+        DeviceType cdType = Items.typeOf(candidate);
+        if (ftType != null || cdType != null) {
+            return ftType == cdType;
+        }
+
+        // 2) Chequeo por Slimefun Item ID
+        String ftSf = SlimefunBridge.idDe(filterTemplate);
+        String cdSf = SlimefunBridge.idDe(candidate);
+        if (ftSf != null || cdSf != null) {
+            return java.util.Objects.equals(ftSf, cdSf);
+        }
+
+        // 3) Chequeo por meta customizada / nombre visible
+        if (filterTemplate.hasItemMeta() && filterTemplate.getItemMeta().hasDisplayName()) {
+            return StackUtils.itemsMatch(filterTemplate, candidate, false);
+        }
+
+        // 4) Ítem estándar de vanilla: el material debe coincidir Y el candidato no debe ser un ítem custom con DeviceType o Slimefun
+        return candidate.getType() == filterTemplate.getType() && cdType == null && cdSf == null;
+    }
+
+    private static boolean matchesMaterialOrId(String entry, ItemStack candidate) {
+        if (entry == null || candidate == null) {
+            return false;
+        }
+        if (entry.startsWith("MULTIVERSENETS:")) {
+            String devName = entry.substring("MULTIVERSENETS:".length());
+            DeviceType candType = Items.typeOf(candidate);
+            return candType != null && candType.name().equalsIgnoreCase(devName);
+        }
+        if (entry.startsWith("SLIMEFUN:")) {
+            String sfId = entry.substring("SLIMEFUN:".length());
+            return sfId.equalsIgnoreCase(SlimefunBridge.idDe(candidate));
+        }
+        Material mat = Material.matchMaterial(entry);
+        if (mat != null) {
+            return candidate.getType() == mat && Items.typeOf(candidate) == null && !SlimefunBridge.esItemSlimefun(candidate);
+        }
+        return false;
     }
 
     public static ItemStack extractFirst(Inventory inv, Predicate<ItemStack> pred, int max) {
