@@ -35,6 +35,8 @@ public class NodeBlob implements Serializable {
     public int txX;
     public int txY;
     public int txZ;
+    /** Dirección seleccionada para Grabbers y Pushers (NORTH, SOUTH, EAST, WEST, UP, DOWN, o ALL / null). */
+    public String targetFace;
 
     public static NodeBlob create(String typeName) {
         NodeBlob blob = new NodeBlob();

@@ -129,6 +129,17 @@ public class NetworkTicker {
                 new Particle.DustOptions(Color.AQUA, 0.8f));
     }
 
+    private BlockFace[] facesFor(NodeBlob blob) {
+        if (blob != null && blob.targetFace != null && !blob.targetFace.equalsIgnoreCase("ALL")) {
+            try {
+                BlockFace single = BlockFace.valueOf(blob.targetFace.toUpperCase(java.util.Locale.ROOT));
+                return new BlockFace[]{single};
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return FACES;
+    }
+
     /**
      * Saca hasta {@code rate} unidades del contenedor adyacente y las mete en la red. Si la red
      * no las admite todas, el sobrante vuelve al origen; si el origen tampoco lo admite (alguien
@@ -141,7 +152,7 @@ public class NetworkTicker {
         }
         Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
         Block self = net.block(pos);
-        for (BlockFace face : FACES) {
+        for (BlockFace face : facesFor(blob)) {
             Block target = self.getRelative(face);
 
             if (target.getState() instanceof InventoryHolder holder) {
@@ -200,7 +211,7 @@ public class NetworkTicker {
             return;
         }
         Block self = net.block(pos);
-        for (BlockFace face : FACES) {
+        for (BlockFace face : facesFor(blob)) {
             Block target = self.getRelative(face);
 
             if (target.getState() instanceof InventoryHolder holder) {

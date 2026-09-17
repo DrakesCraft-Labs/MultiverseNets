@@ -195,4 +195,25 @@ class FilterGuiTest {
         assertTrue(after.filterItems.isEmpty(), "clear debe vaciar filterItems");
         assertTrue(after.filterMaterials.isEmpty(), "clear debe vaciar filterMaterials");
     }
+
+    @Test
+    void seleccionDeDireccionEstableceTargetFace() {
+        Block grabber = colocar(DeviceType.GRABBER);
+        // Colocar cofre al Norte
+        Block northBlock = world.getBlockAt(0, 64, -1);
+        northBlock.setType(Material.CHEST);
+
+        new FilterMenu(plugin, player, grabber, DeviceType.GRABBER).openMenu();
+
+        // Slot 20 corresponde a NORTH
+        clickTop(20, ClickType.LEFT, InventoryAction.PICKUP_ALL);
+
+        NodeBlob blob = NodeStore.get(grabber);
+        assertEquals("NORTH", blob.targetFace, "hacer clic en el slot de NORTH establece targetFace en NORTH");
+
+        // Slot 24 corresponde a ALL
+        clickTop(FilterMenu.ALL_DIRECTIONS_SLOT, ClickType.LEFT, InventoryAction.PICKUP_ALL);
+        NodeBlob blobAll = NodeStore.get(grabber);
+        assertEquals("ALL", blobAll.targetFace, "hacer clic en ALL establece targetFace en ALL");
+    }
 }

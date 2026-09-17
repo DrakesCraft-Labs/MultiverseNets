@@ -14,25 +14,27 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Menú de configuración de filtro intuitivo y amigable:
+ * Menú de configuración de filtro y selección direccional:
  *
  *   [Filtro 0..16] .................................................... [Modo: 17]
- *   [Fondo 18..24] ................................... [Clear: 25] [Help: 26]
+ *   [DOWN: 18] [UP: 19] [NORTH: 20] [SOUTH: 21] [WEST: 22] [EAST: 23] [ALL: 24] [Clear: 25] [Help: 26]
  *
  *   - Huecos 0..16: casillas de filtro con placeholders claros si están vacías.
  *   - Hueco 17: botón de alternar modo Whitelist (Permitir solo) / Blacklist (Bloquear lista).
+ *   - Huecos 18..24 (en Grabbers y Pushers): selección del bloque y cara adyacente específica (o ALL).
  *   - Hueco 25: botón para limpiar todos los filtros.
  *   - Hueco 26: guía explicativa.
- *   - Soporta ítems custom (Quantum Cells, Slimefun, etc.) y vanilla.
- *   - Shift-click desde el inventario del jugador registra el ítem sin consumirlo.
  */
 public class FilterMenu extends MenuHolder {
 
@@ -41,6 +43,11 @@ public class FilterMenu extends MenuHolder {
     public static final int HELP_SLOT = 26;
     public static final int MAX_FILTER_SLOTS = 17;
 
+    public static final int ALL_DIRECTIONS_SLOT = 24;
+    private static final int[] DIRECTION_SLOTS = {18, 19, 20, 21, 22, 23};
+    private static final BlockFace[] DIRECTION_FACES = {
+            BlockFace.DOWN, BlockFace.UP, BlockFace.NORTH, BlockFace.SOUTH, BlockFace.WEST, BlockFace.EAST
+    };
     private static final int[] BOTTOM_BORDER_SLOTS = {18, 19, 20, 21, 22, 23, 24};
 
     private final Block block;
@@ -53,7 +60,7 @@ public class FilterMenu extends MenuHolder {
     }
 
     public void openMenu() {
-        open(27, Component.text(type.display() + " - Filter", NamedTextColor.DARK_AQUA)
+        open(27, Component.text(type.display() + " - Filter & Target", NamedTextColor.DARK_AQUA)
                 .decoration(TextDecoration.ITALIC, false));
     }
 
@@ -132,10 +139,76 @@ public class FilterMenu extends MenuHolder {
         mode.setItemMeta(metaMode);
         inv.setItem(MODE_SLOT, mode);
 
-        // 3) Paneles de fondo inferiores (18..24)
-        ItemStack border = panel(Material.GRAY_STAINED_GLASS_PANE, " ");
-        for (int slot : BOTTOM_BORDER_SLOTS) {
-            inv.setItem(slot, border);
+        // 3) Fila inferior: Selección direccional de bloque (18..24) en Grabbers y Pushers
+        if (type.isDirectional()) {
+            for (int i = 0; i < DIRECTION_FACES.length; i++) {
+                BlockFace f = DIRECTION_FACES[i];
+                int slot = DIRECTION_SLOTS[i];
+                Block adj = block.getRelative(f);
+                boolean isSelected = blob.targetFace != null && blob.targetFace.equalsIgnoreCase(f.name());
+
+                ItemStack icon;
+                if (adj.getType().isItem() && !adj.getType().isAir()) {
+                    icon = new ItemStack(adj.getType());
+                } else {
+                    icon = new ItemStack(isSelected ? Material.LIME_STAINED_GLASS_PANE : Material.LIGHT_GRAY_STAINED_GLASS_PANE);
+                }
+                var meta = icon.getItemMeta();
+                if (meta != null) {
+                    meta.displayName(Component.text(f.name() + ": " + getBlockDescription(adj),
+                            isSelected ? NamedTextColor.GREEN : NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
+                    List<Component> lore = new ArrayList<>();
+                    lore.add(Component.text("Relative: " + f.name() + " (" + adj.getX() + ", " + adj.getY() + ", " + adj.getZ() + ")",
+                            NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+                    lore.add(Component.text("Block: " + adj.getType().name(), NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                    if (SlimefunBridge.esMaquina(adj)) {
+                        String sf = SlimefunBridge.idDe(adj);
+                        if (sf != null) {
+                            lore.add(Component.text("Machine: " + sf, NamedTextColor.LIGHT_PURPLE).decoration(TextDecoration.ITALIC, false));
+                        }
+                    }
+                    lore.add(Component.empty());
+                    if (isSelected) {
+                        lore.add(Component.text("● SELECTED TARGET (Only interacts with this block)", NamedTextColor.GREEN).decoration(TextDecoration.ITALIC, false));
+                        meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+                        meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+                    } else {
+                        lore.add(Component.text("Click to target ONLY this face / block", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+                    }
+                    meta.lore(lore);
+                    icon.setItemMeta(meta);
+                }
+                inv.setItem(slot, icon);
+            }
+
+            // Slot 24: ALL (Cualquier contenedor adyacente)
+            boolean isAllSelected = blob.targetFace == null || blob.targetFace.equalsIgnoreCase("ALL");
+            ItemStack allIcon = new ItemStack(isAllSelected ? Material.COMPASS : Material.RECOVERY_COMPASS);
+            var metaAll = allIcon.getItemMeta();
+            if (metaAll != null) {
+                metaAll.displayName(Component.text("Target: ALL (Any Adjacent Block)",
+                        isAllSelected ? NamedTextColor.GREEN : NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                List<Component> lore = new ArrayList<>();
+                lore.add(Component.text("Interacts with any connected container or machine.",
+                        NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.empty());
+                if (isAllSelected) {
+                    lore.add(Component.text("● CURRENTLY ACTIVE", NamedTextColor.GREEN).decoration(TextDecoration.ITALIC, false));
+                    metaAll.addEnchant(Enchantment.UNBREAKING, 1, true);
+                    metaAll.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+                } else {
+                    lore.add(Component.text("Click to allow interacting with all adjacent blocks.", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+                }
+                metaAll.lore(lore);
+                allIcon.setItemMeta(metaAll);
+            }
+            inv.setItem(ALL_DIRECTIONS_SLOT, allIcon);
+        } else {
+            // Paneles de fondo estándar para dispositivos no direccionales
+            ItemStack border = panel(Material.GRAY_STAINED_GLASS_PANE, " ");
+            for (int slot : BOTTOM_BORDER_SLOTS) {
+                inv.setItem(slot, border);
+            }
         }
 
         // 4) Botón de limpiar filtro (Slot 25)
@@ -152,12 +225,13 @@ public class FilterMenu extends MenuHolder {
         // 5) Botón de ayuda (Slot 26)
         ItemStack help = new ItemStack(Material.BOOK);
         var metaHelp = help.getItemMeta();
-        metaHelp.displayName(Component.text("How Filter Works", NamedTextColor.GOLD)
+        metaHelp.displayName(Component.text("How Filter & Targeting Works", NamedTextColor.GOLD)
                 .decoration(TextDecoration.ITALIC, false));
         metaHelp.lore(List.of(
                 Component.text("• Shift-Click an item in your inventory to register it.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
                 Component.text("• Click any registered item above to remove it.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
                 Component.text("• Toggle Whitelist / Blacklist with the mode button.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                Component.text("• Click adjacent blocks below to restrict direction (or ALL).", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
                 Component.text("• If filter is empty, Whitelist transfers everything.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
         help.setItemMeta(metaHelp);
         inv.setItem(HELP_SLOT, help);
@@ -188,7 +262,33 @@ public class FilterMenu extends MenuHolder {
             return;
         }
 
-        // 3) Botón de Limpiar Filtro (Slot 25)
+        // 3) Selección de Dirección / Bloque objetivo (Slots 18..24) en Grabbers y Pushers
+        if (type.isDirectional() && raw >= 18 && raw <= 24) {
+            if (raw == ALL_DIRECTIONS_SLOT) {
+                blob.targetFace = "ALL";
+                NodeStore.put(block, blob);
+                player.sendMessage(Text.msg("Target direction set to: ALL (Any adjacent container)", NamedTextColor.GREEN));
+                draw();
+                return;
+            }
+            for (int i = 0; i < DIRECTION_SLOTS.length; i++) {
+                if (DIRECTION_SLOTS[i] == raw) {
+                    BlockFace f = DIRECTION_FACES[i];
+                    if (blob.targetFace != null && blob.targetFace.equalsIgnoreCase(f.name())) {
+                        blob.targetFace = "ALL";
+                        player.sendMessage(Text.msg("Reset target direction to: ALL", NamedTextColor.YELLOW));
+                    } else {
+                        blob.targetFace = f.name();
+                        player.sendMessage(Text.msg("Target direction set to: " + f.name() + " (" + getBlockDescription(block.getRelative(f)) + ")", NamedTextColor.GREEN));
+                    }
+                    NodeStore.put(block, blob);
+                    draw();
+                    return;
+                }
+            }
+        }
+
+        // 4) Botón de Limpiar Filtro (Slot 25)
         if (raw == CLEAR_SLOT) {
             blob.filterItems.clear();
             blob.filterMaterials.clear();
@@ -198,13 +298,13 @@ public class FilterMenu extends MenuHolder {
             return;
         }
 
-        // 4) Botón de Ayuda (Slot 26)
+        // 5) Botón de Ayuda (Slot 26)
         if (raw == HELP_SLOT) {
             draw();
             return;
         }
 
-        // 5) Clic en casillas de filtro (0..16)
+        // 6) Clic en casillas de filtro (0..16)
         if (raw >= 0 && raw < MAX_FILTER_SLOTS) {
             ItemStack cursor = event.getView().getCursor();
             boolean hasCursor = cursor != null && !cursor.getType().isAir();
@@ -271,6 +371,19 @@ public class FilterMenu extends MenuHolder {
         NodeStore.put(block, blob);
         player.sendMessage(Text.msg("Added to filter: " + getItemDisplayName(template), NamedTextColor.GREEN));
         draw();
+    }
+
+    private String getBlockDescription(Block b) {
+        if (b == null || b.getType().isAir()) {
+            return "Air";
+        }
+        if (SlimefunBridge.esMaquina(b)) {
+            String sfId = SlimefunBridge.idDe(b);
+            if (sfId != null) {
+                return sfId;
+            }
+        }
+        return b.getType().name();
     }
 
     private String getItemDisplayName(ItemStack item) {

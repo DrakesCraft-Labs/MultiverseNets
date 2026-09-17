@@ -101,6 +101,10 @@ public enum DeviceType {
         return this == PUSHER || this == PUSHER_HT || this == GREEDY_CELL;
     }
 
+    public boolean isDirectional() {
+        return this == GRABBER || this == GRABBER_HT || this == PUSHER || this == PUSHER_HT;
+    }
+
     public static DeviceType parse(String name) {
         try {
             return valueOf(name.toUpperCase());

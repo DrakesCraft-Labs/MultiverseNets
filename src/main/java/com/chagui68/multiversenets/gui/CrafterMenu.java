@@ -8,7 +8,6 @@ import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.item.Items;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
-import com.chagui68.multiversenets.util.Settings;
 import com.chagui68.multiversenets.util.Text;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -24,20 +23,32 @@ import org.bukkit.inventory.Recipe;
 
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
- * Auto-Crafter: guarda blueprints (matriz real 3x3, como en el NetworkAutoCrafter de
- * NetworksV6) y claves de receta antiguas. En cada pasada del ticker intenta fabricar cada una
- * con extraccion atomica desde la red: todo o nada, sin consumos parciales.
+ * Menú amigable e intuitivo del Auto-Crafter:
  *
- * Click con un Blueprint en el cursor: se instala una COPIA de sus datos (el item no se traga;
- * el de Networks se quedaba fisicamente dentro del bloque, aqui basta con leerlo). Click sin
- * cursor sobre una entrada: la desinstala.
+ *   [Slot 0..17: Casillas de Blueprints / Recetas instaladas]
+ *   [Fondo 18..23] [Status: 24] [Clear: 25] [Help: 26]
+ *
+ *   - Slots 0..17: Muestran los Blueprints instalados con sus ingredientes y salidas; o placeholders claros si están vacíos.
+ *   - Shift-Click desde el inventario del jugador instala Blueprints sin consumirlos.
+ *   - Clic con Blueprint en cursor instala o reemplaza.
+ *   - Clic sin cursor sobre un Blueprint instalado lo desinstala.
+ *   - Slot 24: Estado y contador de recetas instaladas.
+ *   - Slot 25: Botón para limpiar todos los Blueprints instalados.
+ *   - Slot 26: Guía interactiva de funcionamiento.
  */
 public class CrafterMenu extends MenuHolder {
 
-    private static final int HINT_SLOT = 26;
+    public static final int MAX_BLUEPRINT_SLOTS = 18;
+    public static final int STATUS_SLOT = 24;
+    public static final int CLEAR_SLOT = 25;
+    public static final int HELP_SLOT = 26;
+
+    private static final int[] BOTTOM_BORDER_SLOTS = {18, 19, 20, 21, 22, 23};
 
     private final Block block;
 
@@ -47,137 +58,278 @@ public class CrafterMenu extends MenuHolder {
     }
 
     public void openMenu() {
-        open(27, Component.text(DeviceType.CRAFTER.display() + " (" + block.getX() + "," + block.getY()
-                + "," + block.getZ() + ")", NamedTextColor.DARK_AQUA).decoration(TextDecoration.ITALIC, false));
+        open(27, Component.text("Auto-Crafter", NamedTextColor.DARK_AQUA)
+                .decoration(TextDecoration.ITALIC, false));
     }
 
     private NodeBlob blob() {
         NodeBlob blob = NodeStore.get(block);
-        return blob == null ? NodeBlob.create(DeviceType.CRAFTER.name()) : blob;
+        if (blob == null) {
+            blob = NodeBlob.create(DeviceType.CRAFTER.name());
+        }
+        if (blob.blueprintData == null) {
+            blob.blueprintData = new ArrayList<>();
+        }
+        if (blob.recipes == null) {
+            blob.recipes = new ArrayList<>();
+        }
+        return blob;
     }
 
     @Override
     protected void draw() {
         NodeBlob blob = blob();
-        int slot = 0;
-        for (String b64 : blob.blueprintData) {
-            if (slot >= HINT_SLOT) {
-                break;
+        int totalInstalled = blob.blueprintData.size() + blob.recipes.size();
+
+        // 1) Dibujar casillas de Blueprints / Recetas (Slots 0..17)
+        for (int i = 0; i < MAX_BLUEPRINT_SLOTS; i++) {
+            if (i < blob.blueprintData.size()) {
+                String b64 = blob.blueprintData.get(i);
+                RecipeData data = Blueprints.decode(b64);
+                if (data != null && data.output != null) {
+                    ItemStack icon = data.output.clone();
+                    icon.setAmount(1);
+                    var meta = icon.getItemMeta();
+                    if (meta != null) {
+                        meta.displayName(Component.text("Blueprint: " + Blueprints.readableName(data.output),
+                                NamedTextColor.LIGHT_PURPLE).decoration(TextDecoration.ITALIC, false));
+                        List<Component> lore = new ArrayList<>();
+                        lore.add(Component.text("Installed Recipe", NamedTextColor.YELLOW)
+                                .decoration(TextDecoration.ITALIC, false));
+                        lore.addAll(summarizeInputs(data.inputs));
+                        lore.add(Component.empty());
+                        lore.add(Component.text("Output: " + data.output.getAmount() + "x "
+                                + Blueprints.readableName(data.output), NamedTextColor.AQUA)
+                                .decoration(TextDecoration.ITALIC, false));
+                        lore.add(Component.empty());
+                        lore.add(Component.text("Left / Right Click: Uninstall blueprint", NamedTextColor.RED)
+                                .decoration(TextDecoration.ITALIC, false));
+                        meta.lore(lore);
+                        icon.setItemMeta(meta);
+                    }
+                    inv.setItem(i, icon);
+                    continue;
+                }
+            } else if (i - blob.blueprintData.size() < blob.recipes.size()) {
+                String key = blob.recipes.get(i - blob.blueprintData.size());
+                Recipe recipe = CraftingSupport.find(key);
+                ItemStack icon = recipe == null ? new ItemStack(Material.BARRIER) : recipe.getResult().clone();
+                icon.setAmount(1);
+                var meta = icon.getItemMeta();
+                if (meta != null) {
+                    meta.displayName(Component.text("Recipe: " + key, NamedTextColor.WHITE)
+                            .decoration(TextDecoration.ITALIC, false));
+                    meta.lore(List.of(
+                            Component.empty(),
+                            Component.text("Left / Right Click: Remove recipe", NamedTextColor.RED)
+                                    .decoration(TextDecoration.ITALIC, false)));
+                    icon.setItemMeta(meta);
+                }
+                inv.setItem(i, icon);
+                continue;
             }
-            RecipeData data = Blueprints.decode(b64);
-            ItemStack icon = data == null || data.output == null
-                    ? new ItemStack(Material.BARRIER) : data.output.clone();
-            var meta = icon.getItemMeta();
-            meta.displayName(Component.text(
-                            data == null ? "Blueprint ilegible" : "Blueprint: " + Blueprints.readableName(data.output),
-                            NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false));
-            meta.lore(List.of(Component.text("Click to uninstall", NamedTextColor.DARK_GRAY)
-                    .decoration(TextDecoration.ITALIC, false)));
-            icon.setItemMeta(meta);
-            inv.setItem(slot++, icon);
+
+            // Hueco de Blueprint vacío
+            ItemStack emptySlot = new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE);
+            var metaEmpty = emptySlot.getItemMeta();
+            metaEmpty.displayName(Component.text("Empty Blueprint Slot", NamedTextColor.DARK_GRAY)
+                    .decoration(TextDecoration.ITALIC, false));
+            metaEmpty.lore(List.of(
+                    Component.text("Click with a Blueprint on cursor or", NamedTextColor.GRAY)
+                            .decoration(TextDecoration.ITALIC, false),
+                    Component.text("Shift-Click a Blueprint from inventory to install.", NamedTextColor.GRAY)
+                            .decoration(TextDecoration.ITALIC, false)));
+            emptySlot.setItemMeta(metaEmpty);
+            inv.setItem(i, emptySlot);
         }
-        for (String key : blob.recipes) {
-            if (slot >= HINT_SLOT) {
-                break;
-            }
-            Recipe recipe = CraftingSupport.find(key);
-            ItemStack icon = recipe == null ? new ItemStack(Material.BARRIER) : recipe.getResult().clone();
-            var meta = icon.getItemMeta();
-            meta.displayName(Component.text(key, NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false));
-            meta.lore(List.of(Component.text("Click to remove", NamedTextColor.DARK_GRAY)
-                    .decoration(TextDecoration.ITALIC, false)));
-            icon.setItemMeta(meta);
-            inv.setItem(slot++, icon);
+
+        // 2) Bordes inferiores (Slots 18..23)
+        ItemStack border = panel(Material.GRAY_STAINED_GLASS_PANE, " ");
+        for (int slot : BOTTOM_BORDER_SLOTS) {
+            inv.setItem(slot, border);
         }
-        ItemStack hint = new ItemStack(Material.PAPER);
-        var meta = hint.getItemMeta();
-        meta.displayName(Component.text("Recipes (" + (blob.blueprintData.size() + blob.recipes.size())
-                + "/" + Settings.maxBlueprints() + ")", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(
-                Component.text("Click with a Blueprint in cursor: install", NamedTextColor.GRAY)
+
+        // 3) Botón de Estado / Info (Slot 24)
+        ItemStack status = new ItemStack(Material.HOPPER);
+        var metaStatus = status.getItemMeta();
+        metaStatus.displayName(Component.text("Auto-Crafter Status", NamedTextColor.AQUA)
+                .decoration(TextDecoration.ITALIC, false));
+        metaStatus.lore(List.of(
+                Component.text("Installed Blueprints: " + totalInstalled + " / " + MAX_BLUEPRINT_SLOTS,
+                        NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false),
+                Component.empty(),
+                Component.text("Pulls ingredients automatically from network.", NamedTextColor.GRAY)
                         .decoration(TextDecoration.ITALIC, false),
-                Component.text("Click on an entry with empty cursor: remove", NamedTextColor.GRAY)
+                Component.text("Crafting operations are atomic and safe.", NamedTextColor.GRAY)
                         .decoration(TextDecoration.ITALIC, false)));
-        hint.setItemMeta(meta);
-        inv.setItem(HINT_SLOT, hint);
+        status.setItemMeta(metaStatus);
+        inv.setItem(STATUS_SLOT, status);
+
+        // 4) Botón de Limpiar todo (Slot 25)
+        ItemStack clear = new ItemStack(Material.BARRIER);
+        var metaClear = clear.getItemMeta();
+        metaClear.displayName(Component.text("Clear All Blueprints", NamedTextColor.RED)
+                .decoration(TextDecoration.ITALIC, false));
+        metaClear.lore(List.of(
+                Component.text("Click to remove all installed blueprints.", NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, false)));
+        clear.setItemMeta(metaClear);
+        inv.setItem(CLEAR_SLOT, clear);
+
+        // 5) Botón de Ayuda (Slot 26)
+        ItemStack help = new ItemStack(Material.BOOK);
+        var metaHelp = help.getItemMeta();
+        metaHelp.displayName(Component.text("How Auto-Crafter Works", NamedTextColor.GOLD)
+                .decoration(TextDecoration.ITALIC, false));
+        metaHelp.lore(List.of(
+                Component.text("• Encode recipes using the Blueprint Encoder.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                Component.text("• Shift-Click or place Blueprints here to install.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                Component.text("• The network crafts items automatically and stores output.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                Component.text("• Click any installed recipe above to uninstall it.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
+        help.setItemMeta(metaHelp);
+        inv.setItem(HELP_SLOT, help);
+    }
+
+    private List<Component> summarizeInputs(ItemStack[] inputs) {
+        List<Component> list = new ArrayList<>();
+        if (inputs == null) {
+            return list;
+        }
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (ItemStack in : inputs) {
+            if (in != null && !in.getType().isAir()) {
+                String name = Blueprints.readableName(in);
+                counts.put(name, counts.getOrDefault(name, 0) + in.getAmount());
+            }
+        }
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            list.add(Component.text("- " + entry.getValue() + "x " + entry.getKey(), NamedTextColor.GRAY)
+                    .decoration(TextDecoration.ITALIC, false));
+        }
+        return list;
     }
 
     @Override
     protected void click(InventoryClickEvent event) {
-        // Shift sobre un blueprint del inventario propio: lo instala sin tocar el item.
-        if (event.getClickedInventory() != inv) {
-            ItemStack mover = event.getCurrentItem();
-            RecipeData data = mover == null ? null : Blueprints.read(mover);
-            if (data == null) {
-                return;
-            }
-            NodeBlob blob = blob();
-            if (blob.blueprintData.size() + blob.recipes.size() >= Settings.maxBlueprints()) {
-                player.sendMessage(Text.msg("Recipe limit reached.", NamedTextColor.RED));
-                return;
-            }
-            String encoded = Blueprints.encode(data);
-            if (!blob.blueprintData.contains(encoded)) {
-                blob.blueprintData.add(encoded);
-                NodeStore.put(block, blob);
-                player.sendMessage(Text.msg("Blueprint installed: "
-                        + Blueprints.readableName(data.output), NamedTextColor.GREEN));
-            }
-            refresh();
-            return;
-        }
         int raw = event.getRawSlot();
-        if (raw == HINT_SLOT) {
-            refresh();
-            return;
-        }
         NodeBlob blob = blob();
-        ItemStack cursor = event.getCursor();
 
-        if (cursor != null && !cursor.getType().isAir()) {
-            RecipeData data = Blueprints.read(cursor);
-            String legacyKey = data == null ? Items.readBlueprint(cursor) : null;
-            if (data == null && legacyKey == null) {
-                legacyKey = findRecipeKeyByResult(cursor);
+        // 1) Shift-click desde el inventario del jugador hacia el Auto-Crafter
+        if (raw >= inv.getSize()) {
+            ItemStack mover = event.getCurrentItem();
+            if (mover == null || mover.getType().isAir()) {
+                return;
             }
-            if (data == null && legacyKey == null) {
-                player.sendMessage(Text.msg("That item is not a valid blueprint or recipe result.",
-                        NamedTextColor.RED));
+            RecipeData data = Blueprints.read(mover);
+            if (data == null) {
+                player.sendMessage(Text.msg("This item is not a Blueprint. Create one with the Blueprint Encoder.", NamedTextColor.YELLOW));
                 return;
             }
             int total = blob.blueprintData.size() + blob.recipes.size();
-            if (total >= Settings.maxBlueprints()) {
-                player.sendMessage(Text.msg("Recipe limit reached.", NamedTextColor.RED));
+            if (total >= MAX_BLUEPRINT_SLOTS) {
+                player.sendMessage(Text.msg("Auto-Crafter is full (max " + MAX_BLUEPRINT_SLOTS + " recipes).", NamedTextColor.RED));
                 return;
             }
-            if (data != null) {
-                String encoded = Blueprints.encode(data);
-                if (!blob.blueprintData.contains(encoded)) {
-                    blob.blueprintData.add(encoded);
-                    player.sendMessage(Text.msg("Blueprint installed: "
-                            + Blueprints.readableName(data.output), NamedTextColor.GREEN));
-                }
-            } else if (!blob.recipes.contains(legacyKey)) {
-                blob.recipes.add(legacyKey);
-                player.sendMessage(Text.msg("Recipe added.", NamedTextColor.GREEN));
+            String encoded = Blueprints.encode(data);
+            if (blob.blueprintData.contains(encoded)) {
+                player.sendMessage(Text.msg("This Blueprint is already installed.", NamedTextColor.YELLOW));
+                return;
             }
+            blob.blueprintData.add(encoded);
             NodeStore.put(block, blob);
-            refresh();
+            player.sendMessage(Text.msg("Blueprint installed: " + Blueprints.readableName(data.output), NamedTextColor.GREEN));
+            draw();
             return;
         }
 
-        // Sin cursor: click sobre una entrada la retira.
-        if (raw < 0 || raw >= HINT_SLOT) {
+        // 2) Botón de Limpiar Todo (Slot 25)
+        if (raw == CLEAR_SLOT) {
+            blob.blueprintData.clear();
+            blob.recipes.clear();
+            NodeStore.put(block, blob);
+            player.sendMessage(Text.msg("All blueprints cleared from Auto-Crafter.", NamedTextColor.YELLOW));
+            draw();
             return;
         }
-        int blueCount = blob.blueprintData.size();
-        if (raw < blueCount) {
-            blob.blueprintData.remove(raw);
-        } else if (raw - blueCount < blob.recipes.size()) {
-            blob.recipes.remove(raw - blueCount);
+
+        // 3) Botón de Estado o Ayuda (Slots 24, 26)
+        if (raw == STATUS_SLOT || raw == HELP_SLOT) {
+            draw();
+            return;
         }
-        NodeStore.put(block, blob);
-        refresh();
+
+        // 4) Clic en casillas de Blueprints (0..17)
+        if (raw >= 0 && raw < MAX_BLUEPRINT_SLOTS) {
+            ItemStack cursor = event.getView().getCursor();
+            boolean hasCursor = cursor != null && !cursor.getType().isAir();
+            int total = blob.blueprintData.size() + blob.recipes.size();
+
+            if (hasCursor) {
+                RecipeData data = Blueprints.read(cursor);
+                String legacyKey = data == null ? Items.readBlueprint(cursor) : null;
+                if (data == null && legacyKey == null) {
+                    legacyKey = findRecipeKeyByResult(cursor);
+                }
+                if (data == null && legacyKey == null) {
+                    player.sendMessage(Text.msg("Please insert a valid Blueprint (created with Blueprint Encoder).", NamedTextColor.RED));
+                    return;
+                }
+
+                if (raw < total) {
+                    // Reemplazar la receta existente en este hueco
+                    if (data != null) {
+                        String encoded = Blueprints.encode(data);
+                        if (raw < blob.blueprintData.size()) {
+                            blob.blueprintData.set(raw, encoded);
+                        } else {
+                            blob.blueprintData.add(encoded);
+                        }
+                        NodeStore.put(block, blob);
+                        player.sendMessage(Text.msg("Updated blueprint to: " + Blueprints.readableName(data.output), NamedTextColor.GREEN));
+                        draw();
+                    }
+                } else {
+                    // Instalar nueva receta
+                    if (total >= MAX_BLUEPRINT_SLOTS) {
+                        player.sendMessage(Text.msg("Auto-Crafter is full (max " + MAX_BLUEPRINT_SLOTS + " recipes).", NamedTextColor.RED));
+                        return;
+                    }
+                    if (data != null) {
+                        String encoded = Blueprints.encode(data);
+                        if (blob.blueprintData.contains(encoded)) {
+                            player.sendMessage(Text.msg("This Blueprint is already installed.", NamedTextColor.YELLOW));
+                            return;
+                        }
+                        blob.blueprintData.add(encoded);
+                        NodeStore.put(block, blob);
+                        player.sendMessage(Text.msg("Blueprint installed: " + Blueprints.readableName(data.output), NamedTextColor.GREEN));
+                        draw();
+                    } else if (legacyKey != null) {
+                        if (!blob.recipes.contains(legacyKey)) {
+                            blob.recipes.add(legacyKey);
+                            NodeStore.put(block, blob);
+                            player.sendMessage(Text.msg("Recipe added: " + legacyKey, NamedTextColor.GREEN));
+                            draw();
+                        }
+                    }
+                }
+            } else {
+                // Clic sin ítem en el cursor: desinstalar / retirar la receta en este hueco
+                if (raw < total) {
+                    if (raw < blob.blueprintData.size()) {
+                        String removedB64 = blob.blueprintData.remove(raw);
+                        RecipeData data = Blueprints.decode(removedB64);
+                        String name = data != null && data.output != null ? Blueprints.readableName(data.output) : "Blueprint";
+                        player.sendMessage(Text.msg("Uninstalled blueprint: " + name, NamedTextColor.YELLOW));
+                    } else {
+                        String removedKey = blob.recipes.remove(raw - blob.blueprintData.size());
+                        player.sendMessage(Text.msg("Removed recipe: " + removedKey, NamedTextColor.YELLOW));
+                    }
+                    NodeStore.put(block, blob);
+                    draw();
+                }
+            }
+        }
     }
 
     private String findRecipeKeyByResult(ItemStack sample) {
@@ -192,5 +344,13 @@ public class CrafterMenu extends MenuHolder {
             }
         }
         return null;
+    }
+
+    private ItemStack panel(Material material, String nombre) {
+        ItemStack item = new ItemStack(material);
+        var meta = item.getItemMeta();
+        meta.displayName(Component.text(nombre, NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+        item.setItemMeta(meta);
+        return item;
     }
 }

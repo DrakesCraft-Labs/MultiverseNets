@@ -310,4 +310,43 @@ class FlujosBloquesTest {
                 Action.RIGHT_CLICK_BLOCK, crayon, controller, BlockFace.NORTH, EquipmentSlot.HAND, null));
         assertFalse(NodeStore.get(controller).crayon, "segundo clic las apaga");
     }
+
+    @Test
+    void grabberConTargetFaceSoloExtraeDeLaCaraIndicada() {
+        Block ctrl = colocar(0, 64, 0, DeviceType.CONTROLLER);
+        plugin.networks().registerController(ctrl);
+        Block cell = colocar(1, 64, 0, DeviceType.CELL_T1);
+        plugin.networks().invalidateNear(cell);
+        Block grabber = colocar(0, 64, 1, DeviceType.GRABBER);
+        plugin.networks().invalidateNear(grabber);
+
+        // Cofre al Oeste del grabber (-1, 64, 1) con diamantes
+        Block westChest = world.getBlockAt(-1, 64, 1);
+        westChest.setType(Material.CHEST);
+        org.bukkit.block.Chest wChestState = (org.bukkit.block.Chest) westChest.getState();
+        wChestState.getInventory().addItem(new ItemStack(Material.DIAMOND, 10));
+
+        // Cofre al Sur del grabber (0, 64, 2) con esmeraldas
+        Block southChest = world.getBlockAt(0, 64, 2);
+        southChest.setType(Material.CHEST);
+        org.bukkit.block.Chest sChestState = (org.bukkit.block.Chest) southChest.getState();
+        sChestState.getInventory().addItem(new ItemStack(Material.EMERALD, 10));
+
+        // Fijar targetFace a "WEST"
+        NodeBlob blob = NodeStore.get(grabber);
+        blob.targetFace = "WEST";
+        NodeStore.put(grabber, blob);
+
+        // Tick del servidor para procesar transferencias
+        server.getScheduler().performOneTick();
+        server.getScheduler().performTicks(20);
+
+        Network net = plugin.networks().networkByController(ctrl.getLocation());
+        assertNotNull(net);
+        // Debe haber extraído diamante (Oeste) pero NO esmeralda (Sur)
+        assertEquals(10, net.storage().count(i -> i.getType() == Material.DIAMOND),
+                "debe extraer del cofre oeste seleccionado");
+        assertEquals(0, net.storage().count(i -> i.getType() == Material.EMERALD),
+                "NO debe tocar el cofre sur");
+    }
 }
