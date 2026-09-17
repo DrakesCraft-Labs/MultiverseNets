@@ -41,6 +41,11 @@ crafter:
 vacuum:
   radius: 4.0
 
+# Herramientas.
+rake:
+  # Usos de un Network Rake recien crafteado.
+  uses: 250
+
 cells:
   # Capacity per tier (T1..T6).
   capacities: [65536, 262144, 1048576, 16777216, 268435456, 2000000000]

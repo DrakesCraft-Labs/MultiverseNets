@@ -51,7 +51,17 @@ public enum DeviceType {
     TRANSMITTER(Material.CONDUIT, "Wireless Transmitter", true, -1),
     RECEIVER(Material.REDSTONE_LAMP, "Wireless Receiver", true, -1),
     WIRELESS_TERMINAL(Material.NETHER_STAR, "Wireless Terminal", false, -1),
-    BLUEPRINT(Material.BOOK, "Blueprint", false, -1);
+    BLUEPRINT(Material.BOOK, "Blueprint", false, -1),
+    /*
+     * Herramientas de mano traidas de NetworksV6. No se colocan: existen en el inventario.
+     *
+     * CONFIGURATOR copia y pega configuraciones entre dispositivos con filtro.
+     * RAKE desmonta nodos al instante con usos limitados (no controladores ni celdas cargadas).
+     * CRAYON marca una red para que sus maquinas echen particulas al trabajar.
+     */
+    CONFIGURATOR(Material.COMPARATOR, "Configuration Wrench", false, -1),
+    RAKE(Material.DEAD_BUSH, "Network Rake", false, -1),
+    CRAYON(Material.CYAN_DYE, "Network Crayon", false, -1);
 
     private final Material material;
     private final String display;
@@ -87,7 +97,7 @@ public enum DeviceType {
 
     public boolean filterable() {
         return switch (this) {
-            case GRABBER, GRABBER_HT, PUSHER, PUSHER_HT, VACUUM, GREEDY_CELL, PURGER -> true;
+            case GRABBER, GRABBER_HT, PUSHER, PUSHER_HT, VACUUM, GREEDY_CELL, PURGER, RECEIVER -> true;
             default -> false;
         };
     }

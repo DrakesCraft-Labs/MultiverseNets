@@ -2,6 +2,7 @@ package com.chagui68.multiversenets.item;
 
 import com.chagui68.multiversenets.MultiverseNets;
 import com.chagui68.multiversenets.util.Keys;
+import com.chagui68.multiversenets.util.Settings;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -47,6 +48,81 @@ public final class Items {
         String name = item.getItemMeta().getPersistentDataContainer()
                 .get(Keys.DEVICE_TYPE, PersistentDataType.STRING);
         return name == null ? null : DeviceType.parse(name);
+    }
+
+    // ---------------------------------------------------------------- herramientas
+
+    /** Un rake nuevo con todos sus usos. */
+    public static ItemStack rake() {
+        ItemStack item = create(DeviceType.RAKE);
+        var meta = item.getItemMeta();
+        meta.getPersistentDataContainer().set(Keys.RAKE_USES, PersistentDataType.INTEGER, Settings.rakeUses());
+        meta.lore(java.util.List.of(
+                Component.text("Right click a network node to remove it instantly.", NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, false),
+                Component.text(Settings.rakeUses() + " uses left", NamedTextColor.YELLOW)
+                        .decoration(TextDecoration.ITALIC, false)));
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    public static int rakeUses(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return 0;
+        }
+        Integer uses = item.getItemMeta().getPersistentDataContainer()
+                .get(Keys.RAKE_USES, PersistentDataType.INTEGER);
+        return uses == null ? 0 : uses;
+    }
+
+    /**
+     * Gasta un uso. Devuelve false cuando la herramienta se ha gastado del todo y hay que romperla.
+     */
+    public static boolean spendRakeUse(ItemStack item) {
+        int uses = rakeUses(item) - 1;
+        var meta = item.getItemMeta();
+        meta.getPersistentDataContainer().set(Keys.RAKE_USES, PersistentDataType.INTEGER, uses);
+        meta.lore(java.util.List.of(
+                Component.text("Right click a network node to remove it instantly.", NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, false),
+                Component.text(Math.max(0, uses) + " uses left", NamedTextColor.YELLOW)
+                        .decoration(TextDecoration.ITALIC, false)));
+        item.setItemMeta(meta);
+        return uses > 0;
+    }
+
+    /** Configuracion copiada en el wrench: "WL:MAT1,MAT2" o "BL:MAT1,MAT2". */
+    public static void saveConfig(ItemStack item, java.util.List<String> mats, boolean blacklist) {
+        var meta = item.getItemMeta();
+        meta.getPersistentDataContainer().set(Keys.CONFIG_DATA, PersistentDataType.STRING,
+                (blacklist ? "BL:" : "WL:") + String.join(",", mats));
+        meta.lore(java.util.List.of(
+                Component.text((blacklist ? "Blacklist: " : "Whitelist: ")
+                                + (mats.isEmpty() ? "(vacio)" : String.join(", ", mats)),
+                        NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
+        item.setItemMeta(meta);
+    }
+
+    /** Devuelve [datos-en-minusculas..., "bl"/"wl"], o null si el wrench no guarda nada. */
+    public static String[] readConfig(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return null;
+        }
+        String data = item.getItemMeta().getPersistentDataContainer()
+                .get(Keys.CONFIG_DATA, PersistentDataType.STRING);
+        if (data == null || data.length() < 3) {
+            return null;
+        }
+        String mode = data.substring(0, 3);
+        String body = data.substring(3);
+        if (body.isEmpty()) {
+            return new String[]{mode.equals("BL:") ? "bl" : "wl"};
+        }
+        String[] mats = body.split(",");
+        String[] out = new String[mats.length + 1];
+        System.arraycopy(mats, 0, out, 0, mats.length);
+        out[mats.length] = mode.equals("BL:") ? "bl" : "wl";
+        return out;
     }
 
     public static ItemStack blueprint(String recipeKey, String resultName) {
@@ -263,6 +339,27 @@ public final class Items {
             r.setIngredient('C', Material.CRAFTING_TABLE);
             r.setIngredient('R', Material.REDSTONE);
             r.setIngredient('G', Material.CARTOGRAPHY_TABLE);
+        });
+        // Blueprint en blanco: el Encoder lo rellena con la receta de la matriz.
+        shaped(plugin, "blueprint", stackOf(create(DeviceType.BLUEPRINT), 4), r -> {
+            r.shape("PPP", "PBP", "PPP");
+            r.setIngredient('P', Material.PAPER);
+            r.setIngredient('B', Material.BLUE_DYE);
+        });
+        shaped(plugin, "configurator", create(DeviceType.CONFIGURATOR), r -> {
+            r.shape("I I", " C ", " I ");
+            r.setIngredient('I', Material.IRON_INGOT);
+            r.setIngredient('C', Material.COMPARATOR);
+        });
+        shaped(plugin, "rake", rake(), r -> {
+            r.shape("D D", " S ", " S ");
+            r.setIngredient('D', Material.DEAD_BUSH);
+            r.setIngredient('S', Material.STICK);
+        });
+        shaped(plugin, "crayon", create(DeviceType.CRAYON), r -> {
+            r.shape("C", "S");
+            r.setIngredient('C', Material.CYAN_DYE);
+            r.setIngredient('S', Material.STICK);
         });
     }
 

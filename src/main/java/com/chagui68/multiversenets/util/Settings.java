@@ -110,4 +110,9 @@ public final class Settings {
     public static boolean debug() {
         return cfg.getBoolean("debug", false);
     }
+
+    /** Usos de un Network Rake recien crafteado (NetworksV6 ofrecia 250/1000/9999; aqui, uno). */
+    public static int rakeUses() {
+        return Math.max(1, cfg.getInt("rake.uses", 250));
+    }
 }

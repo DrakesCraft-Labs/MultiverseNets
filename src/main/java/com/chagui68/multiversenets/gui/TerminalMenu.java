@@ -14,6 +14,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
@@ -24,18 +25,20 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /**
- * Calco del modelo de la grilla de Networks (AbstractGrid/NetworkGrid), que es lo que el
- * servidor ya conoce:
+ * Calco del modelo de la grilla de Networks (NetworkGrid), que es lo que el servidor ya conoce:
  *
  *   - Columna derecha: hueco de entrada real (8), fondo (17), orden (26), filtro (35),
  *     pagina previa (44) y siguiente (53).
- *   - Los items guardados se pintan con "Amount: N" en el lore; SOLO esos stacks se pueden
- *     retirar (anti-dupe, mismo guard que isGridDisplayStack en Networks).
+ *   - Los items guardados se pintan con "Amount: N" en el lore y la marca TERMINAL_DISPLAY en el
+ *     PDC; SOLO esos stacks se pueden retirar (anti-dupe, mismo guard que isGridDisplayStack).
  *   - Retiro: izquierdo deja 1 en el cursor (suma al stack igual que ya tengas), derecho un
  *     stack completo y shift manda directo al inventario.
  *   - Ingreso: shift+izquierdo sobre un stack propio lo inserta (se quita del inventario antes,
  *     anti-dupe) o se estaciona en el hueco de entrada y la red lo absorbe sola.
- *   - Todo otro clic sobre el inventario propio queda vanilla.
+ *   - Al cerrar: lo que quede en el hueco de entrada vuelve a la red, luego al jugador, y como
+ *     ultimo recurso se suelta en el mundo. Nunca se pierde.
+ *   - El display se repinta cada 10 ticks mientras este abierto (la vista del storage cachea
+ *     500 ms, asi que no redecodifica celdas en cada pase).
  */
 public class TerminalMenu extends MenuHolder {
 
@@ -57,13 +60,15 @@ public class TerminalMenu extends MenuHolder {
     };
 
     /** Marca en el lore que identifica a los stacks pintados por la grilla. */
-    private static final String MARCA_MONTO = "Amount: ";    private enum Orden {ALFABETICO, CANTIDAD}
+    private static final String MARCA_MONTO = "Amount: ";
+
+    private enum Orden {ALFABETICO, CANTIDAD}
 
     private final Network network;
     private int page = 0;
     private String query = "";
     private Orden orden = Orden.ALFABETICO;
-    private BukkitTask absorber;
+    private BukkitTask tarea;
 
     public TerminalMenu(MultiverseNets plugin, Player player, Network network) {
         super(plugin, player);
@@ -71,31 +76,16 @@ public class TerminalMenu extends MenuHolder {
     }
 
     public void openMenu() {
+        cancelarTarea();
         open(54, Component.text("Network Terminal", NamedTextColor.DARK_AQUA)
                 .decoration(TextDecoration.ITALIC, false));
         // La red absorbe el hueco de entrada por ticks, como el BlockTicker de la grilla.
-        absorber = plugin.getServer().getScheduler().runTaskTimer(plugin, this::absorberEntrada, 10L, 10L);
-    }
-
-    @Override
-    protected boolean cancelarClicsJugador() {
-        return false;
+        tarea = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tickVivo, 10L, 10L);
     }
 
     @Override
     protected java.util.Set<Integer> vanillaSlots() {
         return java.util.Set.of(INPUT_SLOT);
-    }
-
-    @Override
-    protected void refresh() {
-        ItemStack entrada = inv != null ? inv.getItem(INPUT_SLOT) : null;
-        super.refresh();
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
-            if (entrada != null && !entrada.getType().isAir() && inv.getItem(INPUT_SLOT) == null) {
-                inv.setItem(INPUT_SLOT, entrada);
-            }
-        });
     }
 
     @Override
@@ -141,6 +131,10 @@ public class TerminalMenu extends MenuHolder {
     }
 
     private String nombreLegible(ItemStack item) {
+        if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
+            return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                    .serialize(item.getItemMeta().displayName());
+        }
         return item.getType().name();
     }
 
@@ -210,10 +204,15 @@ public class TerminalMenu extends MenuHolder {
                     page = 0;
                     refresh();
                 } else {
+                    // Igual que la grilla de Networks: el filtro se escribe por chat. Al abrir
+                    // el chat Minecraft CIERRA el inventario, asi que lo cerramos nosotros y,
+                    // cuando responda, reabrimos la terminal con el filtro ya aplicado. Sin
+                    // esto la respuesta caia en un menu cerrado y el filtro nunca hacia nada.
+                    player.closeInventory();
                     ChatPrompts.ask(player, "Type your search term:", text -> {
                         query = text == null ? "" : text;
                         page = 0;
-                        refresh();
+                        openMenu();
                     });
                 }
                 return;
@@ -245,9 +244,10 @@ public class TerminalMenu extends MenuHolder {
             return;
         }
         // El matcher debe comparar contra el stack REAL de la celda: sin lore y sin la marca del
-        // PDC, porque isSimilar los tiene en cuenta y si no, nunca encontraria nada.
+        // PDC, porque la comparacion profunda los tiene en cuenta y si no, jamas encontraria nada.
         ItemStack limpio = stackLimpio(icono);
-        Predicate<ItemStack> coincide = limpio::isSimilar;
+        Predicate<ItemStack> coincide =
+                item -> com.chagui68.multiversenets.util.StackUtils.itemsMatch(item, limpio);
         ClickType clic = event.getClick();
         boolean shift = clic == ClickType.SHIFT_LEFT || clic == ClickType.SHIFT_RIGHT;
 
@@ -261,7 +261,7 @@ public class TerminalMenu extends MenuHolder {
                     network.storage().deposit(sacado);
                 }
             }
-            refresh();
+            draw();
             return;
         }
 
@@ -282,20 +282,22 @@ public class TerminalMenu extends MenuHolder {
                 cursor.setAmount(Math.min(cursor.getMaxStackSize(), cursor.getAmount() + 1));
             }
         }
-        refresh();
+        draw();
     }
 
     /**
      * Shift+izquierdo sobre un stack propio: se retira del inventario ANTES de entrar a la red
-     * (anti-dupe #shift-click) y solo ese stack entra, no todo el inventario.
+     * (anti-dupe de Networks) y solo ese stack entra, no todo el inventario.
      */
     private void insertarStackPropio(InventoryClickEvent event) {
-        ItemStack actual = event.getCurrentItem();
-        if (actual == null || actual.getType().isAir()) {
+        ItemStack item = event.getCurrentItem();
+        if (item == null || item.getType().isAir()) {
             return;
         }
+        ItemStack actual = item.clone();
         int antes = actual.getAmount();
-        player.getInventory().setItem(event.getSlot(), null);
+        int slotJugador = slotInventarioJugador(event);
+        player.getInventory().setItem(slotJugador, null);
         int sobra = network.storage().deposit(actual);
         if (sobra <= 0) {
             player.sendMessage(Text.msg("Deposited " + Items.formatAmount(antes) + " items.", NamedTextColor.GREEN));
@@ -308,33 +310,49 @@ public class TerminalMenu extends MenuHolder {
             }
             ItemStack devuelto = actual.clone();
             devuelto.setAmount(sobra);
-            player.getInventory().setItem(event.getSlot(), devuelto);
+            player.getInventory().setItem(slotJugador, devuelto);
         }
-        refresh();
+        draw();
     }
 
-    /** Vacia el hueco de entrada hacia la red; lo que no cupo se queda a la vista. */
-    private void absorberEntrada() {
+    /** Trabajo periodico: absorber la entrada y repintar la vista si sigue abierta. */
+    private void tickVivo() {
         if (inv == null || player.getOpenInventory().getTopInventory().getHolder() != this) {
-            if (absorber != null) {
-                absorber.cancel();
-                absorber = null;
-            }
+            cancelarTarea();
             return;
         }
+        ItemStack entrada = inv.getItem(INPUT_SLOT);
+        if (entrada != null && !entrada.getType().isAir()) {
+            int sobra = network.storage().deposit(entrada);
+            if (sobra <= 0) {
+                inv.setItem(INPUT_SLOT, null);
+            } else {
+                entrada.setAmount(sobra);
+            }
+        }
+        draw();
+    }
+
+    @Override
+    protected void onClose(InventoryCloseEvent event) {
+        cancelarTarea();
         ItemStack entrada = inv.getItem(INPUT_SLOT);
         if (entrada == null || entrada.getType().isAir()) {
             return;
         }
-        int antes = entrada.getAmount();
+        // Primero que intente guardarse de verdad; lo que no entre se devuelve al jugador.
         int sobra = network.storage().deposit(entrada);
-        if (sobra <= 0) {
-            inv.setItem(INPUT_SLOT, null);
-        } else {
+        inv.setItem(INPUT_SLOT, null);
+        if (sobra > 0) {
             entrada.setAmount(sobra);
+            devolverAlJugador(entrada);
         }
-        if (sobra < antes) {
-            refresh();
+    }
+
+    private void cancelarTarea() {
+        if (tarea != null) {
+            tarea.cancel();
+            tarea = null;
         }
     }
 

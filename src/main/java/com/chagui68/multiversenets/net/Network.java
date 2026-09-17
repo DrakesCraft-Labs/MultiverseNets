@@ -38,6 +38,8 @@ public class Network {
     private final NetworkStorage storage = new NetworkStorage(this);
     private volatile long version = 0;
     private long lastScanMs = 0;
+    /** Particulas activadas con el crayon; se lee del blob del controlador en cada scan. */
+    private volatile boolean crayon;
     public String error;
 
     public Network(com.chagui68.multiversenets.MultiverseNets plugin, org.bukkit.World world, long controllerPos) {
@@ -68,6 +70,10 @@ public class Network {
 
     public long versionSnapshot() {
         return version;
+    }
+
+    public boolean crayon() {
+        return crayon;
     }
 
     public boolean contains(long pos) {
@@ -106,11 +112,30 @@ public class Network {
         Deque<Long> queue = new ArrayDeque<>();
         List<String> errors = new ArrayList<>();
 
-        NodeBlob ctrlBlob = NodeStore.get(block(controllerPos));
-        if (ctrlBlob == null) {
-            error = "controller missing";
+        // No cargar chunks a la fuerza: si el controlador esta en uno sin cargar, la red se queda
+        // como estaba y el proximo scan (o la carga del chunk) lo resuelve. Antes el BFS llamaba
+        // a getBlockAt a ciegas y el servidor cargaba trozos enteros de disco en pleno tick.
+        int ctrlCx = PosUtil.unpackX(controllerPos) >> 4;
+        int ctrlCz = PosUtil.unpackZ(controllerPos) >> 4;
+        if (!world.isChunkLoaded(ctrlCx, ctrlCz)) {
             return;
         }
+
+        NodeBlob ctrlBlob = NodeStore.get(block(controllerPos));
+        if (ctrlBlob == null) {
+            // El registro dice que aqui hubo un controlador pero el chunk ya no lo tiene. Dejar
+            // la topologia vieja viva haria trabajar a la red sobre bloques que ya no existen.
+            synchronized (nodes) {
+                nodes.clear();
+                byType.clear();
+            }
+            error = "controller missing";
+            version++;
+            storage.invalidate();
+            return;
+        }
+        this.crayon = ctrlBlob.crayon;
+
         found.put(controllerPos, DeviceType.CONTROLLER);
         visited.add(controllerPos);
         queue.add(controllerPos);
@@ -123,6 +148,9 @@ public class Network {
             long pos = queue.poll();
             for (long next : neighbors(pos)) {
                 if (!visited.add(next)) {
+                    continue;
+                }
+                if (!world.isChunkLoaded(PosUtil.unpackX(next) >> 4, PosUtil.unpackZ(next) >> 4)) {
                     continue;
                 }
                 Block block = block(next);

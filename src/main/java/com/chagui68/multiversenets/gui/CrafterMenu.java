@@ -1,11 +1,14 @@
 package com.chagui68.multiversenets.gui;
 
 import com.chagui68.multiversenets.MultiverseNets;
+import com.chagui68.multiversenets.craft.Blueprints;
 import com.chagui68.multiversenets.craft.CraftingSupport;
-import com.chagui68.multiversenets.item.Items;
+import com.chagui68.multiversenets.craft.RecipeData;
 import com.chagui68.multiversenets.item.DeviceType;
+import com.chagui68.multiversenets.item.Items;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
+import com.chagui68.multiversenets.util.Settings;
 import com.chagui68.multiversenets.util.Text;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -23,7 +26,18 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+/**
+ * Auto-Crafter: guarda blueprints (matriz real 3x3, como en el NetworkAutoCrafter de
+ * NetworksV6) y claves de receta antiguas. En cada pasada del ticker intenta fabricar cada una
+ * con extraccion atomica desde la red: todo o nada, sin consumos parciales.
+ *
+ * Click con un Blueprint en el cursor: se instala una COPIA de sus datos (el item no se traga;
+ * el de Networks se quedaba fisicamente dentro del bloque, aqui basta con leerlo). Click sin
+ * cursor sobre una entrada: la desinstala.
+ */
 public class CrafterMenu extends MenuHolder {
+
+    private static final int HINT_SLOT = 26;
 
     private final Block block;
 
@@ -46,8 +60,24 @@ public class CrafterMenu extends MenuHolder {
     protected void draw() {
         NodeBlob blob = blob();
         int slot = 0;
+        for (String b64 : blob.blueprintData) {
+            if (slot >= HINT_SLOT) {
+                break;
+            }
+            RecipeData data = Blueprints.decode(b64);
+            ItemStack icon = data == null || data.output == null
+                    ? new ItemStack(Material.BARRIER) : data.output.clone();
+            var meta = icon.getItemMeta();
+            meta.displayName(Component.text(
+                            data == null ? "Blueprint ilegible" : "Blueprint: " + Blueprints.readableName(data.output),
+                            NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false));
+            meta.lore(List.of(Component.text("Click to uninstall", NamedTextColor.DARK_GRAY)
+                    .decoration(TextDecoration.ITALIC, false)));
+            icon.setItemMeta(meta);
+            inv.setItem(slot++, icon);
+        }
         for (String key : blob.recipes) {
-            if (slot >= 26) {
+            if (slot >= HINT_SLOT) {
                 break;
             }
             Recipe recipe = CraftingSupport.find(key);
@@ -61,50 +91,91 @@ public class CrafterMenu extends MenuHolder {
         }
         ItemStack hint = new ItemStack(Material.PAPER);
         var meta = hint.getItemMeta();
-        meta.displayName(Component.text("Recipes", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(Component.text("Click with the result in hand: add recipe",
-                NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
+        meta.displayName(Component.text("Recipes (" + (blob.blueprintData.size() + blob.recipes.size())
+                + "/" + Settings.maxBlueprints() + ")", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+        meta.lore(List.of(
+                Component.text("Click with a Blueprint in cursor: install", NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, false),
+                Component.text("Click on an entry with empty cursor: remove", NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, false)));
         hint.setItemMeta(meta);
-        inv.setItem(26, hint);
+        inv.setItem(HINT_SLOT, hint);
     }
 
     @Override
     protected void click(InventoryClickEvent event) {
+        // Shift sobre un blueprint del inventario propio: lo instala sin tocar el item.
         if (event.getClickedInventory() != inv) {
-            return;
-        }
-        NodeBlob blob = blob();
-        List<String> recipes = new ArrayList<>(blob.recipes);
-
-        ItemStack cursor = event.getCursor();
-        int raw = event.getRawSlot();
-        if (raw == 26) {
+            ItemStack mover = event.getCurrentItem();
+            RecipeData data = mover == null ? null : Blueprints.read(mover);
+            if (data == null) {
+                return;
+            }
+            NodeBlob blob = blob();
+            if (blob.blueprintData.size() + blob.recipes.size() >= Settings.maxBlueprints()) {
+                player.sendMessage(Text.msg("Recipe limit reached.", NamedTextColor.RED));
+                return;
+            }
+            String encoded = Blueprints.encode(data);
+            if (!blob.blueprintData.contains(encoded)) {
+                blob.blueprintData.add(encoded);
+                NodeStore.put(block, blob);
+                player.sendMessage(Text.msg("Blueprint installed: "
+                        + Blueprints.readableName(data.output), NamedTextColor.GREEN));
+            }
             refresh();
             return;
         }
-        if (cursor != null && !cursor.getType().isAir()) {
-            String blueprintKey = Items.readBlueprint(cursor);
-            String key;
-            if (blueprintKey != null) {
-                key = blueprintKey;
-            } else {
-                key = findRecipeKeyByResult(cursor);
-            }
-            if (key == null) {
-                player.sendMessage(Text.msg("No valid recipe for that result.", NamedTextColor.RED));
-            } else if (!recipes.contains(key)) {
-                if (recipes.size() >= 26) {
-                    player.sendMessage(Text.msg("Recipe limit reached.", NamedTextColor.RED));
-                } else {
-                    recipes.add(key);
-                    player.sendMessage(Text.msg(blueprintKey != null ? "Blueprint installed." : "Recipe added.", NamedTextColor.GREEN));
-                }
-            }
-        } else if (raw >= 0 && raw < recipes.size()) {
-            recipes.remove(raw);
+        int raw = event.getRawSlot();
+        if (raw == HINT_SLOT) {
+            refresh();
+            return;
         }
-        blob.recipes.clear();
-        blob.recipes.addAll(recipes);
+        NodeBlob blob = blob();
+        ItemStack cursor = event.getCursor();
+
+        if (cursor != null && !cursor.getType().isAir()) {
+            RecipeData data = Blueprints.read(cursor);
+            String legacyKey = data == null ? Items.readBlueprint(cursor) : null;
+            if (data == null && legacyKey == null) {
+                legacyKey = findRecipeKeyByResult(cursor);
+            }
+            if (data == null && legacyKey == null) {
+                player.sendMessage(Text.msg("That item is not a valid blueprint or recipe result.",
+                        NamedTextColor.RED));
+                return;
+            }
+            int total = blob.blueprintData.size() + blob.recipes.size();
+            if (total >= Settings.maxBlueprints()) {
+                player.sendMessage(Text.msg("Recipe limit reached.", NamedTextColor.RED));
+                return;
+            }
+            if (data != null) {
+                String encoded = Blueprints.encode(data);
+                if (!blob.blueprintData.contains(encoded)) {
+                    blob.blueprintData.add(encoded);
+                    player.sendMessage(Text.msg("Blueprint installed: "
+                            + Blueprints.readableName(data.output), NamedTextColor.GREEN));
+                }
+            } else if (!blob.recipes.contains(legacyKey)) {
+                blob.recipes.add(legacyKey);
+                player.sendMessage(Text.msg("Recipe added.", NamedTextColor.GREEN));
+            }
+            NodeStore.put(block, blob);
+            refresh();
+            return;
+        }
+
+        // Sin cursor: click sobre una entrada la retira.
+        if (raw < 0 || raw >= HINT_SLOT) {
+            return;
+        }
+        int blueCount = blob.blueprintData.size();
+        if (raw < blueCount) {
+            blob.blueprintData.remove(raw);
+        } else if (raw - blueCount < blob.recipes.size()) {
+            blob.recipes.remove(raw - blueCount);
+        }
         NodeStore.put(block, blob);
         refresh();
     }

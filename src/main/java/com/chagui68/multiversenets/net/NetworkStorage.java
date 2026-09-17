@@ -3,28 +3,63 @@ package com.chagui68.multiversenets.net;
 import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
-import com.chagui68.multiversenets.util.PosUtil;
 import com.chagui68.multiversenets.util.Settings;
+import com.chagui68.multiversenets.util.StackUtils;
 import org.bukkit.block.Block;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Predicate;
 
+/**
+ * Almacenamiento agregado de la red: la suma de todas las celdas (T1-T6) y greedy cells.
+ *
+ * Modelo calcado del NetworkRoot de NetworksV6, adaptado a que aqui las celdas son virtuales
+ * (muestra + cantidad en el blob, estilo Quantum Storage) en vez de inventarios de bloque:
+ *
+ *   - Insercion: greedy cells que ya guarden ese tipo -> celdas con el mismo tipo -> celdas
+ *     vacias (que adoptan el tipo). Las greedy con muestra solo reciben si coincide.
+ *   - Extraccion: celdas normales primero, greedy al final.
+ *   - La vista agregada se cachea 500 ms y se fusiona por comparacion lineal con
+ *     StackUtils.itemsMatch, no por hashCode: Bukkit calcula mal los hash de ItemStack y la
+ *     grilla partia un mismo item en dos filas (bug #226 de Networks).
+ *   - Cada operacion decodifica el blob de cada celda UNA sola vez; antes el orden previo a la
+ *     insercion releia y re-decodificaba cada celda por comparacion del sort.
+ */
 public class NetworkStorage {
+
+    private static final long VIEW_CACHE_MS = 500;
 
     public record View(ItemStack sample, long amount) {
     }
 
-    private record CellRef(long pos, int tier) {
+    private record CellRef(long pos, int tier, boolean greedy) {
+    }
+
+    /** Una celda con su blob ya decodificado para una operacion concreta. */
+    private static final class CellState {
+        private final long pos;
+        private final boolean greedy;
+        private final Block block;
+        private final NodeBlob blob;
+        private final long capacity;
+        private boolean dirty;
+
+        private CellState(long pos, boolean greedy, Block block, NodeBlob blob, long capacity) {
+            this.pos = pos;
+            this.greedy = greedy;
+            this.block = block;
+            this.blob = blob;
+            this.capacity = capacity;
+        }
     }
 
     private final Network network;
     private final List<CellRef> cells = new ArrayList<>();
     private long boundVersion = -1;
+    private List<View> viewCache;
+    private long viewCacheAt;
 
     public NetworkStorage(Network network) {
         this.network = network;
@@ -32,21 +67,135 @@ public class NetworkStorage {
 
     public void invalidate() {
         boundVersion = -1;
+        viewCache = null;
     }
 
     private void sync() {
-        if (boundVersion == network.versionSnapshot()) {
+        long current = network.versionSnapshot();
+        if (boundVersion == current) {
             return;
         }
         cells.clear();
         synchronized (network.nodes()) {
-            for (Map.Entry<Long, DeviceType> entry : network.nodes().entrySet()) {
-                if (entry.getValue().isCell()) {
-                    cells.add(new CellRef(entry.getKey(), entry.getValue().cellTier()));
+            for (var entry : network.nodes().entrySet()) {
+                DeviceType type = entry.getValue();
+                if (type.isCell()) {
+                    cells.add(new CellRef(entry.getKey(), type.cellTier(), false));
+                } else if (type == DeviceType.GREEDY_CELL) {
+                    cells.add(new CellRef(entry.getKey(), 0, true));
                 }
             }
         }
-        boundVersion = network.versionSnapshot();
+        boundVersion = current;
+        viewCache = null;
+    }
+
+    /** Las celdas con su blob decodificado, en el orden del indice. Salta las ilegibles. */
+    private List<CellState> load() {
+        sync();
+        List<CellState> states = new ArrayList<>(cells.size());
+        for (CellRef ref : cells) {
+            // Si el chunk se descargo despues del scan, la celda se salta en vez de forzar una
+            // carga sincrona desde el ticker. Su contenido no desaparece: vuelve en cuanto el
+            // chunk cargue y el scan la redescubra.
+            int cx = com.chagui68.multiversenets.util.PosUtil.unpackX(ref.pos()) >> 4;
+            int cz = com.chagui68.multiversenets.util.PosUtil.unpackZ(ref.pos()) >> 4;
+            if (!network.world().isChunkLoaded(cx, cz)) {
+                continue;
+            }
+            Block block = network.block(ref.pos());
+            NodeBlob blob = NodeStore.get(block);
+            if (blob == null) {
+                continue;
+            }
+            DeviceType real = DeviceType.parse(blob.typeName);
+            boolean stillValid = ref.greedy() ? real == DeviceType.GREEDY_CELL : real != null && real.isCell();
+            if (!stillValid) {
+                continue;
+            }
+            long cap = ref.greedy() ? Settings.greedyCapacity() : Settings.cellCapacity(ref.tier());
+            states.add(new CellState(ref.pos(), ref.greedy(), block, blob, cap));
+        }
+        return states;
+    }
+
+    private void flush(List<CellState> states) {
+        boolean anyDirty = false;
+        for (CellState state : states) {
+            if (state.dirty) {
+                NodeStore.put(state.block, state.blob);
+                anyDirty = true;
+            }
+        }
+        if (anyDirty) {
+            viewCache = null;
+        }
+    }
+
+    /**
+     * Mete un item en la red. Devuelve cuantas unidades NO entraron (0 = todo dentro).
+     *
+     * No muta el stack recibido; el llamante decide que hacer con el sobrante restandolo el
+     * mismo, como hace addItemStack0 en NetworksV6.
+     */
+    public int deposit(ItemStack item) {
+        if (item == null || item.getType().isAir() || item.getAmount() <= 0) {
+            return 0;
+        }
+        List<CellState> states = load();
+        long remaining = item.getAmount();
+
+        // 1) greedy cells que ya guarden este tipo: son el sumidero preferido de la red.
+        for (CellState state : states) {
+            if (!state.greedy || state.blob.cellSample == null
+                    || !StackUtils.itemsMatch(state.blob.cellSample, item)) {
+                continue;
+            }
+            remaining = pour(state, item, remaining);
+            if (remaining <= 0) {
+                break;
+            }
+        }
+        // 2) celdas normales con el mismo tipo.
+        if (remaining > 0) {
+            for (CellState state : states) {
+                if (state.greedy || state.blob.cellSample == null
+                        || !StackUtils.itemsMatch(state.blob.cellSample, item)) {
+                    continue;
+                }
+                remaining = pour(state, item, remaining);
+                if (remaining <= 0) {
+                    break;
+                }
+            }
+        }
+        // 3) celdas vacias: adoptan el tipo entrante (una greedy vacia NO se auto-asigna aqui;
+        //    su tipo lo fija ella misma tirando de su filtro, que es para lo que existe).
+        if (remaining > 0) {
+            for (CellState state : states) {
+                if (state.greedy || state.blob.cellSample != null) {
+                    continue;
+                }
+                state.blob.cellSample = StackUtils.getAsQuantity(item, 1);
+                remaining = pour(state, item, remaining);
+                if (remaining <= 0) {
+                    break;
+                }
+            }
+        }
+        flush(states);
+        return (int) remaining;
+    }
+
+    private static long pour(CellState state, ItemStack item, long remaining) {
+        long space = state.capacity - state.blob.cellAmount;
+        if (space <= 0) {
+            return remaining;
+        }
+        long take = Math.min(space, remaining);
+        state.blob.cellAmount += take;
+        state.dirty = true;
+        return remaining - take;
     }
 
     public int depositAll(List<ItemStack> items) {
@@ -57,122 +206,108 @@ public class NetworkStorage {
         return leftover;
     }
 
-    public int deposit(ItemStack item) {
-        if (item == null || item.getType().isAir() || item.getAmount() <= 0) {
-            return 0;
-        }
-        sync();
-        int remaining = item.getAmount();
-        List<CellRef> candidates = new ArrayList<>(cells);
-
-        candidates.sort((a, b) -> Long.compare(freeSpace(a, item), freeSpace(b, item)));
-
-        for (CellRef cell : candidates) {
-            Block block = network.block(cell.pos());
-            NodeBlob blob = NodeStore.get(block);
-            if (blob == null || !DeviceType.parse(blob.typeName).isCell()) {
-                continue;
-            }
-            if (blob.cellSample != null && !blob.cellSample.isSimilar(item)) {
-                continue;
-            }
-            if (blob.cellAmount == 0 || blob.cellSample == null) {
-                blob.cellSample = item.clone();
-                blob.cellSample.setAmount(1);
-            }
-            long cap = Settings.cellCapacity(cell.tier());
-            long space = cap - blob.cellAmount;
-            if (space <= 0) {
-                continue;
-            }
-            int take = (int) Math.min(space, remaining);
-            blob.cellAmount += take;
-            remaining -= take;
-            NodeStore.put(block, blob);
-            if (remaining <= 0) {
-                break;
-            }
-        }
-        return remaining;
-    }
-
-    private long freeSpace(CellRef cell, ItemStack sample) {
-        Block block = network.block(cell.pos());
-        NodeBlob blob = NodeStore.get(block);
-        if (blob == null) {
-            return 0;
-        }
-        if (blob.cellSample != null && !blob.cellSample.isSimilar(sample)) {
-            return -1;
-        }
-        return Settings.cellCapacity(cell.tier()) - Math.max(0, blob.cellAmount);
-    }
-
+    /**
+     * Saca hasta {@code want} unidades que cumplan el matcher, combinando celdas: normales
+     * primero y greedy al final, que es su papel de "buffer de salida".
+     *
+     * @return el stack con lo obtenido, o null si no habia nada
+     */
     public ItemStack withdraw(Predicate<ItemStack> matcher, int want) {
-        sync();
-        int got = 0;
-        ItemStack result = null;
-        for (CellRef cell : new ArrayList<>(cells)) {
-            if (got >= want) {
-                break;
-            }
-            Block block = network.block(cell.pos());
-            NodeBlob blob = NodeStore.get(block);
-            if (blob == null || blob.cellSample == null || blob.cellAmount <= 0) {
-                continue;
-            }
-            if (!matcher.test(blob.cellSample)) {
-                continue;
-            }
-            if (result == null) {
-                result = blob.cellSample.clone();
-            }
-            int take = (int) Math.min((long) want - got, blob.cellAmount);
-            got += take;
-            blob.cellAmount -= take;
-            if (blob.cellAmount <= 0) {
-                blob.cellAmount = 0;
-                blob.cellSample = null;
-            }
-            NodeStore.put(block, blob);
+        return withdraw(matcher, want, -1L);
+    }
+
+    /**
+     * Variante con una celda excluida: la greedy cell se auto-surtiria con su propio contenido
+     * cada tick (sacar para volver a meter) si no se le prohibe tocarse a si misma.
+     */
+    public ItemStack withdraw(Predicate<ItemStack> matcher, int want, long excludePos) {
+        if (want <= 0) {
+            return null;
         }
+        List<CellState> states = load();
+        ItemStack result = null;
+        long got = 0;
+        for (int pass = 0; pass < 2 && got < want; pass++) {
+            boolean greedyPass = pass == 1;
+            for (CellState state : states) {
+                if (state.greedy != greedyPass || state.pos == excludePos) {
+                    continue;
+                }
+                if (blobEmpty(state.blob) || !matcher.test(state.blob.cellSample)) {
+                    continue;
+                }
+                if (result == null) {
+                    result = StackUtils.getAsQuantity(state.blob.cellSample, 0);
+                }
+                long take = Math.min(want - got, state.blob.cellAmount);
+                state.blob.cellAmount -= take;
+                got += take;
+                if (state.blob.cellAmount <= 0) {
+                    state.blob.cellAmount = 0;
+                    state.blob.cellSample = null;
+                }
+                state.dirty = true;
+                if (got >= want) {
+                    break;
+                }
+            }
+        }
+        flush(states);
         if (result == null || got <= 0) {
             return null;
         }
-        result.setAmount(got);
+        result.setAmount((int) got);
         return result;
     }
 
+    private static boolean blobEmpty(NodeBlob blob) {
+        return blob.cellSample == null || blob.cellAmount <= 0;
+    }
+
     public long count(Predicate<ItemStack> matcher) {
-        sync();
         long total = 0;
-        for (CellRef cell : cells) {
-            Block block = network.block(cell.pos());
-            NodeBlob blob = NodeStore.get(block);
-            if (blob != null && blob.cellSample != null && matcher.test(blob.cellSample)) {
-                total += blob.cellAmount;
+        for (CellState state : load()) {
+            if (!blobEmpty(state.blob) && matcher.test(state.blob.cellSample)) {
+                total += state.blob.cellAmount;
             }
         }
         return total;
     }
 
+    /**
+     * La foto del contenido para las grillas, cacheada 500 ms (equivalente al CACHE_ITEMS_MS del
+     * NetworkRoot). La agregacion es por escaneo lineal con itemsMatch, nunca por hash.
+     */
     public List<View> view() {
-        sync();
-        Map<String, View> merged = new LinkedHashMap<>();
-        for (CellRef cell : cells) {
-            Block block = network.block(cell.pos());
-            NodeBlob blob = NodeStore.get(block);
-            if (blob == null || blob.cellSample == null || blob.cellAmount <= 0) {
+        long now = System.currentTimeMillis();
+        if (viewCache != null && now - viewCacheAt < VIEW_CACHE_MS) {
+            return new ArrayList<>(viewCache);
+        }
+        List<View> merged = new ArrayList<>();
+        for (CellState state : load()) {
+            if (blobEmpty(state.blob)) {
                 continue;
             }
-            String key = blob.cellSample.getType() + "|" + (blob.cellSample.hasItemMeta()
-                    ? String.valueOf(blob.cellSample.getItemMeta().hashCode()) : "-");
-            View existing = merged.get(key);
-            merged.put(key, existing == null
-                    ? new View(blob.cellSample.clone(), blob.cellAmount)
-                    : new View(existing.sample(), existing.amount() + blob.cellAmount));
+            boolean found = false;
+            for (int i = 0; i < merged.size(); i++) {
+                View v = merged.get(i);
+                if (StackUtils.itemsMatch(v.sample(), state.blob.cellSample)) {
+                    long sum = v.amount() + state.blob.cellAmount;
+                    if (sum < 0) {
+                        sum = Long.MAX_VALUE;
+                    }
+                    merged.set(i, new View(v.sample(), sum));
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                merged.add(new View(StackUtils.getAsQuantity(state.blob.cellSample, 1), state.blob.cellAmount));
+            }
         }
-        return new ArrayList<>(merged.values());
+        viewCache = new ArrayList<>(merged);
+        viewCacheAt = now;
+        return merged;
     }
 
     public boolean isEmpty() {

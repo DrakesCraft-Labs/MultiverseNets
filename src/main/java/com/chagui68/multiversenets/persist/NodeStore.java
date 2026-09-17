@@ -70,9 +70,33 @@ public final class NodeStore {
     public static NodeBlob decode(String data) {
         try (BukkitObjectInputStream in = new BukkitObjectInputStream(
                 new ByteArrayInputStream(Base64.getDecoder().decode(data)))) {
-            return (NodeBlob) in.readObject();
+            NodeBlob blob = (NodeBlob) in.readObject();
+            normalize(blob);
+            return blob;
         } catch (IOException | ClassNotFoundException | ClassCastException e) {
             return null;
+        }
+    }
+
+    /**
+     * Los campos anadidos despues de la primera version se deserializan a null en los blobs
+     * viejos (la deserializacion de Java no ejecuta constructores). Aqui vuelven a su default.
+     */
+    private static void normalize(NodeBlob blob) {
+        if (blob == null) {
+            return;
+        }
+        if (blob.filterMaterials == null) {
+            blob.filterMaterials = new ArrayList<>();
+        }
+        if (blob.recipes == null) {
+            blob.recipes = new ArrayList<>();
+        }
+        if (blob.blueprintData == null) {
+            blob.blueprintData = new ArrayList<>();
+        }
+        if (blob.craftingMatrix == null) {
+            blob.craftingMatrix = new org.bukkit.inventory.ItemStack[9];
         }
     }
 

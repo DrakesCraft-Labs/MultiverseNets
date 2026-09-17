@@ -90,9 +90,30 @@ public class NetworkManager {
         return nets.get(PosUtil.pack(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ()));
     }
 
+    /**
+     * Rescanea la red que toca al bloque o a CUALQUIERA de sus vecinos.
+     *
+     * El matiz importa: un nodo recien colocado o recien roto todavia no es miembro de ninguna
+     * red, asi que buscar la red en su propia posicion no encuentra nada y la topologia se
+     * quedaba obsoleta hasta el scan periodico. Mirando los adyacentes, el cambio se ve al
+     * instante (antes: "abro la terminal que acabo de poner y dice que no tengo red").
+     */
     public void invalidateNear(Block block) {
-        Network net = networkAt(block);
-        if (net != null) {
+        java.util.Set<Network> tocadas = new java.util.HashSet<>();
+        Network propia = networkAt(block);
+        if (propia != null) {
+            tocadas.add(propia);
+        }
+        for (org.bukkit.block.BlockFace face : new org.bukkit.block.BlockFace[]{
+                org.bukkit.block.BlockFace.NORTH, org.bukkit.block.BlockFace.SOUTH,
+                org.bukkit.block.BlockFace.EAST, org.bukkit.block.BlockFace.WEST,
+                org.bukkit.block.BlockFace.UP, org.bukkit.block.BlockFace.DOWN}) {
+            Network vecina = networkAt(block.getRelative(face));
+            if (vecina != null) {
+                tocadas.add(vecina);
+            }
+        }
+        for (Network net : tocadas) {
             net.scan();
         }
     }
@@ -119,12 +140,20 @@ public class NetworkManager {
         return total;
     }
 
+    /**
+     * Filtro de un nodo. Sin materiales configuradas pasa todo; con materiales manda el modo:
+     * whitelist (defecto) deja pasar solo lo listado, blacklist lo excluye. Es la version barata
+     * (por material) del par filtro+modo de los dispositivos avanzados de NetworksV6.
+     */
     public static Predicate<ItemStack> filterPredicate(NodeBlob blob) {
+        if (blob.filterMaterials.isEmpty()) {
+            return item -> true;
+        }
         Set<String> mats = new HashSet<>();
         for (String m : blob.filterMaterials) {
             mats.add(m.toUpperCase(Locale.ROOT));
         }
-        return item -> mats.isEmpty() || mats.contains(item.getType().name());
+        return item -> blob.filterBlacklist != mats.contains(item.getType().name());
     }
 
     public static ItemStack extractFirst(Inventory inv, Predicate<ItemStack> pred, int max) {

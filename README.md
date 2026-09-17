@@ -25,7 +25,7 @@
 * **Cable de Red**: transmite la señal entre nodos.
 * **Terminal de Red** (bloque) y **Terminal Inalámbrico** (ítem vinculable con shift+click al controlador).
 * **Network Monitor**: panel de diagnóstico con desglose de nodos, almacenamiento y estado.
-* **Transmisor / Receptor Inalámbrico**: vincula un receptor (shift+click sobre el transmisor con el ítem en mano) y colócalo en otra base o dimensión para abrir la terminal de esa red remotamente.
+* **Transmisor / Receptor Inalámbrico**: vincula un receptor (shift+click sobre el transmisor con el ítem en mano) y colócalo en otra base o dimensión. El receptor **abre la terminal de la red remota** y, si le pones filtro, **puentea ítems** desde la red del transmisor a la suya cada ciclo (sin filtro no cruza nada, a propósito).
 
 ### 📦 Almacenamiento cuántico
 * **Celdas T1–T6**: cada celda guarda un solo tipo de ítem hasta su capacidad (65k → 2.000M configurable).
@@ -40,15 +40,22 @@
 * **Aspirador (Vacuum)**: recoge ítems del suelo en radio configurable, ahora con filtro whitelist opcional.
 
 ### 🛠️ Autocrafteo
-* **Auto-Crafteador**: registra recetas vanilla (shaped/shapeless/cocción) y las fabrica automáticamente si hay ingredientes en la red.
-* **Recipe Encoder**: genera Blueprints (planos) a partir del resultado en mano.
-* **Blueprints**: planos reutilizables que se instalan en un Auto-Crafteador con un click.
-* **Crafting Grid**: crafteo manual usando ingredientes de la red directamente.
+* **Auto-Crafteador**: acepta **Blueprints** (matriz 3×3 real) y recetas por resultado (modo antiguo). Cada blueprints se intenta una vez por ciclo con **extracción atómica**: o hay ingredientes para todo o no se toca nada.
+* **Recipe Encoder**: monta la receta en una matriz 3×3 de plantillas persistente (clic para fijar huecos, sin gastar ítems) y codifica un Blueprint en blanco con un clic.
+* **Blueprints**: planos reutilizables que llevan la receta completa (matriz + resultado) en su PDC; se instalan en un Auto-Crafteador con un click y no se consumen.
+* **Crafting Grid**: crafteo manual tirando de la red: la matriz de plantillas se guarda en el bloque, y cada craft retira ingredientes de la red de forma transaccional.
+
+### 🧰 Herramientas (traídas de NetworksV6)
+* **Configuration Wrench**: shift+clic sobre un dispositivo con filtro **copia** su configuración; clic normal la **pega** en otro.
+* **Network Rake**: retira nodos al instante (250 usos por defecto, `rake.uses`); no toca controladores ni celdas cargadas.
+* **Network Crayon**: marca el controlador y la red enseña partículas cuando sus máquinas trabajan.
+* Filtros con **modo whitelist/blacklist** en cualquier dispositivo con filtro (grabbers, pushers, vacuum, purgador, greedy cell, receptor).
 
 ### 🛡️ Fiabilidad
 * Protección contra pistones y explosiones sobre nodos.
-* Al romper una celda su contenido viaja dentro del ítem (como en Networks): no se derrama nada y al recolocarla recupera su carga.
-* `/mvnets doctor` reescanea y diagnostica todas las redes.
+* Al romper un nodo su estado viaja dentro del ítem (como en Networks): carga de la celda, filtros, blueprints, matriz de la parrilla y enlace del receptor. Al recolocarlo, sigue como estaba.
+* Guardias anti-dupe de Networks en todos los menús (sin double-click, sin drags sobre huecos pintados, sin shift+clic derecho al vacío) y **recuperación de lo dejado en los huecos reales al cerrar**.
+* `/mvnets doctor` reescanea y diagnostica todas las redes; `/mvnets inspect` y `/mvnets repair` inspeccionan y reescanean el bloque mirado.
 
 ## 🍳 Recetas
 
@@ -72,6 +79,10 @@
 | Pusher HT | soltador + pistón + soltador |
 | Recipe Encoder | mesa herrería + papel + tinta |
 | Crafting Grid | cartografía + mesas crafteo + redstone |
+| Blueprint en blanco x4 | 8 papeles + tinte azul |
+| Configuration Wrench | 4 hierros + comparador |
+| Network Rake | 2 dead bushes + 2 palos |
+| Network Crayon | 2 tintes cian + palo |
 
 ## ⌨️ Comandos
 
@@ -81,6 +92,8 @@
 | `/mvnets give <id> [n]` | Da un dispositivo | `multiversenets.admin` |
 | `/mvnets doctor` | Reescanea y diagnostica redes | `multiversenets.admin` |
 | `/mvnets stats` | Estadísticas globales | `multiversenets.admin` |
+| `/mvnets inspect` | Inspecciona el bloque mirado (tipo, red, contenido, filtro) | `multiversenets.admin` |
+| `/mvnets repair` | Fuerza el reescaneo de la red del bloque mirado | `multiversenets.admin` |
 | `/mvnets reload` | Recarga la configuración | `multiversenets.admin` |
 
 Alias: `/mvn`
@@ -90,9 +103,9 @@ Alias: `/mvn`
 1. Coloca un **Controlador**, rodea el área con **Cables** y conecta **Celdas**, **Grabbers/Pushers**, etc.
 2. Click derecho en el controlador o en una **Terminal** para abrir la Grid.
 3. En la terminal (mismas convenciones que la grilla de Networks): **izquierdo** saca 1 al cursor, **derecho** un stack, **shift+clic** manda al inventario; **shift+izquierdo** sobre tus items los inserta en la red, o déjalos en el **hueco de entrada** (esquina derecha) y la red los absorbe. Lupa/etiqueta busca (clic derecho limpia), botón azul cambia el orden, flechas paganinan.
-4. Shift+click con **Terminal Inalámbrico** sobre el controlador para vincularlo.
-5. **Encoder**: click con el resultado en mano → Blueprint → click sobre un Auto-Crafteador para instalarlo.
-6. **Receptor**: shift+click con el ítem del receptor sobre un Transmisor, colócalo en otra base y ábrelo.
+4. Shift+click con **Terminal Inalámbrico** sobre el controlador para vincularlo (luego clic derecho al aire para abrir la red a distancia).
+5. **Encoder**: monta la receta en la matriz de plantillas, mete un **Blueprint en blanco** en el hueco azul y pulsa *Encode*. Ese Blueprint se instala en un Auto-Crafteador con un clic en su lista.
+6. **Receptor**: shift+click con el ítem del receptor sobre un Transmisor, colócalo en otra base y ábrelo; ponle filtro y además **traerá ítems** de la red del transmisor.
 
 ## 🤝 Convivencia con Networks
 

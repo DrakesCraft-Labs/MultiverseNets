@@ -2,13 +2,19 @@ package com.chagui68.multiversenets.net;
 
 import com.chagui68.multiversenets.MultiverseNets;
 import com.chagui68.multiversenets.compat.SlimefunBridge;
+import com.chagui68.multiversenets.craft.Blueprints;
 import com.chagui68.multiversenets.craft.CraftingSupport;
+import com.chagui68.multiversenets.craft.RecipeData;
 import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
 import com.chagui68.multiversenets.util.PosUtil;
 import com.chagui68.multiversenets.util.Settings;
+import com.chagui68.multiversenets.util.StackUtils;
+import org.bukkit.Color;
 import org.bukkit.Location;
+import org.bukkit.Particle;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Item;
@@ -17,6 +23,24 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.util.ArrayList;
+import java.util.UUID;
+import java.util.function.Predicate;
+
+/**
+ * El corazon de todas las redes. Corre cada 5 ticks y reparte el trabajo por bloques de tiempo:
+ * cada familia (transferencias, vacuum, crafteo, escaneo) tiene su propio intervalo del config.
+ *
+ * Antes los intervalos se evaluaban como "tick % intervalo == 0" sobre un contador que avanzaba
+ * de 5 en 5: un intervalo que no fuera multiplo de 5 no se cumplia JAMAS (p.ej. un scan cada 6
+ * ticks no ocurria nunca). Ahora cada familia guarda cuanto le quedaba y dispara cuando llega.
+ *
+ * Reglas heredadas de NetworksV6 que aqui se respetan a rajatabla:
+ *   - Nada se borra jamas al moverse: lo que la red no absorbe vuelve al origen, y si el origen
+ *     tampoco lo admite se suelta en el mundo. Perder items es peor que tirarlos.
+ *   - El purgador sin filtro no borra ni un solo item.
+ *   - Los nodos de chunks no cargados no se tocan (ni se fuerza su carga).
+ */
 public class NetworkTicker {
 
     private static final BlockFace[] FACES = {
@@ -25,7 +49,12 @@ public class NetworkTicker {
     private final MultiverseNets plugin;
     private final NetworkManager manager;
     private BukkitTask task;
-    private long tick = 0;
+
+    // Cada familia cuenta sus ticks restantes; al llegar a 0 se ejecuta y se rearma.
+    private int scanIn;
+    private int transferIn;
+    private int vacuumIn;
+    private int craftIn;
 
     public NetworkTicker(MultiverseNets plugin, NetworkManager manager) {
         this.plugin = plugin;
@@ -43,26 +72,39 @@ public class NetworkTicker {
     }
 
     private void run() {
-        tick += 5;
-        boolean scanDue = due(Settings.scanIntervalTicks());
+        scanIn -= 5;
+        transferIn -= 5;
+        vacuumIn -= 5;
+        craftIn -= 5;
         for (Network net : manager.all()) {
-            if (scanDue) {
+            if (scanIn <= 0) {
                 net.scan();
             }
-            doTransfers(net);
-            doVacuum(net);
-            doCrafting(net);
+            if (transferIn <= 0) {
+                doTransfers(net);
+            }
+            if (vacuumIn <= 0) {
+                doVacuum(net);
+            }
+            if (craftIn <= 0) {
+                doCrafting(net);
+            }
         }
-    }
-
-    private boolean due(int interval) {
-        return interval > 0 && tick % interval == 0;
+        if (scanIn <= 0) {
+            scanIn = Settings.scanIntervalTicks();
+        }
+        if (transferIn <= 0) {
+            transferIn = Settings.transferIntervalTicks();
+        }
+        if (vacuumIn <= 0) {
+            vacuumIn = Settings.vacuumIntervalTicks();
+        }
+        if (craftIn <= 0) {
+            craftIn = Settings.craftIntervalTicks();
+        }
     }
 
     private void doTransfers(Network net) {
-        if (!due(Settings.transferIntervalTicks())) {
-            return;
-        }
         int base = Settings.itemsPerOp();
         int ht = base * Settings.htMultiplier();
         net.forEach(DeviceType.GRABBER, (pos, type) -> grabOnce(net, pos, base));
@@ -71,32 +113,54 @@ public class NetworkTicker {
         net.forEach(DeviceType.PUSHER_HT, (pos, type) -> pushOnce(net, pos, ht));
         net.forEach(DeviceType.GREEDY_CELL, (pos, type) -> greedyTick(net, pos));
         net.forEach(DeviceType.PURGER, (pos, type) -> purgeOnce(net, pos, base));
+        net.forEach(DeviceType.RECEIVER, (pos, type) -> bridgeOnce(net, pos, base));
     }
 
     private NodeBlob blobOf(Network net, long pos) {
         return NodeStore.get(net.block(pos));
     }
 
+    private void spark(Network net, long pos) {
+        if (!net.crayon()) {
+            return;
+        }
+        Location at = net.block(pos).getLocation().add(0.5, 0.6, 0.5);
+        at.getWorld().spawnParticle(Particle.DUST, at, 4, 0.25, 0.25, 0.25, 0,
+                new Particle.DustOptions(Color.AQUA, 0.8f));
+    }
+
+    /**
+     * Saca hasta {@code rate} unidades del contenedor adyacente y las mete en la red. Si la red
+     * no las admite todas, el sobrante vuelve al origen; si el origen tampoco lo admite (alguien
+     * lo lleno en medio), se suelta en el mundo. Al aire no se va nada.
+     */
     private void grabOnce(Network net, long pos, int rate) {
         NodeBlob blob = blobOf(net, pos);
         if (blob == null) {
             return;
         }
-        var pred = NetworkManager.filterPredicate(blob);
+        Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
+        Block self = net.block(pos);
         for (BlockFace face : FACES) {
-            Block target = net.block(pos).getRelative(face);
+            Block target = self.getRelative(face);
 
             if (target.getState() instanceof InventoryHolder holder) {
                 Inventory inv = holder.getInventory();
                 ItemStack extracted = NetworkManager.extractFirst(inv, pred, rate);
                 if (extracted == null) {
+                    // Inventario vacio para este filtro: se mira la siguiente cara.
                     continue;
                 }
                 int leftover = net.storage().deposit(extracted);
                 if (leftover > 0) {
                     extracted.setAmount(leftover);
-                    NetworkManager.insertInto(inv, extracted);
+                    int sinCasa = NetworkManager.insertInto(inv, extracted);
+                    if (sinCasa > 0) {
+                        extracted.setAmount(sinCasa);
+                        dropAt(target, extracted);
+                    }
                 }
+                spark(net, pos);
                 return;
             }
 
@@ -109,76 +173,97 @@ public class NetworkTicker {
             int sobra = net.storage().deposit(sacado);
             if (sobra > 0) {
                 sacado.setAmount(sobra);
-                SlimefunBridge.insertar(target, sacado);
+                int sinCasa = SlimefunBridge.insertar(target, sacado);
+                if (sinCasa > 0) {
+                    sacado.setAmount(sinCasa);
+                    dropAt(target, sacado);
+                }
             }
+            spark(net, pos);
             return;
         }
     }
 
+    /**
+     * Saca un stack de la red y lo reparte entre los contenedores adyacentes hasta agotarlo.
+     * Antes se rendia en el primer inventario lleno; una cara llena no es razon para no mirar
+     * las demas.
+     */
     private void pushOnce(Network net, long pos, int rate) {
         NodeBlob blob = blobOf(net, pos);
         if (blob == null) {
             return;
         }
-        var pred = NetworkManager.filterPredicate(blob);
+        Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
         ItemStack stack = net.storage().withdraw(pred, rate);
         if (stack == null) {
             return;
         }
+        Block self = net.block(pos);
         for (BlockFace face : FACES) {
-            Block target = net.block(pos).getRelative(face);
+            Block target = self.getRelative(face);
 
             if (target.getState() instanceof InventoryHolder holder) {
                 int leftover = NetworkManager.insertInto(holder.getInventory(), stack);
-                if (leftover > 0) {
-                    stack.setAmount(leftover);
-                    net.storage().deposit(stack);
+                if (leftover < stack.getAmount()) {
+                    spark(net, pos);
                 }
-                return;
+                stack.setAmount(leftover);
+                if (leftover <= 0) {
+                    break;
+                }
+                continue;
             }
 
-            // Slimefun: se le entrega solo a los huecos que la propia maquina declara de entrada,
-            // no a cualquiera. Meter carbon en la salida de una fundidora la atasca.
             if (!SlimefunBridge.esMaquina(target)) {
                 continue;
             }
+            int antes = stack.getAmount();
             int noCupo = SlimefunBridge.insertar(target, stack);
-            if (noCupo >= stack.getAmount()) {
-                continue;
+            stack.setAmount(Math.max(0, Math.min(noCupo, antes)));
+            if (stack.getAmount() < antes) {
+                spark(net, pos);
             }
-            if (noCupo > 0) {
-                stack.setAmount(noCupo);
-                net.storage().deposit(stack);
+            if (stack.getAmount() <= 0) {
+                break;
             }
-            return;
         }
-        net.storage().deposit(stack);
+        if (stack.getAmount() > 0) {
+            net.storage().deposit(stack);
+        }
     }
 
     /**
-     * Saca de la red lo que case con el filtro del purgador y lo descarta.
-     *
-     * Sin esto una red se atasca sola: cualquier maquina que genere un residuo acaba llenando las
-     * celdas y bloqueando lo que si interesa.
+     * Descarta de la red lo que case con el filtro del purgador.
      *
      * Sin filtro configurado NO hace nada, a proposito. Un purgador que por defecto se lo comiera
      * todo seria una trituradora de inventarios esperando a que alguien lo coloque sin mirar.
+     * (En NetworksV6 el purgador exige plantilla exactamente por lo mismo.)
      */
     private void purgeOnce(Network net, long pos, int rate) {
         NodeBlob blob = blobOf(net, pos);
         if (blob == null || blob.filterMaterials.isEmpty()) {
             return;
         }
-        var pred = NetworkManager.filterPredicate(blob);
+        Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
         ItemStack sacado = net.storage().withdraw(pred, rate);
-        // withdraw ya lo saco del almacen; no devolverlo es justamente descartarlo.
-        if (sacado != null && Settings.debug()) {
+        if (sacado == null) {
+            return;
+        }
+        spark(net, pos);
+        if (Settings.debug()) {
             plugin.getLogger().info("[Purger] descartadas " + sacado.getAmount() + " de "
                     + sacado.getType() + " en " + PosUtil.unpackX(pos) + ","
                     + PosUtil.unpackY(pos) + "," + PosUtil.unpackZ(pos));
         }
     }
 
+    /**
+     * La greedy cell es un buffer de salida con nombre propio: reclama de la red el item de su
+     * filtro hasta llenarse y lo va sirviendo a los contenedores de alrededor. Su contenido se
+     * cuenta como almacenamiento de la red (la terminal lo ve), con la salvedad de que consigo
+     * misma no choca: al re-llenarse se excluye para no aspirarse a si misma en bucle.
+     */
     private void greedyTick(Network net, long pos) {
         Block block = net.block(pos);
         NodeBlob blob = NodeStore.get(block);
@@ -187,36 +272,37 @@ public class NetworkTicker {
         }
         long cap = Settings.greedyCapacity();
 
-        if (blob.cellSample == null && !blob.filterMaterials.isEmpty()) {
-            for (String matName : blob.filterMaterials) {
-                org.bukkit.Material mat = org.bukkit.Material.matchMaterial(matName);
-                if (mat == null) {
-                    continue;
-                }
-                long available = net.storage().count(item -> item.getType() == mat);
-                if (available <= 0) {
-                    continue;
-                }
-                int want = (int) Math.min(cap, available);
-                ItemStack got = net.storage().withdraw(item -> item.getType() == mat, want);
-                if (got != null) {
-                    blob.cellAmount += got.getAmount();
-                    blob.cellSample = got;
-                    blob.cellSample.setAmount(1);
-                    break;
-                }
+        boolean tryAdopt = blob.cellSample == null && !blob.filterMaterials.isEmpty();
+        boolean tryRefill = blob.cellSample != null && blob.cellAmount < cap;
+        if (tryAdopt || tryRefill) {
+            final ItemStack muestra = blob.cellSample;
+            Predicate<ItemStack> pred = tryAdopt
+                    ? NetworkManager.filterPredicate(blob)
+                    : item -> StackUtils.itemsMatch(item, muestra);
+            int want = (int) Math.min(cap, Integer.MAX_VALUE);
+            if (!tryAdopt) {
+                want = (int) Math.min(cap - blob.cellAmount, Integer.MAX_VALUE);
             }
-        } else if (blob.cellSample != null && blob.cellAmount < cap) {
-            int missing = (int) Math.min((long) Integer.MAX_VALUE, cap - blob.cellAmount);
-            ItemStack got = net.storage().withdraw(blob.cellSample::isSimilar, missing);
+            ItemStack got = net.storage().withdraw(pred, want, pos);
             if (got != null) {
+                // El withdraw puede haber tocado otras greedy; se relee el propio blob para no
+                // sumar sobre una copia vieja.
+                blob = NodeStore.get(block);
+                if (blob == null) {
+                    net.storage().deposit(got);
+                    return;
+                }
+                if (blob.cellSample == null) {
+                    blob.cellSample = StackUtils.getAsQuantity(got, 1);
+                }
                 blob.cellAmount += got.getAmount();
+                NodeStore.put(block, blob);
+                spark(net, pos);
             }
         }
 
-        if (blob.cellAmount > 0) {
-            int rate = Settings.itemsPerOp() * 2;
-            int take = (int) Math.min(blob.cellAmount, rate);
+        if (blob.cellAmount > 0 && blob.cellSample != null) {
+            int take = (int) Math.min(blob.cellAmount, Settings.itemsPerOp() * 2L);
             for (BlockFace face : FACES) {
                 Block target = block.getRelative(face);
                 if (!(target.getState() instanceof InventoryHolder holder)) {
@@ -228,6 +314,9 @@ public class NetworkTicker {
                 int moved = take - leftover;
                 blob.cellAmount -= moved;
                 take = leftover;
+                if (moved > 0) {
+                    spark(net, pos);
+                }
                 if (take <= 0) {
                     break;
                 }
@@ -241,39 +330,122 @@ public class NetworkTicker {
         NodeStore.put(block, blob);
     }
 
-    private void doVacuum(Network net) {
-        if (!due(Settings.vacuumIntervalTicks())) {
+    /**
+     * El puente inalambrico: el RECEPTOR tira de la red del TRANSMISOR enlazado hacia la suya.
+     *
+     * Espejo del transmisor/receptor de NetworksV6, con el enlace guardado en el receptor (aqui
+     * el enlace se fija haciendo shift+click con el receptor sobre el transmisor). Solo cruzan
+     * items que pasen el filtro DEL RECEPTOR, y con filtro vacio no cruza nada: abrir un puente
+     * sin decidir que pasa mezclaria dos redes enteras sin querer.
+     */
+    private void bridgeOnce(Network net, long pos, int rate) {
+        NodeBlob blob = blobOf(net, pos);
+        if (blob == null || blob.txWorld == null || blob.filterMaterials.isEmpty()) {
             return;
         }
+        UUID worldId;
+        try {
+            worldId = UUID.fromString(blob.txWorld);
+        } catch (IllegalArgumentException e) {
+            return;
+        }
+        World world = plugin.getServer().getWorld(worldId);
+        if (world == null || !world.isChunkLoaded(blob.txX >> 4, blob.txZ >> 4)) {
+            return;
+        }
+        Block txBlock = world.getBlockAt(blob.txX, blob.txY, blob.txZ);
+        NodeBlob txBlob = NodeStore.get(txBlock);
+        if (txBlob == null || DeviceType.parse(txBlob.typeName) != DeviceType.TRANSMITTER) {
+            return;
+        }
+        Network remote = manager.networkAt(txBlock);
+        if (remote == null || remote == net) {
+            return;
+        }
+        Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
+        ItemStack stack = remote.storage().withdraw(pred, rate);
+        if (stack == null) {
+            return;
+        }
+        int leftover = net.storage().deposit(stack);
+        if (leftover > 0) {
+            stack.setAmount(leftover);
+            remote.storage().deposit(stack);
+        } else {
+            spark(net, pos);
+        }
+    }
+
+    private void doVacuum(Network net) {
         double radius = Settings.vacuumRadius();
         net.forEach(DeviceType.VACUUM, (pos, type) -> {
+            NodeBlob blob = blobOf(net, pos);
+            if (blob == null) {
+                return;
+            }
+            Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
             Location center = net.block(pos).getLocation().add(0.5, 0.5, 0.5);
-            for (org.bukkit.entity.Entity entity : center.getWorld().getNearbyEntities(center, radius, radius, radius)) {
+            for (org.bukkit.entity.Entity entity : center.getWorld()
+                    .getNearbyEntities(center, radius, radius, radius)) {
                 if (!(entity instanceof Item item)) {
                     continue;
                 }
+                // Los items con cooldown de recogida (acaban de soltarse) no se tocan: mismo
+                // respeto que el vacuum avanzado de NetworksV6, para no robar lo que un jugador
+                // tiro hace medio segundo.
+                if (item.getPickupDelay() > 0) {
+                    continue;
+                }
                 ItemStack stack = item.getItemStack();
+                if (!pred.test(stack)) {
+                    continue;
+                }
                 int leftover = net.storage().deposit(stack);
                 if (leftover <= 0) {
                     item.remove();
-                } else {
+                    spark(net, pos);
+                } else if (leftover < stack.getAmount()) {
                     stack.setAmount(leftover);
                     item.setItemStack(stack);
+                    spark(net, pos);
                 }
             }
         });
     }
 
     private void doCrafting(Network net) {
-        if (!due(Settings.craftIntervalTicks())) {
-            return;
-        }
         net.forEach(DeviceType.CRAFTER, (pos, type) -> {
             NodeBlob blob = blobOf(net, pos);
-            if (blob == null || blob.recipes.isEmpty()) {
+            if (blob == null) {
                 return;
             }
-            CraftingSupport.tryCraftAll(net, blob);
+            boolean worked = false;
+            // Blueprints instalados: un intento de craft por cada uno, atomico.
+            for (String b64 : new ArrayList<>(blob.blueprintData)) {
+                RecipeData data = Blueprints.decode(b64);
+                if (data == null) {
+                    continue;
+                }
+                if (CraftingSupport.tryCraftBlueprint(net, data)) {
+                    worked = true;
+                }
+            }
+            // Recetas antiguas por clave (las que ya estuvieran instaladas antes de los
+            // blueprints) siguen funcionando.
+            if (!blob.recipes.isEmpty()) {
+                worked |= CraftingSupport.tryCraftAll(net, blob);
+            }
+            if (worked) {
+                spark(net, pos);
+            }
         });
+    }
+
+    /** Ultima red de seguridad: lo que no tenga donde volver aparece como drop en el bloque. */
+    private static void dropAt(Block block, ItemStack stack) {
+        if (stack == null || stack.getAmount() <= 0) {
+            return;
+        }
+        block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), stack);
     }
 }

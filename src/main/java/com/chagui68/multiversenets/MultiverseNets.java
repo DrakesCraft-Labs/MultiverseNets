@@ -13,7 +13,8 @@ import com.chagui68.multiversenets.util.Settings;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public final class MultiverseNets extends JavaPlugin {
+// No final: MockBukkit necesita hacerle subclase para cargar el plugin en los tests.
+public class MultiverseNets extends JavaPlugin {
 
     private static MultiverseNets instance;
 

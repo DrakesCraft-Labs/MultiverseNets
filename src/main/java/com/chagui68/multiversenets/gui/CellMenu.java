@@ -13,6 +13,7 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -22,6 +23,8 @@ import java.util.Set;
 /**
  * Calco del menu de un Quantum Storage de Networks (NetworkQuantumStorage):
  *
+ *   Dos filas (18 huecos), suficiente para lo unico que hace una celda:
+ *
  *   [ Input ][ENTRADA][ Input ][ Item ][DISPLAY][ Item ][ Output][SALIDA][ Output ]
  *   [ fondo ][ fondo ][ fondo ][ fondo ][ SET ITEM ][ fondo ][ fondo ][ fondo ][ fondo ]
  *
@@ -29,6 +32,9 @@ import java.util.Set;
  *   - DISPLAY (4): el item guardado con su monto; en Networks es el ITEM_SLOT.
  *   - SALIDA (7): hueco real que la celda rellena sola hasta un stack, como el OUTPUT_SLOT.
  *   - SET ITEM (13): registra el tipo con un item en el cursor, solo con la celda vacia.
+ *
+ * Al cerrar, lo que quede en ENTRADA se absorbe a la celda y lo que no quepa (o lo que quede en
+ * SALIDA) vuelve al jugador. Antes de este cambio esos items se evaporaban al cerrar.
  */
 public class CellMenu extends MenuHolder {
 
@@ -50,7 +56,8 @@ public class CellMenu extends MenuHolder {
     }
 
     public void openMenu() {
-        open(27, Component.text(type.display(), NamedTextColor.DARK_AQUA)
+        // 18 huecos (2 filas): las tres de antes sobraban enteras.
+        open(18, Component.text(type.display(), NamedTextColor.DARK_AQUA)
                 .decoration(TextDecoration.ITALIC, false));
         // Mismo rol del BlockTicker del Quantum Storage: mover entrada y salida por ticks.
         tarea = plugin.getServer().getScheduler().runTaskTimer(plugin, this::moverPorTick, 5L, 5L);
@@ -83,7 +90,7 @@ public class CellMenu extends MenuHolder {
         var metaSet = setItem.getItemMeta();
         metaSet.displayName(Component.text("Set Item", NamedTextColor.GREEN).decoration(TextDecoration.ITALIC, false));
         metaSet.lore(List.of(
-                passivo("Drag an item on top of this pane to register it."),
+                passivo("Click with an item on your cursor to register it."),
                 passivo("Only works while the cell is empty.")));
         setItem.setItemMeta(metaSet);
         inv.setItem(SET_SLOT, setItem);
@@ -130,93 +137,183 @@ public class CellMenu extends MenuHolder {
      */
     private void moverPorTick() {
         if (inv == null || player.getOpenInventory().getTopInventory().getHolder() != this) {
-            if (tarea != null) {
-                tarea.cancel();
-                tarea = null;
-            }
+            cancelarTarea();
             return;
         }
         NodeBlob blob = NodeStore.get(block);
         if (blob == null) {
+            cancelarTarea();
             return;
         }
-        long cap = Items.capacityOf(type);
-        boolean cambio = false;
-
-        ItemStack entrada = inv.getItem(INPUT_SLOT);
-        if (entrada != null && !entrada.getType().isAir() && cap > 0
-                && (blob.cellSample == null || entrada.isSimilar(blob.cellSample))
-                && blob.cellAmount < cap) {
-            long espacio = cap - blob.cellAmount;
-            int tomar = (int) Math.min(Math.min(espacio, entrada.getAmount()), Integer.MAX_VALUE);
-            if (tomar > 0) {
-                if (blob.cellSample == null) {
-                    blob.cellSample = entrada.clone();
-                    blob.cellSample.setAmount(1);
-                }
-                blob.cellAmount += tomar;
-                int sobra = entrada.getAmount() - tomar;
-                if (sobra <= 0) {
-                    inv.setItem(INPUT_SLOT, null);
-                } else {
-                    entrada.setAmount(sobra);
-                }
-                NodeStore.put(block, blob);
-                cambio = true;
-            }
-        }
-
-        if (blob.cellSample != null && blob.cellAmount > 0) {
-            ItemStack salida = inv.getItem(OUTPUT_SLOT);
-            if (salida == null || salida.getType().isAir()) {
-                int dar = (int) Math.min(blob.cellSample.getMaxStackSize(), blob.cellAmount);
-                if (dar > 0) {
-                    ItemStack stack = blob.cellSample.clone();
-                    stack.setAmount(dar);
-                    inv.setItem(OUTPUT_SLOT, stack);
-                    descontar(blob, dar);
-                    NodeStore.put(block, blob);
-                    cambio = true;
-                }
-            } else if (salida.isSimilar(blob.cellSample) && salida.getAmount() < salida.getMaxStackSize()) {
-                int caben = salida.getMaxStackSize() - salida.getAmount();
-                int dar = (int) Math.min(caben, blob.cellAmount);
-                if (dar > 0) {
-                    salida.setAmount(salida.getAmount() + dar);
-                    descontar(blob, dar);
-                    NodeStore.put(block, blob);
-                    cambio = true;
-                }
-            }
-        }
+        boolean cambio = moverEntrada(blob) | moverSalida(blob);
 
         if (cambio) {
             actualizarDisplay();
         }
     }
 
+    /** Absorbe del hueco de entrada; devuelve si cambio algo. */
+    private boolean moverEntrada(NodeBlob blob) {
+        ItemStack entrada = inv.getItem(INPUT_SLOT);
+        if (entrada == null || entrada.getType().isAir()) {
+            return false;
+        }
+        if (absorberEnCelda(blob, entrada)) {
+            if (entrada.getAmount() <= 0) {
+                inv.setItem(INPUT_SLOT, null);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Mete a la celda lo que se pueda del stack dado (que se queda mutado con el sobrante).
+     * Devuelve true si entro algo.
+     */
+    private boolean absorberEnCelda(NodeBlob blob, ItemStack stack) {
+        long cap = Items.capacityOf(type);
+        if (blob.cellSample != null && !stack.isSimilar(blob.cellSample)) {
+            return false;
+        }
+        long espacio = cap - blob.cellAmount;
+        if (espacio <= 0) {
+            return false;
+        }
+        int tomar = (int) Math.min(Math.min(espacio, stack.getAmount()), Integer.MAX_VALUE);
+        if (tomar <= 0) {
+            return false;
+        }
+        if (blob.cellSample == null) {
+            blob.cellSample = stack.clone();
+            blob.cellSample.setAmount(1);
+        }
+        blob.cellAmount += tomar;
+        stack.setAmount(stack.getAmount() - tomar);
+        NodeStore.put(block, blob);
+        return true;
+    }
+
+    /** Rellena el hueco de salida hasta un stack; devuelve si cambio algo. */
+    private boolean moverSalida(NodeBlob blob) {
+        if (blob.cellSample == null || blob.cellAmount <= 0) {
+            return false;
+        }
+        ItemStack salida = inv.getItem(OUTPUT_SLOT);
+        if (salida == null || salida.getType().isAir()) {
+            int dar = (int) Math.min(blob.cellSample.getMaxStackSize(), blob.cellAmount);
+            if (dar <= 0) {
+                return false;
+            }
+            ItemStack stack = blob.cellSample.clone();
+            stack.setAmount(dar);
+            inv.setItem(OUTPUT_SLOT, stack);
+            descontar(blob, dar);
+            NodeStore.put(block, blob);
+            return true;
+        }
+        if (salida.isSimilar(blob.cellSample) && salida.getAmount() < salida.getMaxStackSize()) {
+            int caben = salida.getMaxStackSize() - salida.getAmount();
+            int dar = (int) Math.min(caben, blob.cellAmount);
+            if (dar <= 0) {
+                return false;
+            }
+            salida.setAmount(salida.getAmount() + dar);
+            descontar(blob, dar);
+            NodeStore.put(block, blob);
+            return true;
+        }
+        return false;
+    }
+
     @Override
     protected void click(InventoryClickEvent event) {
-        if (event.getRawSlot() != SET_SLOT) {
+        int raw = event.getRawSlot();
+        if (raw == SET_SLOT || raw == ITEM_SLOT) {
+            // Tanto el boton "Set Item" como el propio display fijan el tipo si esta vacio:
+            // el display es lo primero que el jugador intenta clicar con el item en mano.
+            NodeBlob blob = NodeStore.get(block);
+            if (blob == null) {
+                return;
+            }
+            if (blob.cellSample != null && blob.cellAmount > 0) {
+                player.sendMessage(Text.msg("The cell holds " + Items.formatAmount(blob.cellAmount)
+                        + ". Empty it (Output slot) before changing the stored item.", NamedTextColor.RED));
+                return;
+            }
+            ItemStack cursor = event.getView().getCursor();
+            if (cursor == null || cursor.getType().isAir()) {
+                return;
+            }
+            blob.cellSample = cursor.clone();
+            blob.cellSample.setAmount(1);
+            NodeStore.put(block, blob);
+            actualizarDisplay();
             return;
         }
+        // Shift sobre el inventario propio: lleva el stack al hueco de entrada si cupiera,
+        // para no obligar a arrastrar a mano (la celda de Networks acepta el gesto igual).
+        if (raw >= inv.getSize()
+                && (event.getClick() == org.bukkit.event.inventory.ClickType.SHIFT_LEFT
+                || event.getClick() == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT)) {
+            ItemStack mover = event.getCurrentItem();
+            ItemStack entrada = inv.getItem(INPUT_SLOT);
+            if (mover == null || mover.getType().isAir()
+                    || (entrada != null && !entrada.getType().isAir() && !entrada.isSimilar(mover))) {
+                return;
+            }
+            int slotJugador = slotInventarioJugador(event);
+            if (entrada == null || entrada.getType().isAir()) {
+                inv.setItem(INPUT_SLOT, mover);
+                player.getInventory().setItem(slotJugador, null);
+            } else {
+                int pasan = Math.min(entrada.getMaxStackSize() - entrada.getAmount(), mover.getAmount());
+                if (pasan <= 0) {
+                    return;
+                }
+                entrada.setAmount(entrada.getAmount() + pasan);
+                mover.setAmount(mover.getAmount() - pasan);
+                if (mover.getAmount() <= 0) {
+                    player.getInventory().setItem(slotJugador, null);
+                }
+            }
+        }
+    }
+
+    /**
+     * Recuperacion al cerrar: ENTRADA y SALIDA intentan volver PRIMERO a la celda.
+     *
+     * La salida es el caso delicado: mientras el menu esta abierto el slot 7 se re-llena solo
+     * desde el almacen (como el OUTPUT_SLOT de NetworksV6, que pertenece al bloque y conserva
+     * su contenido al cerrar). Si aqui se la dieramos al jugador, cada cierre le regalaria un
+     * stack extraido gratis — y al usuario le pareceria que "la celda le escupe items en vez de
+     * guardarlos". Solo vuelve al jugador lo que la celda no puede tragar (tipo distinto metido
+     * a mano, o celda llena).
+     */
+    @Override
+    protected void onClose(InventoryCloseEvent event) {
+        cancelarTarea();
         NodeBlob blob = NodeStore.get(block);
-        if (blob == null) {
-            return;
+        for (int slot : new int[]{INPUT_SLOT, OUTPUT_SLOT}) {
+            ItemStack contenido = inv.getItem(slot);
+            if (contenido == null || contenido.getType().isAir()) {
+                continue;
+            }
+            inv.setItem(slot, null);
+            if (blob != null) {
+                absorberEnCelda(blob, contenido);
+            }
+            if (contenido.getAmount() > 0) {
+                devolverAlJugador(contenido);
+            }
         }
-        if (blob.cellSample != null && blob.cellAmount > 0) {
-            player.sendMessage(Text.msg("The cell must be empty before changing the stored item.",
-                    NamedTextColor.RED));
-            return;
+    }
+
+    private void cancelarTarea() {
+        if (tarea != null) {
+            tarea.cancel();
+            tarea = null;
         }
-        ItemStack cursor = event.getView().getCursor();
-        if (cursor == null || cursor.getType().isAir()) {
-            return;
-        }
-        blob.cellSample = cursor.clone();
-        blob.cellSample.setAmount(1);
-        NodeStore.put(block, blob);
-        actualizarDisplay();
     }
 
     private void descontar(NodeBlob blob, int cuantos) {

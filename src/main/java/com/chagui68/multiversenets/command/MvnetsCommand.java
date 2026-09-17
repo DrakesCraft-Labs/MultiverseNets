@@ -22,7 +22,8 @@ import java.util.Locale;
 
 public class MvnetsCommand implements CommandExecutor, TabCompleter {
 
-    private static final List<String> SUBCOMMANDS = List.of("help", "info", "reload", "give", "devices", "doctor", "stats");
+    private static final List<String> SUBCOMMANDS =
+            List.of("help", "info", "reload", "give", "devices", "doctor", "stats", "inspect", "repair");
 
     private final MultiverseNets plugin;
 
@@ -47,6 +48,8 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
             case "devices" -> sendDevices(sender);
             case "doctor" -> doctor(sender);
             case "stats" -> stats(sender);
+            case "inspect" -> inspect(sender);
+            case "repair" -> repair(sender);
             default -> sender.sendMessage(Text.msg("Unknown subcommand. Use /" + label + " help.", NamedTextColor.RED));
         }
         return true;
@@ -70,6 +73,10 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
                 .append(Component.text(" - Network diagnostics.", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/mvnets stats", NamedTextColor.YELLOW)
                 .append(Component.text(" - Global statistics.", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/mvnets inspect", NamedTextColor.YELLOW)
+                .append(Component.text(" - Inspect the block you are looking at.", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/mvnets repair", NamedTextColor.YELLOW)
+                .append(Component.text(" - Force rescan of the network you are looking at.", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/mvnets reload", NamedTextColor.YELLOW)
                 .append(Component.text(" - Reload the configuration.", NamedTextColor.GRAY)));
     }
@@ -122,7 +129,7 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
             } catch (NumberFormatException ignored) {
             }
         }
-        ItemStack stack = Items.create(type);
+        ItemStack stack = type == DeviceType.RAKE ? Items.rake() : Items.create(type);
         stack.setAmount(type == DeviceType.WIRELESS_TERMINAL ? 1 : amount);
         player.getInventory().addItem(stack);
         player.sendMessage(Text.msg("Received: " + type.display(), NamedTextColor.GREEN));
@@ -170,6 +177,67 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
         return com.chagui68.multiversenets.util.PosUtil.unpackX(net.controllerPos()) + ","
                 + com.chagui68.multiversenets.util.PosUtil.unpackY(net.controllerPos()) + ","
                 + com.chagui68.multiversenets.util.PosUtil.unpackZ(net.controllerPos());
+    }
+
+    /**
+     * /mvnets inspect: como el 'inspect' de NetworksV6, cuenta lo que tiene delante (tipo,
+     * red, contenido si es celda/greedy).
+     */
+    private void inspect(CommandSender sender) {
+        if (!requireAdmin(sender) || !(sender instanceof Player player)) {
+            return;
+        }
+        org.bukkit.block.Block target = player.getTargetBlockExact(8);
+        if (target == null) {
+            sender.sendMessage(Text.msg("Look at a block within 8 blocks.", NamedTextColor.RED));
+            return;
+        }
+        var blob = com.chagui68.multiversenets.persist.NodeStore.get(target);
+        if (blob == null) {
+            sender.sendMessage(Text.msg("That block is not a network device.", NamedTextColor.GRAY));
+            return;
+        }
+        DeviceType type = DeviceType.parse(blob.typeName);
+        sender.sendMessage(Text.msg("Device: " + (type == null ? blob.typeName : type.display()),
+                NamedTextColor.AQUA));
+        Network net = plugin.networks().networkAt(target);
+        sender.sendMessage(Text.msg(net == null
+                        ? "Network: none (check cables to a controller)"
+                        : "Network: " + net.size() + " nodes, controller at " + coord(net),
+                net == null ? NamedTextColor.RED : NamedTextColor.GRAY));
+        if (blob.cellSample != null && blob.cellAmount > 0) {
+            sender.sendMessage(Text.msg("Stored: " + Items.formatAmount(blob.cellAmount)
+                    + " x " + blob.cellSample.getType().name(), NamedTextColor.GRAY));
+        }
+        if (!blob.filterMaterials.isEmpty()) {
+            sender.sendMessage(Text.msg("Filter (" + (blob.filterBlacklist ? "blacklist" : "whitelist")
+                    + "): " + String.join(", ", blob.filterMaterials), NamedTextColor.GRAY));
+        }
+    }
+
+    /**
+     * /mvnets repair: fuerza el reescaneo de la red del bloque mirado (el "repair" de
+     * NetworksV6 que reconstruye la topologia de un controlador).
+     */
+    private void repair(CommandSender sender) {
+        if (!requireAdmin(sender) || !(sender instanceof Player player)) {
+            return;
+        }
+        org.bukkit.block.Block target = player.getTargetBlockExact(8);
+        if (target == null) {
+            sender.sendMessage(Text.msg("Look at a network block within 8 blocks.", NamedTextColor.RED));
+            return;
+        }
+        Network net = plugin.networks().networkAt(target);
+        if (net == null) {
+            sender.sendMessage(Text.msg("That block does not belong to any network.", NamedTextColor.RED));
+            return;
+        }
+        net.scan();
+        sender.sendMessage(Text.msg("Network rescanned: " + net.size() + " node(s).", NamedTextColor.GREEN));
+        if (net.error != null && !net.error.isBlank()) {
+            sender.sendMessage(Text.msg("Warning: " + net.error, NamedTextColor.YELLOW));
+        }
     }
 
     @Override
