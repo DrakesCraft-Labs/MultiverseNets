@@ -25,20 +25,9 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /**
- * Calco del modelo de la grilla de Networks (NetworkGrid), que es lo que el servidor ya conoce:
+ * Main interactive digital storage terminal GUI for MultiverseNets networks.
  *
- *   - Columna derecha: hueco de entrada real (8), fondo (17), orden (26), filtro (35),
- *     pagina previa (44) y siguiente (53).
- *   - Los items guardados se pintan con "Amount: N" en el lore y la marca TERMINAL_DISPLAY en el
- *     PDC; SOLO esos stacks se pueden retirar (anti-dupe, mismo guard que isGridDisplayStack).
- *   - Retiro: izquierdo deja 1 en el cursor (suma al stack igual que ya tengas), derecho un
- *     stack completo y shift manda directo al inventario.
- *   - Ingreso: shift+izquierdo sobre un stack propio lo inserta (se quita del inventario antes,
- *     anti-dupe) o se estaciona en el hueco de entrada y la red lo absorbe sola.
- *   - Al cerrar: lo que quede en el hueco de entrada vuelve a la red, luego al jugador, y como
- *     ultimo recurso se suelta en el mundo. Nunca se pierde.
- *   - El display se repinta cada 10 ticks mientras este abierto (la vista del storage cachea
- *     500 ms, asi que no redecodifica celdas en cada pase).
+ * Menú principal interactivo de la terminal de almacenamiento digital para redes MultiverseNets.
  */
 public class TerminalMenu extends MenuHolder {
 
@@ -59,16 +48,15 @@ public class TerminalMenu extends MenuHolder {
             45, 46, 47, 48, 49, 50, 51, 52
     };
 
-    /** Marca en el lore que identifica a los stacks pintados por la grilla. */
-    private static final String MARCA_MONTO = "Amount: ";
+    private static final String AMOUNT_PREFIX = "Amount: ";
 
-    private enum Orden {ALFABETICO, CANTIDAD}
+    private enum SortOrder {ALPHABETIC, AMOUNT}
 
     private final Network network;
     private int page = 0;
     private String query = "";
-    private Orden orden = Orden.ALFABETICO;
-    private BukkitTask tarea;
+    private SortOrder sortOrder = SortOrder.ALPHABETIC;
+    private BukkitTask tickTask;
 
     public TerminalMenu(MultiverseNets plugin, Player player, Network network) {
         super(plugin, player);
@@ -76,11 +64,10 @@ public class TerminalMenu extends MenuHolder {
     }
 
     public void openMenu() {
-        cancelarTarea();
+        cancelTask();
         open(54, Component.text("Network Terminal", NamedTextColor.DARK_AQUA)
                 .decoration(TextDecoration.ITALIC, false));
-        // La red absorbe el hueco de entrada por ticks, como el BlockTicker de la grilla.
-        tarea = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tickVivo, 10L, 10L);
+        tickTask = plugin.getServer().getScheduler().runTaskTimer(plugin, this::liveTick, 10L, 10L);
     }
 
     @Override
@@ -90,47 +77,47 @@ public class TerminalMenu extends MenuHolder {
 
     @Override
     protected void draw() {
-        ItemStack fondo = panel(Material.LIGHT_GRAY_STAINED_GLASS_PANE, " ");
-        inv.setItem(BACKGROUND_SLOT, fondo);
+        ItemStack background = panel(Material.LIGHT_GRAY_STAINED_GLASS_PANE, " ");
+        inv.setItem(BACKGROUND_SLOT, background);
         inv.setItem(SORT_SLOT, panel(Material.BLUE_STAINED_GLASS_PANE,
-                orden == Orden.ALFABETICO ? "Change Sort Order: A-Z" : "Change Sort Order: Amount"));
-        inv.setItem(FILTER_SLOT, filtroIcono());
+                sortOrder == SortOrder.ALPHABETIC ? "Change Sort Order: A-Z" : "Change Sort Order: Amount"));
+        inv.setItem(FILTER_SLOT, filterIcon());
         inv.setItem(PREV_SLOT, panel(Material.RED_STAINED_GLASS_PANE, "Previous Page"));
         inv.setItem(NEXT_SLOT, panel(Material.RED_STAINED_GLASS_PANE, "Next Page"));
 
-        List<NetworkStorage.View> lista = filtradas();
-        int pages = Math.max(1, (lista.size() + PAGE_SIZE - 1) / PAGE_SIZE);
+        List<NetworkStorage.View> list = filteredItems();
+        int pages = Math.max(1, (list.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         if (page >= pages) {
             page = pages - 1;
         }
         int start = page * PAGE_SIZE;
         for (int i = 0; i < DISPLAY_SLOTS.length; i++) {
-            int indice = start + i;
-            if (indice < lista.size()) {
-                inv.setItem(DISPLAY_SLOTS[i], iconoGrilla(lista.get(indice)));
+            int index = start + i;
+            if (index < list.size()) {
+                inv.setItem(DISPLAY_SLOTS[i], gridIcon(list.get(index)));
             } else {
-                inv.setItem(DISPLAY_SLOTS[i], fondo);
+                inv.setItem(DISPLAY_SLOTS[i], background);
             }
         }
     }
 
-    private List<NetworkStorage.View> filtradas() {
+    private List<NetworkStorage.View> filteredItems() {
         List<NetworkStorage.View> all = network.storage().view();
-        Comparator<NetworkStorage.View> comparador = orden == Orden.CANTIDAD
+        Comparator<NetworkStorage.View> comparator = sortOrder == SortOrder.AMOUNT
                 ? Comparator.comparingLong(NetworkStorage.View::amount).reversed()
-                : Comparator.comparing(v -> nombreLegible(v.sample()));
+                : Comparator.comparing(v -> readableName(v.sample()));
         List<NetworkStorage.View> out = new ArrayList<>(all);
-        out.sort(comparador);
+        out.sort(comparator);
         if (query.isBlank()) {
             return out;
         }
         String q = query.toLowerCase();
-        out.removeIf(v -> !nombreLegible(v.sample()).toLowerCase().contains(q)
+        out.removeIf(v -> !readableName(v.sample()).toLowerCase().contains(q)
                 && !v.sample().getType().name().toLowerCase().contains(q));
         return out;
     }
 
-    private String nombreLegible(ItemStack item) {
+    private String readableName(ItemStack item) {
         if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
             return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
                     .serialize(item.getItemMeta().displayName());
@@ -138,34 +125,29 @@ public class TerminalMenu extends MenuHolder {
         return item.getType().name();
     }
 
-    /**
-     * El icono visible de una entrada: sample de a 1 con el monto en el lore y una marca en el
-     * PDC. La marca cumple el papel de isGridDisplayStack en Networks: SOLO los stacks pintados
-     * por la grilla se dejan retirar, nunca un item que un jugador logre colar aca.
-     */
-    private ItemStack iconoGrilla(NetworkStorage.View view) {
-        ItemStack icono = view.sample().clone();
-        icono.setAmount(1);
-        var meta = icono.getItemMeta();
+    private ItemStack gridIcon(NetworkStorage.View view) {
+        ItemStack icon = view.sample().clone();
+        icon.setAmount(1);
+        var meta = icon.getItemMeta();
         List<Component> lore = new ArrayList<>();
         lore.add(Component.empty());
-        lore.add(Component.text(MARCA_MONTO + Items.formatAmount(view.amount()), NamedTextColor.GRAY)
+        lore.add(Component.text(AMOUNT_PREFIX + Items.formatAmount(view.amount()), NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(lore);
         meta.getPersistentDataContainer().set(Keys.TERMINAL_DISPLAY, PersistentDataType.BYTE, (byte) 1);
-        icono.setItemMeta(meta);
-        return icono;
+        icon.setItemMeta(meta);
+        return icon;
     }
 
-    private ItemStack panel(Material material, String nombre) {
+    private ItemStack panel(Material material, String name) {
         ItemStack item = new ItemStack(material);
         var meta = item.getItemMeta();
-        meta.displayName(Component.text(nombre, NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+        meta.displayName(Component.text(name, NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
         item.setItemMeta(meta);
         return item;
     }
 
-    private ItemStack filtroIcono() {
+    private ItemStack filterIcon() {
         ItemStack item = new ItemStack(Material.NAME_TAG);
         var meta = item.getItemMeta();
         meta.displayName(Component.text(query.isBlank()
@@ -193,7 +175,7 @@ public class TerminalMenu extends MenuHolder {
                 return;
             }
             case SORT_SLOT -> {
-                orden = orden == Orden.ALFABETICO ? Orden.CANTIDAD : Orden.ALFABETICO;
+                sortOrder = sortOrder == SortOrder.ALPHABETIC ? SortOrder.AMOUNT : SortOrder.ALPHABETIC;
                 page = 0;
                 refresh();
                 return;
@@ -204,10 +186,6 @@ public class TerminalMenu extends MenuHolder {
                     page = 0;
                     refresh();
                 } else {
-                    // Igual que la grilla de Networks: el filtro se escribe por chat. Al abrir
-                    // el chat Minecraft CIERRA el inventario, asi que lo cerramos nosotros y,
-                    // cuando responda, reabrimos la terminal con el filtro ya aplicado. Sin
-                    // esto la respuesta caia en un menu cerrado y el filtro nunca hacia nada.
                     player.closeInventory();
                     ChatPrompts.ask(player, "Type your search term:", text -> {
                         query = text == null ? "" : text;
@@ -223,111 +201,98 @@ public class TerminalMenu extends MenuHolder {
 
         for (int slot : DISPLAY_SLOTS) {
             if (raw == slot) {
-                retirarDeDisplay(event);
+                withdrawFromDisplay(event);
                 return;
             }
         }
 
         if (raw >= event.getView().getTopInventory().getSize()) {
-            insertarStackPropio(event);
+            insertPlayerStack(event);
         }
     }
 
-    /**
-     * Retiro desde un stack pintado por la grilla, mismas reglas que retrieveItem en Networks:
-     * izquierdo 1 al cursor (sumando al stack igual que ya traigas), derecho un stack entero y
-     * shift directo al inventario con devolucion del sobrante.
-     */
-    private void retirarDeDisplay(InventoryClickEvent event) {
-        ItemStack icono = event.getCurrentItem();
-        if (!esStackDeGrilla(icono)) {
+    private void withdrawFromDisplay(InventoryClickEvent event) {
+        ItemStack icon = event.getCurrentItem();
+        if (!isGridStack(icon)) {
             return;
         }
-        // El matcher debe comparar contra el stack REAL de la celda: sin lore y sin la marca del
-        // PDC, porque la comparacion profunda los tiene en cuenta y si no, jamas encontraria nada.
-        ItemStack limpio = stackLimpio(icono);
-        Predicate<ItemStack> coincide =
-                item -> com.chagui68.multiversenets.util.StackUtils.itemsMatch(item, limpio);
-        ClickType clic = event.getClick();
-        boolean shift = clic == ClickType.SHIFT_LEFT || clic == ClickType.SHIFT_RIGHT;
+        ItemStack clean = cleanStack(icon);
+        Predicate<ItemStack> matches =
+                item -> com.chagui68.multiversenets.util.StackUtils.itemsMatch(item, clean);
+        ClickType click = event.getClick();
+        boolean shift = click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT;
 
         if (shift) {
-            int want = Math.min(limpio.getMaxStackSize(), 64);
-            ItemStack sacado = network.storage().withdraw(coincide, want);
-            if (sacado != null) {
-                int sobra = NetworkManager.insertInto(player.getInventory(), sacado);
-                if (sobra > 0) {
-                    sacado.setAmount(sobra);
-                    network.storage().deposit(sacado);
+            int want = Math.min(clean.getMaxStackSize(), 64);
+            ItemStack withdrawn = network.storage().withdraw(matches, want);
+            if (withdrawn != null) {
+                int leftover = NetworkManager.insertInto(player.getInventory(), withdrawn);
+                if (leftover > 0) {
+                    withdrawn.setAmount(leftover);
+                    network.storage().deposit(withdrawn);
                 }
             }
             draw();
             return;
         }
 
-        var vista = event.getView();
-        ItemStack cursor = vista.getCursor();
-        boolean derecho = clic == ClickType.RIGHT;
+        var view = event.getView();
+        ItemStack cursor = view.getCursor();
+        boolean right = click == ClickType.RIGHT;
 
         if (cursor == null || cursor.getType().isAir()) {
-            int want = derecho ? Math.min(limpio.getMaxStackSize(), 64) : 1;
-            ItemStack sacado = network.storage().withdraw(coincide, want);
-            if (sacado != null) {
-                vista.setCursor(sacado);
+            int want = right ? Math.min(clean.getMaxStackSize(), 64) : 1;
+            ItemStack withdrawn = network.storage().withdraw(matches, want);
+            if (withdrawn != null) {
+                view.setCursor(withdrawn);
             }
-        } else if (!derecho && limpio.isSimilar(cursor) && cursor.getAmount() < cursor.getMaxStackSize()) {
-            // Mismo gesto que setCursor/canAddMore en Networks: sumar de a uno al stack en mano.
-            ItemStack uno = network.storage().withdraw(coincide, 1);
-            if (uno != null) {
+        } else if (!right && clean.isSimilar(cursor) && cursor.getAmount() < cursor.getMaxStackSize()) {
+            ItemStack single = network.storage().withdraw(matches, 1);
+            if (single != null) {
                 cursor.setAmount(Math.min(cursor.getMaxStackSize(), cursor.getAmount() + 1));
             }
         }
         draw();
     }
 
-    /**
-     * Shift+izquierdo sobre un stack propio: se retira del inventario ANTES de entrar a la red
-     * (anti-dupe de Networks) y solo ese stack entra, no todo el inventario.
-     */
-    private void insertarStackPropio(InventoryClickEvent event) {
+    private void insertPlayerStack(InventoryClickEvent event) {
         ItemStack item = event.getCurrentItem();
         if (item == null || item.getType().isAir()) {
             return;
         }
         ItemStack actual = item.clone();
-        int antes = actual.getAmount();
-        int slotJugador = slotInventarioJugador(event);
-        player.getInventory().setItem(slotJugador, null);
-        int sobra = network.storage().deposit(actual);
-        if (sobra <= 0) {
-            player.sendMessage(Text.msg("Deposited " + Items.formatAmount(antes) + " items.", NamedTextColor.GREEN));
+        int initialAmount = actual.getAmount();
+        int playerSlot = playerInventorySlot(event);
+        player.getInventory().setItem(playerSlot, null);
+        int leftover = network.storage().deposit(actual);
+        if (leftover <= 0) {
+            player.sendMessage(Text.msg("Deposited " + Items.formatAmount(initialAmount) + " items.", NamedTextColor.GREEN));
         } else {
-            if (sobra < antes) {
-                player.sendMessage(Text.msg("Deposited " + Items.formatAmount(antes - sobra) + " items.", NamedTextColor.GREEN));
+            if (leftover < initialAmount) {
+                player.sendMessage(Text.msg("Deposited " + Items.formatAmount(initialAmount - leftover) + " items.", NamedTextColor.GREEN));
             } else {
                 player.sendMessage(Text.msg("Nothing deposited: the network needs a Quantum Cell "
                         + "with free space for this item.", NamedTextColor.RED));
             }
-            ItemStack devuelto = actual.clone();
-            devuelto.setAmount(sobra);
-            player.getInventory().setItem(slotJugador, devuelto);
+            ItemStack returned = actual.clone();
+            returned.setAmount(leftover);
+            player.getInventory().setItem(playerSlot, returned);
         }
         draw();
     }
 
-    /** Trabajo periodico: absorber la entrada y repintar la vista si sigue abierta. */
-    private void tickVivo() {
+    private void liveTick() {
         if (inv == null || player.getOpenInventory().getTopInventory().getHolder() != this) {
-            cancelarTarea();
+            cancelTask();
             return;
         }
-        ItemStack entrada = inv.getItem(INPUT_SLOT);
-        if (entrada != null && !entrada.getType().isAir()) {
-            int sobra = network.storage().deposit(entrada);
-            if (sobra <= 0) {
+        ItemStack input = inv.getItem(INPUT_SLOT);
+        if (input != null && !input.getType().isAir()) {
+            int leftover = network.storage().deposit(input);
+            if (leftover <= 0) {
                 inv.setItem(INPUT_SLOT, null);
             } else {
-                entrada.setAmount(sobra);
+                input.setAmount(leftover);
             }
         }
         draw();
@@ -335,42 +300,41 @@ public class TerminalMenu extends MenuHolder {
 
     @Override
     protected void onClose(InventoryCloseEvent event) {
-        cancelarTarea();
-        ItemStack entrada = inv.getItem(INPUT_SLOT);
-        if (entrada == null || entrada.getType().isAir()) {
+        cancelTask();
+        ItemStack input = inv.getItem(INPUT_SLOT);
+        if (input == null || input.getType().isAir()) {
             return;
         }
-        // Primero que intente guardarse de verdad; lo que no entre se devuelve al jugador.
-        int sobra = network.storage().deposit(entrada);
+        int leftover = network.storage().deposit(input);
         inv.setItem(INPUT_SLOT, null);
-        if (sobra > 0) {
-            entrada.setAmount(sobra);
-            devolverAlJugador(entrada);
+        if (leftover > 0) {
+            input.setAmount(leftover);
+            giveOrDrop(input);
         }
     }
 
-    private void cancelarTarea() {
-        if (tarea != null) {
-            tarea.cancel();
-            tarea = null;
+    private void cancelTask() {
+        if (tickTask != null) {
+            tickTask.cancel();
+            tickTask = null;
         }
     }
 
-    private boolean esStackDeGrilla(ItemStack icono) {
-        if (icono == null || icono.getType().isAir() || !icono.hasItemMeta()) {
+    private boolean isGridStack(ItemStack icon) {
+        if (icon == null || icon.getType().isAir() || !icon.hasItemMeta()) {
             return false;
         }
-        Byte marca = icono.getItemMeta().getPersistentDataContainer()
+        Byte mark = icon.getItemMeta().getPersistentDataContainer()
                 .get(Keys.TERMINAL_DISPLAY, PersistentDataType.BYTE);
-        return marca != null && marca == (byte) 1;
+        return mark != null && mark == (byte) 1;
     }
 
-    private ItemStack stackLimpio(ItemStack icono) {
-        ItemStack limpio = icono.clone();
-        var meta = limpio.getItemMeta();
+    private ItemStack cleanStack(ItemStack icon) {
+        ItemStack clean = icon.clone();
+        var meta = clean.getItemMeta();
         meta.lore((List<Component>) null);
         meta.getPersistentDataContainer().remove(Keys.TERMINAL_DISPLAY);
-        limpio.setItemMeta(meta);
-        return limpio;
+        clean.setItemMeta(meta);
+        return clean;
     }
 }

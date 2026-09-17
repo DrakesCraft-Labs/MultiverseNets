@@ -25,17 +25,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Crafting Grid: mesa de crafteo que tira del almacen de la red.
+ * Interactive crafting grid menu allowing players to craft items using items stored in the network.
  *
- * La matriz 3x3 es de PLANTILLAS (se pintan con un clic, sin soltar el item de verdad) y se
- * guarda en el blob del bloque, asi que sobrevive al cerrar. Antes vivia solo en memoria del
- * menu y, peor, ni se pintaba: craftear aqui era hacerlo a ciegas.
- *
- *   - Craft x1 / Craft x16: extrae los ingredientes de la red de forma transaccional (falta
- *     uno -> se devuelve todo) y entrega el resultado al jugador; lo que no quepa en su
- *     inventario vuelve a la red.
- *   - Clear: vacia las plantillas.
- *   - Shift+izquierdo sobre un stack propio: lo deposita en la red (solo ese stack).
+ * Menú de mesa de crafteo interactiva que permite a los jugadores craftear usando ítems de la red.
  */
 public class CraftingGridMenu extends MenuHolder {
 
@@ -94,7 +86,6 @@ public class CraftingGridMenu extends MenuHolder {
 
     @Override
     protected void draw() {
-        // Matriz (ahora pintada: las plantillas guardadas en el bloque).
         ItemStack[] matrix = matrix();
         for (int i = 0; i < MATRIX_SLOTS.length; i++) {
             ItemStack tpl = matrix[i];
@@ -112,9 +103,9 @@ public class CraftingGridMenu extends MenuHolder {
         }
         int start = page * BROWSER_SLOTS.length;
         for (int i = 0; i < BROWSER_SLOTS.length; i++) {
-            int indice = start + i;
-            if (indice < view.size()) {
-                inv.setItem(BROWSER_SLOTS[i], browserIcon(view.get(indice)));
+            int index = start + i;
+            if (index < view.size()) {
+                inv.setItem(BROWSER_SLOTS[i], browserIcon(view.get(index)));
             } else {
                 inv.setItem(BROWSER_SLOTS[i], panel(Material.GRAY_STAINED_GLASS_PANE, " "));
             }
@@ -139,7 +130,7 @@ public class CraftingGridMenu extends MenuHolder {
         inv.setItem(PREV_SLOT, button(Material.ARROW, "Previous page", page > 0));
         inv.setItem(NEXT_SLOT, button(Material.SPECTRAL_ARROW, "Next page", page < pages - 1));
 
-        Recipe recipe = recetaActual();
+        Recipe recipe = currentRecipe();
         if (recipe != null) {
             ItemStack result = recipe.getResult().clone();
             var meta = result.getItemMeta();
@@ -156,7 +147,7 @@ public class CraftingGridMenu extends MenuHolder {
         inv.setItem(INFO_SLOT, button(Material.BOOK, "Pulls ingredients from the network", true));
     }
 
-    private Recipe recetaActual() {
+    private Recipe currentRecipe() {
         ItemStack[] matrix = matrix();
         if (Blueprints.isEmpty(matrix)) {
             return null;
@@ -278,13 +269,14 @@ public class CraftingGridMenu extends MenuHolder {
     }
 
     /**
-     * Un intento de craft = una extraccion transaccional de los 9 ingredientes desde la red y
-     * el resultado al inventario del jugador. Si algo falla a mitad, todo vuelve a la red.
+     * Attempts crafting operations, withdrawing ingredients atomically from network storage.
+ *
+     * Intenta operaciones de crafteo, extrayendo ingredientes de forma atómica del almacenamiento de red.
      */
     private void craft(int maxCrafts) {
         int crafted = 0;
         for (int n = 0; n < maxCrafts; n++) {
-            Recipe recipe = recetaActual();
+            Recipe recipe = currentRecipe();
             if (recipe == null) {
                 if (n == 0) {
                     player.sendMessage(Text.msg("That arrangement does not match any recipe.", NamedTextColor.RED));
@@ -293,7 +285,6 @@ public class CraftingGridMenu extends MenuHolder {
             }
             ItemStack[] plan = Blueprints.normalize(matrix());
 
-            // Extraccion transaccional, igual que el crafter: se cuentan agregados antes de tocar.
             record Need(ItemStack sample, int amount) {}
             List<Need> needs = new ArrayList<>();
             for (ItemStack input : plan) {
@@ -313,14 +304,14 @@ public class CraftingGridMenu extends MenuHolder {
                     needs.add(new Need(StackUtils.getAsQuantity(input, 1), 1));
                 }
             }
-            boolean falta = false;
+            boolean missing = false;
             for (Need need : needs) {
                 if (network.storage().count(item -> StackUtils.itemsMatch(item, need.sample())) < need.amount()) {
-                    falta = true;
+                    missing = true;
                     break;
                 }
             }
-            if (falta) {
+            if (missing) {
                 if (n == 0) {
                     player.sendMessage(Text.msg("Not enough ingredients in the network.", NamedTextColor.RED));
                 }
@@ -337,7 +328,7 @@ public class CraftingGridMenu extends MenuHolder {
                 }
                 taken.add(got);
             }
-            if (taken.size() < contar(plan)) {
+            if (taken.size() < countInputs(plan)) {
                 network.storage().depositAll(taken);
                 if (n == 0) {
                     player.sendMessage(Text.msg("Not enough ingredients in the network.", NamedTextColor.RED));
@@ -359,7 +350,7 @@ public class CraftingGridMenu extends MenuHolder {
         refresh();
     }
 
-    private static int contar(ItemStack[] plan) {
+    private static int countInputs(ItemStack[] plan) {
         int n = 0;
         for (ItemStack s : plan) {
             if (s != null && !s.getType().isAir()) {
@@ -369,32 +360,31 @@ public class CraftingGridMenu extends MenuHolder {
         return n;
     }
 
-    /** Shift+click propio: deposita SOLO el stack clicado (nunca armadura ni offhand). */
     private void depositStack(InventoryClickEvent event) {
         ItemStack item = event.getCurrentItem();
         if (item == null || item.getType().isAir()) {
             return;
         }
         ItemStack actual = item.clone();
-        int antes = actual.getAmount();
-        int slotJugador = slotInventarioJugador(event);
-        player.getInventory().setItem(slotJugador, null);
-        int sobra = network.storage().deposit(actual);
-        if (sobra > 0) {
-            actual.setAmount(sobra);
-            player.getInventory().setItem(slotJugador, actual);
+        int initialAmount = actual.getAmount();
+        int playerSlot = playerInventorySlot(event);
+        player.getInventory().setItem(playerSlot, null);
+        int leftover = network.storage().deposit(actual);
+        if (leftover > 0) {
+            actual.setAmount(leftover);
+            player.getInventory().setItem(playerSlot, actual);
         }
-        if (sobra < antes) {
-            player.sendMessage(Text.msg("Deposited " + Items.formatAmount(antes - sobra) + " items.",
+        if (leftover < initialAmount) {
+            player.sendMessage(Text.msg("Deposited " + Items.formatAmount(initialAmount - leftover) + " items.",
                     NamedTextColor.GREEN));
         }
         refresh();
     }
 
-    private ItemStack panel(Material material, String nombre) {
+    private ItemStack panel(Material material, String name) {
         ItemStack item = new ItemStack(material);
         var meta = item.getItemMeta();
-        meta.displayName(Component.text(nombre, NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+        meta.displayName(Component.text(name, NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
         item.setItemMeta(meta);
         return item;
     }

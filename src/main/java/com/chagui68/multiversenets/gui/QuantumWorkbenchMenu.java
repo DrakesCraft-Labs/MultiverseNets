@@ -23,9 +23,9 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Mesa de trabajo cuántica (Quantum Workbench de Networks):
- * Permite mejorar Celdas Cuánticas (T1 -> T2 -> ... -> T6) transfiriendo
- * y preservando atómicamente todos los ítems guardados en su interior.
+ * Quantum Workbench GUI: allows upgrading Quantum Cells (T1 -> T2 -> ... -> T6) while atomically preserving stored cargo.
+ *
+ * Menú de la Mesa de Trabajo Cuántica: permite mejorar Celdas Cuánticas preservando atómicamente la carga guardada.
  */
 public class QuantumWorkbenchMenu extends MenuHolder {
 
@@ -63,9 +63,9 @@ public class QuantumWorkbenchMenu extends MenuHolder {
 
     @Override
     protected void draw() {
-        ItemStack fondo = panel(Material.GRAY_STAINED_GLASS_PANE, " ");
+        ItemStack background = panel(Material.GRAY_STAINED_GLASS_PANE, " ");
         for (int slot : BACKGROUND_SLOTS) {
-            inv.setItem(slot, fondo);
+            inv.setItem(slot, background);
         }
 
         ItemStack craftBtn = new ItemStack(Material.CRAFTING_TABLE);
@@ -89,30 +89,28 @@ public class QuantumWorkbenchMenu extends MenuHolder {
             return;
         }
 
-        // Si es shift-click desde inventario de jugador
         if (raw >= inv.getSize() && (event.getClick() == org.bukkit.event.inventory.ClickType.SHIFT_LEFT
                 || event.getClick() == org.bukkit.event.inventory.ClickType.SHIFT_RIGHT)) {
-            ItemStack mover = event.getCurrentItem();
-            if (mover == null || mover.getType().isAir()) {
+            ItemStack moving = event.getCurrentItem();
+            if (moving == null || moving.getType().isAir()) {
                 return;
             }
-            int slotJugador = slotInventarioJugador(event);
-            // Intentar meter en alguno de los slots de receta vacíos o compatibles
+            int playerSlot = playerInventorySlot(event);
             for (int rSlot : RECIPE_SLOTS) {
                 ItemStack inSlot = inv.getItem(rSlot);
                 if (inSlot == null || inSlot.getType().isAir()) {
-                    inv.setItem(rSlot, mover.clone());
-                    player.getInventory().setItem(slotJugador, null);
+                    inv.setItem(rSlot, moving.clone());
+                    player.getInventory().setItem(playerSlot, null);
                     return;
-                } else if (inSlot.isSimilar(mover) && inSlot.getAmount() < inSlot.getMaxStackSize()) {
+                } else if (inSlot.isSimilar(moving) && inSlot.getAmount() < inSlot.getMaxStackSize()) {
                     int space = inSlot.getMaxStackSize() - inSlot.getAmount();
-                    int toAdd = Math.min(space, mover.getAmount());
+                    int toAdd = Math.min(space, moving.getAmount());
                     inSlot.setAmount(inSlot.getAmount() + toAdd);
-                    mover.setAmount(mover.getAmount() - toAdd);
-                    if (mover.getAmount() <= 0) {
-                        player.getInventory().setItem(slotJugador, null);
+                    moving.setAmount(moving.getAmount() - toAdd);
+                    if (moving.getAmount() <= 0) {
+                        player.getInventory().setItem(playerSlot, null);
                     } else {
-                        player.getInventory().setItem(slotJugador, mover);
+                        player.getInventory().setItem(playerSlot, moving);
                     }
                     return;
                 }
@@ -134,7 +132,6 @@ public class QuantumWorkbenchMenu extends MenuHolder {
             return;
         }
 
-        // Verificar que los 8 slots restantes tengan diamantes
         for (int slot : RECIPE_SLOTS) {
             if (slot == CENTER_SLOT) {
                 continue;
@@ -146,22 +143,20 @@ public class QuantumWorkbenchMenu extends MenuHolder {
             }
         }
 
-        // Calcular siguiente tier
         int nextTier = centerType.cellTier() + 1;
         DeviceType nextType = DeviceType.parse("CELL_T" + nextTier);
         if (nextType == null) {
             return;
         }
 
-        ItemStack resultado = Items.create(nextType);
-        // Transferir la carga almacenada (CELL_CARGO) del tier anterior al nuevo
+        ItemStack result = Items.create(nextType);
         if (center.hasItemMeta()) {
             String cargo = center.getItemMeta().getPersistentDataContainer()
                     .get(Keys.CELL_CARGO, PersistentDataType.STRING);
             if (cargo != null) {
                 NodeBlob blob = NodeStore.decode(cargo);
                 if (blob != null) {
-                    var resMeta = resultado.getItemMeta();
+                    var resMeta = result.getItemMeta();
                     resMeta.getPersistentDataContainer().set(Keys.CELL_CARGO, PersistentDataType.STRING, cargo);
                     List<Component> lore = new ArrayList<>();
                     if (resMeta.hasLore()) {
@@ -172,12 +167,11 @@ public class QuantumWorkbenchMenu extends MenuHolder {
                                 + blob.cellSample.getType().name(), NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
                     }
                     resMeta.lore(lore);
-                    resultado.setItemMeta(resMeta);
+                    result.setItemMeta(resMeta);
                 }
             }
         }
 
-        // Consumir 1 de cada slot de receta
         for (int slot : RECIPE_SLOTS) {
             ItemStack inSlot = inv.getItem(slot);
             if (inSlot != null) {
@@ -189,7 +183,7 @@ public class QuantumWorkbenchMenu extends MenuHolder {
             }
         }
 
-        inv.setItem(OUTPUT_SLOT, resultado);
+        inv.setItem(OUTPUT_SLOT, result);
         player.sendMessage(Text.msg("Quantum Storage upgraded to " + nextType.display() + "!", NamedTextColor.GREEN));
     }
 
@@ -199,20 +193,20 @@ public class QuantumWorkbenchMenu extends MenuHolder {
             ItemStack item = inv.getItem(slot);
             if (item != null && !item.getType().isAir()) {
                 inv.setItem(slot, null);
-                devolverAlJugador(item);
+                giveOrDrop(item);
             }
         }
         ItemStack output = inv.getItem(OUTPUT_SLOT);
         if (output != null && !output.getType().isAir()) {
             inv.setItem(OUTPUT_SLOT, null);
-            devolverAlJugador(output);
+            giveOrDrop(output);
         }
     }
 
-    private ItemStack panel(Material material, String nombre) {
+    private ItemStack panel(Material material, String name) {
         ItemStack item = new ItemStack(material);
         var meta = item.getItemMeta();
-        meta.displayName(Component.text(nombre, NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+        meta.displayName(Component.text(name, NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
         item.setItemMeta(meta);
         return item;
     }

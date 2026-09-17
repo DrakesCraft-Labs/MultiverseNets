@@ -20,6 +20,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * Root command executor and tab completer for /mvnets administration and diagnostics.
+ *
+ * Ejecutor de comando principal y autocompletado para administración y diagnóstico de /mvnets.
+ */
 public class MvnetsCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS =
@@ -142,11 +147,9 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
         var manager = plugin.networks();
         manager.rescanAll();
 
-        // Lo primero que se pregunta cuando un pusher "no hace nada" contra una maquina de
-        // Slimefun es si la integracion llego a activarse. Mejor decirlo aqui que adivinarlo.
-        boolean sf = com.chagui68.multiversenets.compat.SlimefunBridge.disponible();
-        sender.sendMessage(Text.msg("Slimefun: " + (sf ? "conectado (grabbers y pushers "
-                + "pueden usar sus maquinas)" : "no disponible (solo contenedores de vanilla)"),
+        boolean sf = com.chagui68.multiversenets.compat.SlimefunBridge.isAvailable();
+        sender.sendMessage(Text.msg("Slimefun: " + (sf ? "connected (grabbers & pushers "
+                + "can interact with machines)" : "not available (vanilla containers only)"),
                 sf ? NamedTextColor.GREEN : NamedTextColor.YELLOW));
 
         sender.sendMessage(Text.msg("Diagnosing " + manager.all().size() + " network(s):", NamedTextColor.AQUA));

@@ -20,6 +20,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+/**
+ * GUI menu for the Network Monitor displaying controller info, device breakdowns, storage metrics, and network health.
+ *
+ * Menú del Monitor de Red que muestra información del controlador, desglose de dispositivos, métricas de almacenamiento y salud de la red.
+ */
 public class MonitorMenu extends MenuHolder {
 
     private final Network network;

@@ -18,27 +18,28 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
+/**
+ * [EN] Network Graph Topology & State
+ * Represents a single connected network of nodes centered on a Network Controller.
+ *
+ * Scans connected blocks via BFS without triggering synchronous chunk loads, and maintains
+ * type-indexed lookups ({@code byType}) to optimize ticking operations for 4000+ nodes.
+ *
+ * [ES] Topología y Estado del Grafo de Red
+ * Representa una red física de nodos conectados centrada en un Controlador de Red.
+ * Escanea bloques adyacentes por BFS sin forzar la carga de chunks y mantiene un índice
+ * optimizado por tipo de dispositivo.
+ */
 public class Network {
 
     private final com.chagui68.multiversenets.MultiverseNets plugin;
     private final org.bukkit.World world;
     private final long controllerPos;
     private final Map<Long, DeviceType> nodes = new HashMap<>();
-
-    /**
-     * Los mismos nodos agrupados por tipo.
-     *
-     * forEach(tipo) recorria el mapa entero para quedarse con los de una clase, y el ticker lo
-     * llama siete veces por pasada de transferencia. Con el limite de 4096 nodos eso son casi
-     * 29.000 recorridos cada cinco ticks por red, la mayoria para descartar. El indice se
-     * reconstruye en el mismo scan que ya rehace la topologia, asi que no anade trabajo: solo
-     * cambia donde se paga.
-     */
     private final Map<DeviceType, Set<Long>> byType = new EnumMap<>(DeviceType.class);
     private final NetworkStorage storage = new NetworkStorage(this);
     private volatile long version = 0;
     private long lastScanMs = 0;
-    /** Particulas activadas con el crayon; se lee del blob del controlador en cada scan. */
     private volatile boolean crayon;
     public String error;
 

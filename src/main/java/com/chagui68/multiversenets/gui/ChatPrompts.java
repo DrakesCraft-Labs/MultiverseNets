@@ -13,6 +13,11 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
+/**
+ * Intercepts player chat input to handle asynchronous text prompts (e.g. searching, configuration).
+ *
+ * Intercepta la entrada del chat del jugador para procesar solicitudes de texto asíncronas (ej. búsqueda, configuración).
+ */
 public class ChatPrompts implements Listener {
 
     private static final Map<UUID, Consumer<String>> PENDING = new ConcurrentHashMap<>();
@@ -21,12 +26,29 @@ public class ChatPrompts implements Listener {
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
+    /**
+     * Registers a pending chat prompt callback for a specific player.
+ *
+     * Registra un callback de chat pendiente para un jugador específico.
+     *
+     * @param player Target player / Jugador objetivo
+     * @param prompt Prompt message to display / Mensaje de solicitud a mostrar
+     * @param callback Consumer to execute on chat input / Consumer a ejecutar tras el mensaje
+     */
     public static void ask(Player player, String prompt, Consumer<String> callback) {
         PENDING.put(player.getUniqueId(), callback);
         player.sendMessage(com.chagui68.multiversenets.util.Text.msg(prompt, net.kyori.adventure.text.format.NamedTextColor.YELLOW));
         player.sendMessage(com.chagui68.multiversenets.util.Text.msg("Type 'cancel' to abort.", net.kyori.adventure.text.format.NamedTextColor.GRAY));
     }
 
+    /**
+     * Checks if a player has an active pending chat prompt.
+ *
+     * Comprueba si un jugador tiene una solicitud de chat pendiente.
+     *
+     * @param player Target player / Jugador objetivo
+     * @return true if pending / true si está pendiente
+     */
     public static boolean isPending(Player player) {
         return PENDING.containsKey(player.getUniqueId());
     }

@@ -28,18 +28,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Menú amigable e intuitivo del Auto-Crafter:
+ * GUI menu for the Auto-Crafter: displays, installs, and uninstalls crafting recipes and blueprints.
  *
- *   [Slot 0..17: Casillas de Blueprints / Recetas instaladas]
- *   [Fondo 18..23] [Status: 24] [Clear: 25] [Help: 26]
- *
- *   - Slots 0..17: Muestran los Blueprints instalados con sus ingredientes y salidas; o placeholders claros si están vacíos.
- *   - Shift-Click desde el inventario del jugador instala Blueprints sin consumirlos.
- *   - Clic con Blueprint en cursor instala o reemplaza.
- *   - Clic sin cursor sobre un Blueprint instalado lo desinstala.
- *   - Slot 24: Estado y contador de recetas instaladas.
- *   - Slot 25: Botón para limpiar todos los Blueprints instalados.
- *   - Slot 26: Guía interactiva de funcionamiento.
+ * Menú de interfaz para el Auto-Crafter: visualiza, instala y desinstala recetas y planos de crafteo.
  */
 public class CrafterMenu extends MenuHolder {
 
@@ -346,10 +337,10 @@ public class CrafterMenu extends MenuHolder {
         return null;
     }
 
-    private ItemStack panel(Material material, String nombre) {
+    private ItemStack panel(Material material, String name) {
         ItemStack item = new ItemStack(material);
         var meta = item.getItemMeta();
-        meta.displayName(Component.text(nombre, NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+        meta.displayName(Component.text(name, NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
         item.setItemMeta(meta);
         return item;
     }

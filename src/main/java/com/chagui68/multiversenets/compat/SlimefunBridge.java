@@ -10,113 +10,132 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Deja que la red hable con las maquinas de Slimefun sin depender de Slimefun.
+ * [EN] Slimefun Compatibility Bridge
+ * Allows MultiverseNets to interact with Slimefun machines without compile-time dependencies.
  *
- * POR QUE HACE FALTA
- *   Los grabbers y pushers buscan un InventoryHolder en el bloque vecino. Una maquina de
- *   Slimefun no lo es: su inventario no vive en el BlockState sino en un BlockMenu aparte, en
- *   el registro del propio Slimefun. Sin esto, MultiverseNets ve una fundidora electrica como
- *   un bloque decorativo y no puede meterle ni sacarle nada, que es justo lo que hace falta
- *   para ser alternativa a Networks.
+ * Why it's needed: Grabbers and Pushers normally look for an {@code InventoryHolder}
+ * in adjacent blocks. Slimefun machines do not store items in {@code BlockState}, but rather
+ * in a separate {@code BlockMenu} in Slimefun's registry. Without this bridge, MultiverseNets
+ * would treat Slimefun machines as plain decorative blocks.
  *
- * POR QUE POR REFLEXION
- *   El plugin se declara standalone y esa es su gracia: funciona en un servidor sin Slimefun.
- *   Enlazar contra sus clases obligaria a tenerlo. Aqui se resuelve todo en tiempo de ejecucion
- *   y, si Slimefun no esta, el puente se queda inactivo y el resto sigue igual.
+ * Why via reflection: The plugin remains completely standalone. If Slimefun is absent,
+ * the bridge stays dormant and vanilla container operations continue normally.
  *
- * POR QUE DOS PAQUETES
- *   El fork de DrakesCraft repaqueto Slimefun a com.github.drakescraft_labs; el original vive en
- *   io.github.thebusybiscuit. Se prueban ambos, asi que el mismo jar sirve en los dos sitios sin
- *   compilar dos veces.
+ * Multi-package support: Supports both legacy upstream packages ({@code io.github.thebusybiscuit})
+ * and relocated forks ({@code com.github.drakescraft_labs}).
  *
- * QUE SLOTS SE USAN
- *   Los que la propia maquina declara en getSlotsAccessedByItemTransport, no todos los del menu.
- *   Eso importa: meter carbon en el hueco de salida de una fundidora la atasca, y sacar de la
- *   entrada le roba lo que estaba procesando. Preguntandole a la maquina se respeta su diseno.
+ * Slot safety: Only accesses slots declared in {@code getSlotsAccessedByItemTransport} to respect
+ * machine input/output slot design.
+ *
+ * [ES] Puente de Compatibilidad con Slimefun
+ * Permite que MultiverseNets interactúe con máquinas de Slimefun sin dependencias en tiempo de compilación.
+ *
+ * Por qué es necesario: Grabbers y Pushers buscan un {@code InventoryHolder} en bloques vecinos.
+ * Las máquinas de Slimefun guardan su inventario en un {@code BlockMenu} separado. Este puente permite
+ * transferir ítems respetando los slots de entrada/salida de cada máquina.
+ *
+ * Por reflexión: Mantiene el plugin autónomo (standalone). Si Slimefun no está instalado, queda inactivo.
  */
 public final class SlimefunBridge {
 
-    private static final String[] RAICES = {
+    private static final String[] PACKAGE_ROOTS = {
             "com.github.drakescraft_labs.slimefun4.legacy",
             "io.github.thebusybiscuit.slimefun4.legacy",
     };
 
-    private static boolean disponible;
+    private static boolean available;
     private static Method mGetInventory;
     private static Method mCheckId;
     private static Method mGetPreset;
-    private static Method mSlotsParaTransporte;
+    private static Method mSlotsForTransport;
     private static Method mGetItemInSlot;
     private static Method mPushItem;
     private static Method mReplaceExistingItem;
-    private static Object flujoInsertar;
-    private static Object flujoRetirar;
+    private static Object flowInsert;
+    private static Object flowWithdraw;
 
     private SlimefunBridge() {
     }
 
-    /** Resuelve la API de Slimefun una sola vez. Sin el plugin instalado no hace nada. */
+    /**
+     * EN: Initializes the Slimefun reflection hooks. If Slimefun is missing, it stays dormant.
+ *
+     * ES: Inicializa los enlaces por reflexión con Slimefun. Si Slimefun no está instalado, queda inerte.
+     *
+     * @param log Logger instance for diagnostic notices / ES: Instancia del logger para mensajes.
+     */
     public static void init(Logger log) {
         if (!com.chagui68.multiversenets.util.Settings.compatSlimefun()) {
-            log.info("[Compat] Integracion con Slimefun desactivada en el config (compat.slimefun).");
+            log.info("[Compat] Slimefun integration disabled in config (compat.slimefun).");
             return;
         }
         if (Bukkit.getPluginManager().getPlugin("Slimefun") == null) {
-            log.info("[Compat] Slimefun no esta instalado; la red trabajara solo con contenedores de vanilla.");
+            log.info("[Compat] Slimefun is not installed; the network will work only with vanilla containers.");
             return;
         }
-        for (String raiz : RAICES) {
-            if (intentar(raiz)) {
-                disponible = true;
-                log.info("[Compat] Slimefun detectado (" + raiz + "). Grabbers, pushers y "
-                        + "autocrafteadores pueden usar sus maquinas.");
+        for (String root : PACKAGE_ROOTS) {
+            if (tryHook(root)) {
+                available = true;
+                log.info("[Compat] Slimefun detected (" + root + "). Grabbers, pushers, and crafters can use machines.");
                 return;
             }
         }
-        log.warning("[Compat] Slimefun esta instalado pero su API no encaja con ninguna variante "
-                + "conocida. La integracion queda desactivada; el resto del plugin no se ve afectado.");
+        log.warning("[Compat] Slimefun is installed but its API does not match any known package root. Integration disabled.");
     }
 
-    private static boolean intentar(String raiz) {
+    private static boolean tryHook(String root) {
         try {
-            Class<?> blockStorage = Class.forName(raiz + ".Slimefun.api.BlockStorage");
-            Class<?> dirtyMenu = Class.forName(raiz + ".Slimefun.api.inventory.DirtyChestMenu");
-            Class<?> preset = Class.forName(raiz + ".Slimefun.api.inventory.BlockMenuPreset");
-            Class<?> flujo = Class.forName(raiz + ".Slimefun.api.item_transport.ItemTransportFlow");
+            Class<?> blockStorage = Class.forName(root + ".Slimefun.api.BlockStorage");
+            Class<?> dirtyMenu = Class.forName(root + ".Slimefun.api.inventory.DirtyChestMenu");
+            Class<?> preset = Class.forName(root + ".Slimefun.api.inventory.BlockMenuPreset");
+            Class<?> flow = Class.forName(root + ".Slimefun.api.item_transport.ItemTransportFlow");
 
             mGetInventory = blockStorage.getMethod("getInventory", Block.class);
             mCheckId = blockStorage.getMethod("checkID", Block.class);
             mGetPreset = dirtyMenu.getMethod("getPreset");
-            mSlotsParaTransporte = preset.getMethod(
-                    "getSlotsAccessedByItemTransport", dirtyMenu, flujo, ItemStack.class);
+            mSlotsForTransport = preset.getMethod(
+                    "getSlotsAccessedByItemTransport", dirtyMenu, flow, ItemStack.class);
             mGetItemInSlot = dirtyMenu.getMethod("getItemInSlot", int.class);
             mPushItem = dirtyMenu.getMethod("pushItem", ItemStack.class, int[].class);
             mReplaceExistingItem = dirtyMenu.getMethod("replaceExistingItem", int.class, ItemStack.class);
 
-            Object[] valores = flujo.getEnumConstants();
-            for (Object valor : valores) {
-                String nombre = ((Enum<?>) valor).name();
-                if ("INSERT".equals(nombre)) flujoInsertar = valor;
-                if ("WITHDRAW".equals(nombre)) flujoRetirar = valor;
+            Object[] values = flow.getEnumConstants();
+            for (Object val : values) {
+                String name = ((Enum<?>) val).name();
+                if ("INSERT".equals(name)) flowInsert = val;
+                if ("WITHDRAW".equals(name)) flowWithdraw = val;
             }
-            return flujoInsertar != null && flujoRetirar != null;
+            return flowInsert != null && flowWithdraw != null;
         } catch (ReflectiveOperationException | RuntimeException error) {
             return false;
         }
     }
 
-    public static boolean disponible() {
-        return disponible;
+    /**
+     * EN: Returns true if Slimefun is present and its reflection API was successfully resolved.
+ *
+     * ES: Devuelve true si Slimefun está presente y su API se resolvió por reflexión.
+     */
+    public static boolean isAvailable() {
+        return available;
     }
 
-    /** True si el bloque es una maquina de Slimefun con inventario propio. */
-    public static boolean esMaquina(Block block) {
-        return menuDe(block) != null;
+    /**
+     * EN: Checks if a block is an active Slimefun machine with a custom menu.
+ *
+     * ES: Comprueba si un bloque es una máquina activa de Slimefun con menú propio.
+     */
+    public static boolean isMachine(Block block) {
+        return menuOf(block) != null;
     }
 
-    /** El id de Slimefun del bloque, o null. Util para diagnostico. */
-    public static String idDe(Block block) {
-        if (!disponible) return null;
+    /**
+     * EN: Returns the Slimefun item ID for a given block, or null if not a Slimefun block.
+ *
+     * ES: Obtiene el ID de Slimefun de un bloque, o null si no es de Slimefun.
+     */
+    public static String getId(Block block) {
+        if (!available || block == null) return null;
         try {
             Object id = mCheckId.invoke(null, block);
             return id == null ? null : id.toString();
@@ -125,8 +144,12 @@ public final class SlimefunBridge {
         }
     }
 
-    /** El id de Slimefun de un ItemStack, o null. Detecta tags PDC de Slimefun. */
-    public static String idDe(ItemStack item) {
+    /**
+     * EN: Returns the Slimefun ID from an ItemStack's PersistentDataContainer, or null if vanilla.
+ *
+     * ES: Obtiene el ID de Slimefun del PersistentDataContainer de un ItemStack, o null si es vanilla.
+     */
+    public static String getId(ItemStack item) {
         if (item == null || !item.hasItemMeta()) {
             return null;
         }
@@ -143,13 +166,17 @@ public final class SlimefunBridge {
         return null;
     }
 
-    /** Devuelve true si el ItemStack es un ítem registrado de Slimefun. */
-    public static boolean esItemSlimefun(ItemStack item) {
-        return idDe(item) != null;
+    /**
+     * EN: Returns true if the ItemStack is a registered Slimefun item.
+ *
+     * ES: Devuelve true si el ItemStack es un ítem registrado de Slimefun.
+     */
+    public static boolean isSlimefunItem(ItemStack item) {
+        return getId(item) != null;
     }
 
-    private static Object menuDe(Block block) {
-        if (!disponible || block == null) return null;
+    private static Object menuOf(Block block) {
+        if (!available || block == null) return null;
         try {
             return mGetInventory.invoke(null, block);
         } catch (ReflectiveOperationException | RuntimeException error) {
@@ -157,77 +184,131 @@ public final class SlimefunBridge {
         }
     }
 
-    private static int[] slots(Object menu, Object flujo, ItemStack referencia) {
+    private static int[] getTransportSlots(Object menu, Object flow, ItemStack reference) {
         try {
             Object preset = mGetPreset.invoke(menu);
             if (preset == null) return new int[0];
-            Object resultado = mSlotsParaTransporte.invoke(preset, menu, flujo, referencia);
-            return resultado instanceof int[] array ? array : new int[0];
+            Object result = mSlotsForTransport.invoke(preset, menu, flow, reference);
+            return result instanceof int[] array ? array : new int[0];
         } catch (ReflectiveOperationException | RuntimeException error) {
             return new int[0];
         }
     }
 
     /**
-     * Saca hasta {@code maximo} unidades que cumplan el filtro, de los huecos que la maquina
-     * declara como salida. Devuelve null si no habia nada que sacar.
+     * EN: Extracts up to {@code max} items matching {@code filter} from the machine's output slots.
+ *
+     * ES: Extrae hasta {@code max} ítems que cumplan {@code filter} de los huecos de salida de la máquina.
+     *
+     * @param block  The block containing the Slimefun machine / ES: Bloque de la máquina.
+     * @param filter Predicate filtering allowed items / ES: Predicado que filtra los ítems válidos.
+     * @param max    Maximum amount to extract / ES: Cantidad máxima a extraer.
+     * @return Extracted ItemStack, or null if none found / ES: ItemStack extraído o null si no había nada.
      */
-    public static ItemStack extraer(Block block, Predicate<ItemStack> filtro, int maximo) {
-        Object menu = menuDe(block);
-        if (menu == null || maximo <= 0) return null;
+    public static ItemStack extract(Block block, Predicate<ItemStack> filter, int max) {
+        Object menu = menuOf(block);
+        if (menu == null || max <= 0) return null;
         try {
-            for (int slot : slots(menu, flujoRetirar, null)) {
-                Object crudo = mGetItemInSlot.invoke(menu, slot);
-                if (!(crudo instanceof ItemStack actual) || actual.getType().isAir()) continue;
-                if (filtro != null && !filtro.test(actual)) continue;
+            for (int slot : getTransportSlots(menu, flowWithdraw, null)) {
+                Object raw = mGetItemInSlot.invoke(menu, slot);
+                if (!(raw instanceof ItemStack current) || current.getType().isAir()) continue;
+                if (filter != null && !filter.test(current)) continue;
 
-                int cuantos = Math.min(maximo, actual.getAmount());
-                ItemStack sacado = actual.clone();
-                sacado.setAmount(cuantos);
+                int amount = Math.min(max, current.getAmount());
+                ItemStack extracted = current.clone();
+                extracted.setAmount(amount);
 
-                int quedan = actual.getAmount() - cuantos;
-                // replaceExistingItem y no mutar el ItemStack: el menu guarda la referencia viva
-                // y Slimefun necesita enterarse del cambio para marcar el bloque como sucio.
-                ItemStack resto = null;
-                if (quedan > 0) {
-                    resto = actual.clone();
-                    resto.setAmount(quedan);
+                int remaining = current.getAmount() - amount;
+                ItemStack remainingStack = null;
+                if (remaining > 0) {
+                    remainingStack = current.clone();
+                    remainingStack.setAmount(remaining);
                 }
-                mReplaceExistingItem.invoke(menu, slot, resto);
-                return sacado;
+                mReplaceExistingItem.invoke(menu, slot, remainingStack);
+                return extracted;
             }
         } catch (ReflectiveOperationException | RuntimeException error) {
-            registrar(block, error);
+            logError(block, error);
         }
         return null;
     }
 
     /**
-     * Mete el stack en los huecos de entrada que la maquina declara.
+     * EN: Inserts an ItemStack into the machine's valid input slots.
+ *
+     * ES: Inserta un ItemStack en los huecos de entrada declarados por la máquina.
      *
-     * @return cuantas unidades NO cupieron; 0 si entro todo
+     * @param block The block containing the Slimefun machine / ES: Bloque de la máquina.
+     * @param stack The items to insert / ES: Ítems a insertar.
+     * @return Number of items that did not fit (0 if all inserted) / ES: Cantidad que no cupo (0 si entró todo).
      */
-    public static int insertar(Block block, ItemStack stack) {
-        Object menu = menuDe(block);
+    public static int insert(Block block, ItemStack stack) {
+        Object menu = menuOf(block);
         if (menu == null || stack == null || stack.getAmount() <= 0) {
             return stack == null ? 0 : stack.getAmount();
         }
         try {
-            int[] huecos = slots(menu, flujoInsertar, stack);
-            if (huecos.length == 0) return stack.getAmount();
+            int[] slots = getTransportSlots(menu, flowInsert, stack);
+            if (slots.length == 0) return stack.getAmount();
 
-            Object sobra = mPushItem.invoke(menu, stack.clone(), huecos);
-            if (sobra == null) return 0;
-            return sobra instanceof ItemStack resto ? resto.getAmount() : 0;
+            Object excess = mPushItem.invoke(menu, stack.clone(), slots);
+            if (excess == null) return 0;
+            return excess instanceof ItemStack rem ? rem.getAmount() : 0;
         } catch (ReflectiveOperationException | RuntimeException error) {
-            registrar(block, error);
+            logError(block, error);
             return stack.getAmount();
         }
     }
 
-    private static void registrar(Block block, Throwable error) {
+    // ----------------------------------------------------------------
+    // Legacy backward-compatibility aliases / Alias de compatibilidad
+    // ----------------------------------------------------------------
+
+    /** @deprecated Use {@link #isAvailable()} */
+    @Deprecated
+    public static boolean disponible() {
+        return isAvailable();
+    }
+
+    /** @deprecated Use {@link #isMachine(Block)} */
+    @Deprecated
+    public static boolean esMaquina(Block block) {
+        return isMachine(block);
+    }
+
+    /** @deprecated Use {@link #getId(Block)} */
+    @Deprecated
+    public static String idDe(Block block) {
+        return getId(block);
+    }
+
+    /** @deprecated Use {@link #getId(ItemStack)} */
+    @Deprecated
+    public static String idDe(ItemStack item) {
+        return getId(item);
+    }
+
+    /** @deprecated Use {@link #isSlimefunItem(ItemStack)} */
+    @Deprecated
+    public static boolean esItemSlimefun(ItemStack item) {
+        return isSlimefunItem(item);
+    }
+
+    /** @deprecated Use {@link #extract(Block, Predicate, int)} */
+    @Deprecated
+    public static ItemStack extraer(Block block, Predicate<ItemStack> filter, int max) {
+        return extract(block, filter, max);
+    }
+
+    /** @deprecated Use {@link #insert(Block, ItemStack)} */
+    @Deprecated
+    public static int insertar(Block block, ItemStack stack) {
+        return insert(block, stack);
+    }
+
+    private static void logError(Block block, Throwable error) {
         Logger.getLogger("MultiverseNets").log(Level.FINE,
-                "Fallo hablando con la maquina de Slimefun en " + block.getX() + "," + block.getY()
+                "Failed communicating with Slimefun machine at " + block.getX() + "," + block.getY()
                         + "," + block.getZ(), error);
     }
 }

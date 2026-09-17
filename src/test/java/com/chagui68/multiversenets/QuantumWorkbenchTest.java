@@ -24,6 +24,10 @@ import org.mockbukkit.mockbukkit.world.WorldMock;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * [EN] Tests Quantum Workbench crafting: upgrading storage cells while preserving stored cargo, and returning ingredients on close.
+ * [ES] Pruebas de crafteo en la Mesa de Trabajo Cuántica: mejora de celdas preservando la carga, y devolución de ingredientes al cerrar.
+ */
 class QuantumWorkbenchTest {
 
     private ServerMock server;
@@ -44,8 +48,12 @@ class QuantumWorkbenchTest {
         MockBukkit.unmock();
     }
 
+    /**
+     * [EN] Upgrading a Quantum Cell tier in Quantum Workbench transfers stored items and cargo safely to the upgraded cell.
+     * [ES] Mejorar el nivel de una Quantum Cell en la mesa transfiere la carga y los items almacenados de forma segura a la celda mejorada.
+     */
     @Test
-    void upgradeQuantumStoragePreservaCargaYTransfiereItems() {
+    void upgradeQuantumStoragePreservesCargoAndTransfersItems() {
         Block benchBlock = world.getBlockAt(0, 64, 0);
         benchBlock.setType(Material.BRAIN_CORAL_BLOCK);
         NodeStore.put(benchBlock, NodeBlob.create(DeviceType.QUANTUM_WORKBENCH.name()));
@@ -53,7 +61,7 @@ class QuantumWorkbenchTest {
         QuantumWorkbenchMenu menu = new QuantumWorkbenchMenu(plugin, player, benchBlock);
         menu.openMenu();
 
-        // 1) Crear celda T1 con carga previa (500 diamantes)
+        // 1) Create T1 cell with pre-existing cargo (500 iron ingots)
         ItemStack cellT1 = Items.create(DeviceType.CELL_T1);
         NodeBlob blobT1 = NodeBlob.create(DeviceType.CELL_T1.name());
         blobT1.cellSample = new ItemStack(Material.IRON_INGOT);
@@ -62,7 +70,7 @@ class QuantumWorkbenchTest {
         metaT1.getPersistentDataContainer().set(Keys.CELL_CARGO, PersistentDataType.STRING, NodeStore.encode(blobT1));
         cellT1.setItemMeta(metaT1);
 
-        // 2) Colocar celda T1 en el centro (slot 20) y diamantes alrededor
+        // 2) Place T1 cell in center slot (20) and diamonds around it
         for (int slot : QuantumWorkbenchMenu.RECIPE_SLOTS) {
             if (slot == QuantumWorkbenchMenu.CENTER_SLOT) {
                 player.getOpenInventory().getTopInventory().setItem(slot, cellT1);
@@ -71,33 +79,37 @@ class QuantumWorkbenchTest {
             }
         }
 
-        // 3) Clic en el botón de crafteo (slot 23)
+        // 3) Click craft button (slot 23)
         InventoryClickEvent clickCraft = new InventoryClickEvent(player.getOpenInventory(),
                 InventoryType.SlotType.CONTAINER, QuantumWorkbenchMenu.CRAFT_SLOT, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(clickCraft);
 
-        // 4) Verificar que el output slot tiene la celda T2 con la carga preservada
+        // 4) Verify output slot contains T2 cell with preserved cargo
         ItemStack result = player.getOpenInventory().getTopInventory().getItem(QuantumWorkbenchMenu.OUTPUT_SLOT);
-        assertNotNull(result, "el slot de salida debe contener el resultado");
-        assertEquals(DeviceType.CELL_T2, Items.typeOf(result), "el resultado debe ser Quantum Cell T2");
+        assertNotNull(result, "output slot must contain craft result");
+        assertEquals(DeviceType.CELL_T2, Items.typeOf(result), "result must be Quantum Cell T2");
 
         String cargoDecoded = result.getItemMeta().getPersistentDataContainer()
                 .get(Keys.CELL_CARGO, PersistentDataType.STRING);
-        assertNotNull(cargoDecoded, "el resultado debe contener el tag CELL_CARGO");
+        assertNotNull(cargoDecoded, "result must contain CELL_CARGO tag");
         NodeBlob blobT2 = NodeStore.decode(cargoDecoded);
-        assertNotNull(blobT2, "el blob de carga debe decodificarse correctamente");
-        assertEquals(500, blobT2.cellAmount, "la cantidad de items almacenados debe preservarse intacta");
-        assertEquals(Material.IRON_INGOT, blobT2.cellSample.getType(), "el tipo de item debe preservarse");
+        assertNotNull(blobT2, "cargo blob must decode cleanly");
+        assertEquals(500, blobT2.cellAmount, "stored item amount must remain intact");
+        assertEquals(Material.IRON_INGOT, blobT2.cellSample.getType(), "stored item sample type must remain intact");
 
-        // 5) Verificar que los ingredientes de la receta se consumieron
+        // 5) Verify recipe ingredients were consumed
         for (int slot : QuantumWorkbenchMenu.RECIPE_SLOTS) {
             assertNull(player.getOpenInventory().getTopInventory().getItem(slot),
-                    "los ingredientes consumidos deben desaparecer del grid");
+                    "consumed ingredients must be removed from crafting grid");
         }
     }
 
+    /**
+     * [EN] Closing the workbench menu returns uncrafted ingredients to the player.
+     * [ES] Cerrar el menú de la mesa de trabajo devuelve los ingredientes no crafteados al jugador.
+     */
     @Test
-    void cerrarMenuDevuelveIngredientesAlJugador() {
+    void closingMenuReturnsIngredientsToPlayer() {
         Block benchBlock = world.getBlockAt(0, 64, 0);
         benchBlock.setType(Material.BRAIN_CORAL_BLOCK);
         NodeStore.put(benchBlock, NodeBlob.create(DeviceType.QUANTUM_WORKBENCH.name()));
@@ -109,6 +121,6 @@ class QuantumWorkbenchTest {
         player.closeInventory();
 
         assertTrue(player.getInventory().contains(Material.GOLD_BLOCK),
-                "al cerrar la mesa de trabajo, los items en el grid deben volver al jugador");
+                "closing workbench returns placed grid items to player inventory");
     }
 }

@@ -29,10 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Reproduce el fallo reportado: el boton "Set Item" de la celda no hace nada.
- *
- * La GUI se abre de verdad, se hace click de verdad (el evento pasa por el GuiListener, como en
- * el servidor) y se verifica que el blob del bloque acuerda el tipo.
+ * [EN] Tests Quantum Cell GUI interactions: setting item template, quick depositing, withdrawing, and capacity safety.
+ * [ES] Pruebas de interacción con la GUI de Quantum Cell: fijar plantilla de item, depósito rápido, extracción y seguridad de capacidad.
  */
 class CellGuiTest {
 
@@ -54,137 +52,160 @@ class CellGuiTest {
         MockBukkit.unmock();
     }
 
-    private Block colocarCelda(int x, int y, int z, DeviceType tipo) {
+    private Block placeCell(int x, int y, int z, DeviceType type) {
         Block block = world.getBlockAt(x, y, z);
-        block.setType(tipo.material());
-        NodeStore.put(block, NodeBlob.create(tipo.name()));
+        block.setType(type.material());
+        NodeStore.put(block, NodeBlob.create(type.name()));
         return block;
     }
 
+    /**
+     * [EN] Right clicking a cell opens its CellMenu GUI.
+     * [ES] Hacer clic derecho en una celda abre su menú CellMenu.
+     */
     @Test
-    void laCeldaSeAbreConClicDerecho() {
-        Block celda = colocarCelda(0, 64, 0, DeviceType.CELL_T1);
+    void cellOpensOnRightClick() {
+        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
         PlayerInteractEvent interact = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK,
-                null, celda, BlockFace.NORTH, EquipmentSlot.HAND, null);
+                null, cell, BlockFace.NORTH, EquipmentSlot.HAND, null);
         server.getPluginManager().callEvent(interact);
         assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof CellMenu,
-                "el clic derecho sobre la celda tiene que abrir su menu");
+                "right click on cell should open its menu");
     }
 
+    /**
+     * [EN] Clicking Set Item button with item on cursor registers the item template without consuming cursor.
+     * [ES] Clic en el botón Set Item con item en cursor registra la plantilla sin consumir el cursor.
+     */
     @Test
-    void elBotonSetItemFijaElTipo() {
-        Block celda = colocarCelda(0, 64, 0, DeviceType.CELL_T1);
+    void setItemButtonSetsFilterSample() {
+        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
 
-        CellMenu menu = new CellMenu(plugin, player, celda, DeviceType.CELL_T1);
+        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.CELL_T1);
         menu.openMenu();
-        // MockBukkit limpia el cursor al abrir el inventario: se pone despues, como en juego.
         player.getOpenInventory().setCursor(new ItemStack(Material.DIAMOND, 5));
 
         InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
                 InventoryType.SlotType.CONTAINER, 13, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(click);
 
-        NodeBlob blob = NodeStore.get(celda);
-        assertNotNull(blob.cellSample, "tras clicar Set Item con un item en el cursor, la celda debe registrar el tipo");
+        NodeBlob blob = NodeStore.get(cell);
+        assertNotNull(blob.cellSample, "cell sample must be set after clicking Set Item");
         assertEquals(Material.DIAMOND, blob.cellSample.getType());
-        // El item del cursor no se consume: solo se registra como plantilla.
         assertEquals(5, player.getItemOnCursor().getAmount());
     }
 
+    /**
+     * [EN] Quick Deposit button deposits matching items from player inventory into cell storage.
+     * [ES] El botón Quick Deposit guarda items coincidentes del inventario del jugador en la celda.
+     */
     @Test
-    void quickDepositDepositaItemsDeInventarioEnCelda() {
-        Block celda = colocarCelda(0, 64, 0, DeviceType.CELL_T1);
-        NodeBlob blob = NodeStore.get(celda);
+    void quickDepositDepositsInventoryItemsIntoCell() {
+        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
+        NodeBlob blob = NodeStore.get(cell);
         blob.cellSample = new ItemStack(Material.COBBLESTONE);
         blob.cellAmount = 0;
-        NodeStore.put(celda, blob);
+        NodeStore.put(cell, blob);
 
         player.getInventory().addItem(new ItemStack(Material.COBBLESTONE, 64));
-        CellMenu menu = new CellMenu(plugin, player, celda, DeviceType.CELL_T1);
+        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.CELL_T1);
         menu.openMenu();
 
-        // Clic en Quick Deposit (Slot 11)
         InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
                 InventoryType.SlotType.CONTAINER, CellMenu.DEPOSIT_ALL_SLOT, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(click);
 
-        NodeBlob after = NodeStore.get(celda);
-        assertEquals(64, after.cellAmount, "Quick Deposit guarda los items del inventario en la celda");
-        assertFalse(player.getInventory().contains(Material.COBBLESTONE), "los items se retiran del inventario");
+        NodeBlob after = NodeStore.get(cell);
+        assertEquals(64, after.cellAmount, "quick deposit saves matching items to cell");
+        assertFalse(player.getInventory().contains(Material.COBBLESTONE), "items removed from player inventory");
     }
 
+    /**
+     * [EN] Right clicking stored item slot extracts 1 stack to cursor.
+     * [ES] Clic derecho en el slot de item almacenado saca 1 stack al cursor.
+     */
     @Test
-    void storedItemSlotPermiteRetirarItems() {
-        Block celda = colocarCelda(0, 64, 0, DeviceType.CELL_T1);
-        NodeBlob blob = NodeStore.get(celda);
+    void storedItemSlotAllowsWithdrawingItems() {
+        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
+        NodeBlob blob = NodeStore.get(cell);
         blob.cellSample = new ItemStack(Material.DIAMOND);
         blob.cellAmount = 100;
-        NodeStore.put(celda, blob);
+        NodeStore.put(cell, blob);
 
-        CellMenu menu = new CellMenu(plugin, player, celda, DeviceType.CELL_T1);
+        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.CELL_T1);
         menu.openMenu();
 
-        // Clic derecho en el item slot (Slot 4): saca 1 stack (64)
         InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
                 InventoryType.SlotType.CONTAINER, CellMenu.ITEM_SLOT, ClickType.RIGHT, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(click);
 
-        NodeBlob after = NodeStore.get(celda);
-        assertEquals(36, after.cellAmount, "se sacaron 64 items de la celda");
+        NodeBlob after = NodeStore.get(cell);
+        assertEquals(36, after.cellAmount, "withdrew 64 items from cell");
         assertNotNull(player.getItemOnCursor());
         assertEquals(64, player.getItemOnCursor().getAmount());
     }
 
+    /**
+     * [EN] Shift clicking stored item slot extracts items directly into player inventory.
+     * [ES] Shift-clic en el slot de item extrae items directamente al inventario del jugador.
+     */
     @Test
-    void storedItemSlotShiftClickExtraeAlInventario() {
-        Block celda = colocarCelda(0, 64, 0, DeviceType.CELL_T1);
-        NodeBlob blob = NodeStore.get(celda);
+    void storedItemSlotShiftClickExtractsToInventory() {
+        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
+        NodeBlob blob = NodeStore.get(cell);
         blob.cellSample = new ItemStack(Material.EMERALD);
         blob.cellAmount = 100;
-        NodeStore.put(celda, blob);
+        NodeStore.put(cell, blob);
 
-        CellMenu menu = new CellMenu(plugin, player, celda, DeviceType.CELL_T1);
+        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.CELL_T1);
         menu.openMenu();
 
-        // Shift-clic en el item slot (Slot 4): llena el inventario
         InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
                 InventoryType.SlotType.CONTAINER, CellMenu.ITEM_SLOT, ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
         server.getPluginManager().callEvent(click);
 
-        NodeBlob after = NodeStore.get(celda);
-        assertEquals(0, after.cellAmount, "se vaciaron los 100 items al inventario del jugador");
+        NodeBlob after = NodeStore.get(cell);
+        assertEquals(0, after.cellAmount, "all 100 items moved to player inventory");
         assertTrue(player.getInventory().contains(Material.EMERALD));
     }
 
+    /**
+     * [EN] CellMenu top inventory has 18 slots (2 rows).
+     * [ES] El menú CellMenu tiene 18 ranuras (2 filas).
+     */
     @Test
-    void laCeldaTieneDosFilas() {
+    void cellMenuHasTwoRows() {
         assertEquals(18, cellMenuSize());
     }
 
     private int cellMenuSize() {
-        Block celda = colocarCelda(0, 64, 0, DeviceType.CELL_T1);
-        CellMenu menu = new CellMenu(plugin, player, celda, DeviceType.CELL_T1);
+        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
+        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.CELL_T1);
         menu.openMenu();
         return player.getOpenInventory().getTopInventory().getSize();
     }
 
+    /**
+     * [EN] Set Item does not overwrite the template of a non-empty cell.
+     * [ES] Set Item no sobrescribe el tipo de una celda que contiene items.
+     */
     @Test
-    void setItemNoSobrescribeUnaCeldaLlena() {
-        Block celda = colocarCelda(0, 64, 0, DeviceType.CELL_T1);
-        NodeBlob blob = NodeStore.get(celda);
+    void setItemDoesNotOverwriteNonEmptyCell() {
+        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
+        NodeBlob blob = NodeStore.get(cell);
         blob.cellSample = new ItemStack(Material.COBBLESTONE);
         blob.cellAmount = 100;
-        NodeStore.put(celda, blob);
+        NodeStore.put(cell, blob);
 
         player.setItemOnCursor(new ItemStack(Material.DIAMOND, 1));
-        CellMenu menu = new CellMenu(plugin, player, celda, DeviceType.CELL_T1);
+        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.CELL_T1);
         menu.openMenu();
         InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
                 InventoryType.SlotType.CONTAINER, 13, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(click);
 
-        NodeBlob after = NodeStore.get(celda);
+        NodeBlob after = NodeStore.get(cell);
         assertEquals(Material.COBBLESTONE, after.cellSample.getType(),
-                "una celda con contenido no puede cambiar de tipo");
+                "cell with items cannot have its template changed");
     }
 }

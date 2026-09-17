@@ -28,18 +28,16 @@ import java.util.UUID;
 import java.util.function.Predicate;
 
 /**
- * El corazon de todas las redes. Corre cada 5 ticks y reparte el trabajo por bloques de tiempo:
- * cada familia (transferencias, vacuum, crafteo, escaneo) tiene su propio intervalo del config.
+ * [EN] Network Ticking & Processing Loop
+ * Central heartbeat running every 5 ticks. Dispatches scheduled tasks based on independent config timers:
+ * transfer operations (grabbers/pushers), vacuum pickups, auto-crafting, and topology rescans.
+ * - Anti-loss guarantee: Items that cannot be deposited return to source, or drop naturally if full.
+ * - Safe purger: Purger nodes without configured filters never discard items.
+ * - Chunk safety: Nodes in unloaded chunks are never touched or synchronously loaded.
  *
- * Antes los intervalos se evaluaban como "tick % intervalo == 0" sobre un contador que avanzaba
- * de 5 en 5: un intervalo que no fuera multiplo de 5 no se cumplia JAMAS (p.ej. un scan cada 6
- * ticks no ocurria nunca). Ahora cada familia guarda cuanto le quedaba y dispara cuando llega.
- *
- * Reglas heredadas de NetworksV6 que aqui se respetan a rajatabla:
- *   - Nada se borra jamas al moverse: lo que la red no absorbe vuelve al origen, y si el origen
- *     tampoco lo admite se suelta en el mundo. Perder items es peor que tirarlos.
- *   - El purgador sin filtro no borra ni un solo item.
- *   - Los nodos de chunks no cargados no se tocan (ni se fuerza su carga).
+ * [ES] Bucle de Procesamiento y Ticking de Red
+ * Corazón central de todas las redes ejecutado cada 5 ticks. Distribuye el trabajo por temporizadores configurables:
+ * transferencias (grabbers/pushers), recolección por vacuum, autocrafteo y reescaneo de topología.
  */
 public class NetworkTicker {
 
@@ -175,19 +173,18 @@ public class NetworkTicker {
                 return;
             }
 
-            // Una maquina de Slimefun no es InventoryHolder: su inventario vive en un BlockMenu
-            // aparte. Sin esta rama, la red ve una fundidora electrica como un bloque cualquiera.
-            ItemStack sacado = SlimefunBridge.extraer(target, pred, rate);
-            if (sacado == null) {
+            // Slimefun machine compatibility branch
+            ItemStack extracted = SlimefunBridge.extract(target, pred, rate);
+            if (extracted == null) {
                 continue;
             }
-            int sobra = net.storage().deposit(sacado);
-            if (sobra > 0) {
-                sacado.setAmount(sobra);
-                int sinCasa = SlimefunBridge.insertar(target, sacado);
-                if (sinCasa > 0) {
-                    sacado.setAmount(sinCasa);
-                    dropAt(target, sacado);
+            int leftover = net.storage().deposit(extracted);
+            if (leftover > 0) {
+                extracted.setAmount(leftover);
+                int unhoused = SlimefunBridge.insert(target, extracted);
+                if (unhoused > 0) {
+                    extracted.setAmount(unhoused);
+                    dropAt(target, extracted);
                 }
             }
             spark(net, pos);
@@ -196,9 +193,9 @@ public class NetworkTicker {
     }
 
     /**
-     * Saca un stack de la red y lo reparte entre los contenedores adyacentes hasta agotarlo.
-     * Antes se rendia en el primer inventario lleno; una cara llena no es razon para no mirar
-     * las demas.
+     * EN: Exports items from the network into adjacent inventories.
+ *
+     * ES: Exporta ítems desde la red hacia los contenedores adyacentes.
      */
     private void pushOnce(Network net, long pos, int rate) {
         NodeBlob blob = blobOf(net, pos);
@@ -226,13 +223,13 @@ public class NetworkTicker {
                 continue;
             }
 
-            if (!SlimefunBridge.esMaquina(target)) {
+            if (!SlimefunBridge.isMachine(target)) {
                 continue;
             }
-            int antes = stack.getAmount();
-            int noCupo = SlimefunBridge.insertar(target, stack);
-            stack.setAmount(Math.max(0, Math.min(noCupo, antes)));
-            if (stack.getAmount() < antes) {
+            int before = stack.getAmount();
+            int unhoused = SlimefunBridge.insert(target, stack);
+            stack.setAmount(Math.max(0, Math.min(unhoused, before)));
+            if (stack.getAmount() < before) {
                 spark(net, pos);
             }
             if (stack.getAmount() <= 0) {
@@ -245,35 +242,37 @@ public class NetworkTicker {
     }
 
     /**
-     * Descarta de la red lo que case con el filtro del purgador.
-     *
-     * Sin filtro configurado NO hace nada, a proposito. Un purgador que por defecto se lo comiera
-     * todo seria una trituradora de inventarios esperando a que alguien lo coloque sin mirar.
-     * (En NetworksV6 el purgador exige plantilla exactamente por lo mismo.)
+     * EN: Discards matching items from the network storage. Does nothing if no filters are configured.
+ *
+     * ES: Descarta ítems coincidentes del almacenamiento de la red. No hace nada si no hay filtros configurados.
      */
     private void purgeOnce(Network net, long pos, int rate) {
         NodeBlob blob = blobOf(net, pos);
-        if (blob == null || blob.filterMaterials.isEmpty()) {
+        if (blob == null) {
+            return;
+        }
+        boolean hasItems = blob.filterItems != null && !blob.filterItems.isEmpty();
+        boolean hasMats = blob.filterMaterials != null && !blob.filterMaterials.isEmpty();
+        if (!hasItems && !hasMats) {
             return;
         }
         Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
-        ItemStack sacado = net.storage().withdraw(pred, rate);
-        if (sacado == null) {
+        ItemStack purged = net.storage().withdraw(pred, rate);
+        if (purged == null) {
             return;
         }
         spark(net, pos);
         if (Settings.debug()) {
-            plugin.getLogger().info("[Purger] descartadas " + sacado.getAmount() + " de "
-                    + sacado.getType() + " en " + PosUtil.unpackX(pos) + ","
+            plugin.getLogger().info("[Purger] Discarded " + purged.getAmount() + "x "
+                    + purged.getType() + " at " + PosUtil.unpackX(pos) + ","
                     + PosUtil.unpackY(pos) + "," + PosUtil.unpackZ(pos));
         }
     }
 
     /**
-     * La greedy cell es un buffer de salida con nombre propio: reclama de la red el item de su
-     * filtro hasta llenarse y lo va sirviendo a los contenedores de alrededor. Su contenido se
-     * cuenta como almacenamiento de la red (la terminal lo ve), con la salvedad de que consigo
-     * misma no choca: al re-llenarse se excluye para no aspirarse a si misma en bucle.
+     * EN: Ticks a Greedy Cell: claims its configured item from the network and distributes it to adjacent containers.
+ *
+     * ES: Procesa una Greedy Cell: solicita su ítem a la red hasta llenarse y lo sirve a contenedores vecinos.
      */
     private void greedyTick(Network net, long pos) {
         Block block = net.block(pos);
@@ -286,18 +285,16 @@ public class NetworkTicker {
         boolean tryAdopt = blob.cellSample == null && !blob.filterMaterials.isEmpty();
         boolean tryRefill = blob.cellSample != null && blob.cellAmount < cap;
         if (tryAdopt || tryRefill) {
-            final ItemStack muestra = blob.cellSample;
+            final ItemStack sample = blob.cellSample;
             Predicate<ItemStack> pred = tryAdopt
                     ? NetworkManager.filterPredicate(blob)
-                    : item -> StackUtils.itemsMatch(item, muestra);
+                    : item -> StackUtils.itemsMatch(item, sample);
             int want = (int) Math.min(cap, Integer.MAX_VALUE);
             if (!tryAdopt) {
                 want = (int) Math.min(cap - blob.cellAmount, Integer.MAX_VALUE);
             }
             ItemStack got = net.storage().withdraw(pred, want, pos);
             if (got != null) {
-                // El withdraw puede haber tocado otras greedy; se relee el propio blob para no
-                // sumar sobre una copia vieja.
                 blob = NodeStore.get(block);
                 if (blob == null) {
                     net.storage().deposit(got);
@@ -349,6 +346,11 @@ public class NetworkTicker {
      * items que pasen el filtro DEL RECEPTOR, y con filtro vacio no cruza nada: abrir un puente
      * sin decidir que pasa mezclaria dos redes enteras sin querer.
      */
+    /**
+     * EN: Wireless Bridge: pulls matching filtered items from the linked Transmitter network into this Receiver's network.
+ *
+     * ES: Puente inalámbrico: el Receptor extrae ítems filtrados de la red del Transmisor vinculado hacia la suya.
+     */
     private void bridgeOnce(Network net, long pos, int rate) {
         NodeBlob blob = blobOf(net, pos);
         if (blob == null || blob.txWorld == null || blob.filterMaterials.isEmpty()) {
@@ -387,6 +389,11 @@ public class NetworkTicker {
         }
     }
 
+    /**
+     * EN: Collects matching dropped items from the ground within the vacuum radius.
+ *
+     * ES: Recoge ítems del suelo que cumplan el filtro dentro del radio del vacuum.
+     */
     private void doVacuum(Network net) {
         double radius = Settings.vacuumRadius();
         net.forEach(DeviceType.VACUUM, (pos, type) -> {
@@ -401,9 +408,6 @@ public class NetworkTicker {
                 if (!(entity instanceof Item item)) {
                     continue;
                 }
-                // Los items con cooldown de recogida (acaban de soltarse) no se tocan: mismo
-                // respeto que el vacuum avanzado de NetworksV6, para no robar lo que un jugador
-                // tiro hace medio segundo.
                 if (item.getPickupDelay() > 0) {
                     continue;
                 }
@@ -424,6 +428,11 @@ public class NetworkTicker {
         });
     }
 
+    /**
+     * EN: Executes auto-crafting attempts for installed blueprints and recipes.
+ *
+     * ES: Ejecuta intentos de autocrafteo para los blueprints y recetas instaladas.
+     */
     private void doCrafting(Network net) {
         net.forEach(DeviceType.CRAFTER, (pos, type) -> {
             NodeBlob blob = blobOf(net, pos);
@@ -431,7 +440,6 @@ public class NetworkTicker {
                 return;
             }
             boolean worked = false;
-            // Blueprints instalados: un intento de craft por cada uno, atomico.
             for (String b64 : new ArrayList<>(blob.blueprintData)) {
                 RecipeData data = Blueprints.decode(b64);
                 if (data == null) {
@@ -441,8 +449,6 @@ public class NetworkTicker {
                     worked = true;
                 }
             }
-            // Recetas antiguas por clave (las que ya estuvieran instaladas antes de los
-            // blueprints) siguen funcionando.
             if (!blob.recipes.isEmpty()) {
                 worked |= CraftingSupport.tryCraftAll(net, blob);
             }
@@ -452,7 +458,11 @@ public class NetworkTicker {
         });
     }
 
-    /** Ultima red de seguridad: lo que no tenga donde volver aparece como drop en el bloque. */
+    /**
+     * EN: Safety fallback: drops item safely at the block location if no container can accept it.
+ *
+     * ES: Red de seguridad: suelta el ítem en el bloque si ningún contenedor puede aceptarlo.
+     */
     private static void dropAt(Block block, ItemStack stack) {
         if (stack == null || stack.getAmount() <= 0) {
             return;

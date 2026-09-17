@@ -44,6 +44,13 @@ import org.bukkit.persistence.PersistentDataType;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Event listener responsible for block placement, breakage, explosions, piston movements,
+ * tool usage, and network device interactions.
+ *
+ * Listener de eventos responsable de la colocación, rotura, explosiones, pistones,
+ * uso de herramientas e interacción con dispositivos de red.
+ */
 public class BlockListener implements Listener {
 
     private final MultiverseNets plugin;
@@ -67,7 +74,7 @@ public class BlockListener implements Listener {
         }
         NodeStore.put(event.getBlockPlaced(), NodeBlob.create(type.name()));
 
-        restaurarCarga(event);
+        restoreCargo(event);
 
         if (type == DeviceType.RECEIVER) {
             NodeBlob blob = NodeStore.get(event.getBlockPlaced());
@@ -101,7 +108,7 @@ public class BlockListener implements Listener {
             return;
         }
         event.setDropItems(false);
-        block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), suelto(type, blob));
+        block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), createDropItem(type, blob));
 
         NodeStore.remove(block);
         if (type == DeviceType.CONTROLLER) {
@@ -112,14 +119,13 @@ public class BlockListener implements Listener {
     }
 
     /**
-     * Lo que suelta romper un nodo. Todo el estado viaja DENTRO del item: el contenido de las
-     * celdas y la greedy, los filtros, las recetas y los blueprints del crafter, la matriz de
-     * la parrilla y el encoder, y el enlace del receptor. Al recolocarlo, sigue como estaba.
-     * (Es el mismo gesto que NetworkQuantumStorage.onBreak en NetworksV6, pero completo.)
+     * Builds the dropped ItemStack when a network node is broken, preserving its internal state in PDC.
+ *
+     * Construye el ItemStack soltado al romper un nodo de red, preservando su estado interno en PDC.
      */
-    private ItemStack suelto(DeviceType type, NodeBlob blob) {
+    private ItemStack createDropItem(DeviceType type, NodeBlob blob) {
         ItemStack item = Items.create(type);
-        if (type == DeviceType.CONTROLLER || type == DeviceType.CABLE || sinDatos(blob)) {
+        if (type == DeviceType.CONTROLLER || type == DeviceType.CABLE || isEmptyState(blob)) {
             return item;
         }
         var meta = item.getItemMeta();
@@ -143,11 +149,11 @@ public class BlockListener implements Listener {
         return item;
     }
 
-    private static boolean sinDatos(NodeBlob blob) {
-        boolean matrizVacia = true;
+    private static boolean isEmptyState(NodeBlob blob) {
+        boolean matrixEmpty = true;
         for (ItemStack s : blob.craftingMatrix) {
             if (s != null && !s.getType().isAir()) {
-                matrizVacia = false;
+                matrixEmpty = false;
                 break;
             }
         }
@@ -155,12 +161,16 @@ public class BlockListener implements Listener {
                 && blob.filterMaterials.isEmpty()
                 && blob.recipes.isEmpty()
                 && blob.blueprintData.isEmpty()
-                && matrizVacia
+                && matrixEmpty
                 && blob.txWorld == null;
     }
 
-    /** Contraparte de {@link #suelto}: si el nodo colocado trae estado embebido, se restaura. */
-    private void restaurarCarga(BlockPlaceEvent event) {
+    /**
+     * Counterpart of createDropItem: restores embedded state when a preserved node is placed back into the world.
+ *
+     * Contraparte de createDropItem: restaura el estado embebido cuando un nodo preservado se vuelve a colocar en el mundo.
+     */
+    private void restoreCargo(BlockPlaceEvent event) {
         var meta = event.getItemInHand().getItemMeta();
         if (meta == null) {
             return;
@@ -169,26 +179,26 @@ public class BlockListener implements Listener {
         if (data == null) {
             return;
         }
-        NodeBlob cargada = NodeStore.decode(data);
-        if (cargada == null) {
+        NodeBlob loaded = NodeStore.decode(data);
+        if (loaded == null) {
             return;
         }
         NodeBlob actual = NodeStore.get(event.getBlockPlaced());
         if (actual == null) {
             return;
         }
-        actual.cellSample = cargada.cellSample;
-        actual.cellAmount = cargada.cellAmount;
-        actual.filterMaterials = cargada.filterMaterials;
-        actual.filterBlacklist = cargada.filterBlacklist;
-        actual.recipes = cargada.recipes;
-        actual.blueprintData = cargada.blueprintData;
-        actual.craftingMatrix = cargada.craftingMatrix;
-        if (cargada.txWorld != null) {
-            actual.txWorld = cargada.txWorld;
-            actual.txX = cargada.txX;
-            actual.txY = cargada.txY;
-            actual.txZ = cargada.txZ;
+        actual.cellSample = loaded.cellSample;
+        actual.cellAmount = loaded.cellAmount;
+        actual.filterMaterials = loaded.filterMaterials;
+        actual.filterBlacklist = loaded.filterBlacklist;
+        actual.recipes = loaded.recipes;
+        actual.blueprintData = loaded.blueprintData;
+        actual.craftingMatrix = loaded.craftingMatrix;
+        if (loaded.txWorld != null) {
+            actual.txWorld = loaded.txWorld;
+            actual.txX = loaded.txX;
+            actual.txY = loaded.txY;
+            actual.txZ = loaded.txZ;
         }
         NodeStore.put(event.getBlockPlaced(), actual);
     }
@@ -218,26 +228,29 @@ public class BlockListener implements Listener {
         }
         NodeBlob blob = NodeStore.get(block);
 
-        // Herramientas de mano: van por delante de todo lo demas.
+        // Handheld tools: handled before general menus
         if (heldType == DeviceType.PROBE) {
             event.setCancelled(true);
-            sondear(event.getPlayer(), block);
+            probeNode(event.getPlayer(), block);
             return;
         }
         if (heldType == DeviceType.RAKE) {
-            usarRake(event, block, blob);
+            useRake(event, block, blob);
             return;
         }
         if (heldType == DeviceType.CONFIGURATOR) {
-            usarWrench(event, block, blob);
+            useWrench(event, block, blob);
             return;
         }
         if (heldType == DeviceType.CRAYON) {
-            usarCrayon(event, block, blob);
+            useCrayon(event, block, blob);
             return;
         }
 
         if (blob == null) {
+            if (heldType == DeviceType.WIRELESS_TERMINAL && !event.getPlayer().isSneaking()) {
+                useWirelessInAir(event);
+            }
             return;
         }
         DeviceType type = DeviceType.parse(blob.typeName);
@@ -246,10 +259,19 @@ public class BlockListener implements Listener {
         }
         Player player = event.getPlayer();
 
-        // Vinculos con shift.
-        if (type == DeviceType.CONTROLLER && heldType == DeviceType.WIRELESS_TERMINAL && player.isSneaking()) {
+        // Shift-click binding actions
+        if ((type == DeviceType.CONTROLLER || type == DeviceType.TERMINAL) && heldType == DeviceType.WIRELESS_TERMINAL && player.isSneaking()) {
             event.setCancelled(true);
-            Items.bindWireless(held, block.getLocation());
+            Location targetLoc = block.getLocation();
+            if (type == DeviceType.TERMINAL) {
+                Network net = manager.networkAt(block);
+                if (net == null) {
+                    player.sendMessage(Text.msg("This terminal is not connected to a network.", NamedTextColor.RED));
+                    return;
+                }
+                targetLoc = new Location(net.world(), PosUtil.unpackX(net.controllerPos()), PosUtil.unpackY(net.controllerPos()), PosUtil.unpackZ(net.controllerPos()));
+            }
+            Items.bindWireless(held, targetLoc);
             player.sendMessage(Text.msg("Wireless terminal bound to this network.", NamedTextColor.GREEN));
             return;
         }
@@ -260,21 +282,19 @@ public class BlockListener implements Listener {
             return;
         }
 
-        // Agachado con la mano vacia o una herramienta tampoco abre menus (convencion Slimefun).
         if (player.isSneaking()) {
             return;
         }
 
-        // Si el jugador sostiene un bloque y el nodo no tiene un menu principal (p.ej. un cable),
-        // deja que vanilla coloque el bloque contra la cara del nodo. Si es un menu (Terminal,
-        // Celda, etc.) y NO esta agachado, la apertura del menu tiene prioridad.
-        if (held != null && held.getType().isBlock() && (type == DeviceType.CABLE || type == DeviceType.PURGER)) {
+        if (held != null && held.getType().isBlock() && (type == DeviceType.CABLE || type == DeviceType.CONTROLLER)) {
             return;
         }
 
-        event.setCancelled(true);
         switch (type) {
-            case CONTROLLER, TERMINAL, TRANSMITTER -> openTerminal(player, block);
+            case CONTROLLER -> {
+                // The controller is the brain/heart of the network; no inventory GUI.
+            }
+            case TERMINAL, TRANSMITTER -> openTerminal(player, block);
             case MONITOR -> {
                 Network net = manager.networkAt(block);
                 if (net == null) {
@@ -306,13 +326,14 @@ public class BlockListener implements Listener {
         }
     }
 
-    // ------------------------------------------------------------------ herramientas
+    // ------------------------------------------------------------------ Tools / Herramientas
 
     /**
-     * Network Rake (de NetworksV6): quita nodos de la red al instante, con usos. No rompe el
-     * controlador (sin el la red muere) ni celdas con carga (el contenido se perderia).
+     * Handles Network Rake tool action: instantly removes network nodes without destroying controllers or loaded storage.
+ *
+     * Gestiona la acción del Rastrillo de Red: retira nodos al instante sin romper controladores ni almacenamiento con carga.
      */
-    private void usarRake(PlayerInteractEvent event, Block block, NodeBlob blob) {
+    private void useRake(PlayerInteractEvent event, Block block, NodeBlob blob) {
         event.setCancelled(true);
         Player player = event.getPlayer();
         if (blob == null) {
@@ -342,10 +363,11 @@ public class BlockListener implements Listener {
     }
 
     /**
-     * Configuration Wrench (el NetworkConfigurator de NetworksV6): shift+click copia el filtro
-     * del dispositivo, click normal lo pega (y consume nada: los filtros aqui son materiales).
+     * Handles Configuration Wrench: shift-click copies filter settings, regular click pastes.
+ *
+     * Gestiona la Llave de Configuración: shift-click copia la configuración de filtros, click normal la pega.
      */
-    private void usarWrench(PlayerInteractEvent event, Block block, NodeBlob blob) {
+    private void useWrench(PlayerInteractEvent event, Block block, NodeBlob blob) {
         event.setCancelled(true);
         Player player = event.getPlayer();
         ItemStack wrench = event.getItem();
@@ -383,10 +405,11 @@ public class BlockListener implements Listener {
     }
 
     /**
-     * Network Crayon (NetworksV6): marca el controlador para que la red eche particulas cuando
-     * sus maquinas trabajan. Se guarda en el blob del controlador y el scan lo propaga.
+     * Handles Network Crayon: toggles working particle effects on the network controller.
+ *
+     * Gestiona el Crayón de Red: alterna los efectos visuales de partículas en el controlador.
      */
-    private void usarCrayon(PlayerInteractEvent event, Block block, NodeBlob blob) {
+    private void useCrayon(PlayerInteractEvent event, Block block, NodeBlob blob) {
         event.setCancelled(true);
         Player player = event.getPlayer();
         if (blob == null) {
@@ -404,7 +427,7 @@ public class BlockListener implements Listener {
                 ? "Network particles enabled." : "Network particles disabled.", NamedTextColor.GREEN));
     }
 
-    // ------------------------------------------------------------------ menus y enlaces
+    // ------------------------------------------------------------------ Menus & Connections / Menús y Conexiones
 
     private void openReceiver(Player player, Block receiverBlock) {
         NodeBlob blob = NodeStore.get(receiverBlock);
@@ -426,32 +449,34 @@ public class BlockListener implements Listener {
     }
 
     /**
-     * Dice de que red es un bloque, o que no es nada.
+     * Diagnostic probe helper that displays the network owner and status of a clicked block.
+ *
+     * Función auxiliar de la sonda de diagnóstico que muestra el estado y red del bloque seleccionado.
      */
-    private void sondear(Player player, Block block) {
+    private void probeNode(Player player, Block block) {
         NodeBlob blob = NodeStore.get(block);
         if (blob == null) {
-            player.sendMessage(Text.msg("Aqui no hay ningun dispositivo de red.", NamedTextColor.GRAY));
+            player.sendMessage(Text.msg("No network device found at this location.", NamedTextColor.GRAY));
             return;
         }
         DeviceType type = DeviceType.parse(blob.typeName);
-        String nombre = type == null ? blob.typeName : type.display();
+        String name = type == null ? blob.typeName : type.display();
 
-        Network red = plugin.networks().networkAt(block);
-        if (red == null) {
-            player.sendMessage(Text.msg(nombre + ": SIN RED. No lo alcanza ningun controlador.",
+        Network net = plugin.networks().networkAt(block);
+        if (net == null) {
+            player.sendMessage(Text.msg(name + ": NO NETWORK. No controller reached.",
                     NamedTextColor.RED));
-            player.sendMessage(Text.msg("Revisa que haya cables continuos hasta el controlador.",
+            player.sendMessage(Text.msg("Check that cables are continuously connected to the controller.",
                     NamedTextColor.GRAY));
             return;
         }
-        player.sendMessage(Text.msg(nombre + " · red de " + red.size() + " nodo(s)",
+        player.sendMessage(Text.msg(name + " · network of " + net.size() + " node(s)",
                 NamedTextColor.GREEN));
-        player.sendMessage(Text.msg("Controlador en " + PosUtil.unpackX(red.controllerPos()) + ", "
-                + PosUtil.unpackY(red.controllerPos()) + ", " + PosUtil.unpackZ(red.controllerPos()),
+        player.sendMessage(Text.msg("Controller at " + PosUtil.unpackX(net.controllerPos()) + ", "
+                + PosUtil.unpackY(net.controllerPos()) + ", " + PosUtil.unpackZ(net.controllerPos()),
                 NamedTextColor.GRAY));
-        if (red.error != null && !red.error.isBlank()) {
-            player.sendMessage(Text.msg("Aviso: " + red.error, NamedTextColor.YELLOW));
+        if (net.error != null && !net.error.isBlank()) {
+            player.sendMessage(Text.msg("Notice: " + net.error, NamedTextColor.YELLOW));
         }
     }
 

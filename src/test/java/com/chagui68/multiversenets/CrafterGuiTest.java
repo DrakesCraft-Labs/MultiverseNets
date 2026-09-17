@@ -30,6 +30,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * [EN] Tests AutoCrafter GUI interactions: installing blueprints, uninstalling, and clearing recipes.
+ * [ES] Pruebas de interacción con la GUI del AutoCrafter: instalar blueprints, desinstalar y limpiar recetas.
+ */
 class CrafterGuiTest {
 
     private ServerMock server;
@@ -50,37 +54,45 @@ class CrafterGuiTest {
         MockBukkit.unmock();
     }
 
-    private Block colocarCrafter() {
+    private Block placeCrafter() {
         Block block = world.getBlockAt(0, 64, 0);
         block.setType(DeviceType.CRAFTER.material());
         NodeStore.put(block, NodeBlob.create(DeviceType.CRAFTER.name()));
         return block;
     }
 
-    private ItemStack crearBlueprintSample() {
-        ItemStack[] matriz = new ItemStack[]{
+    private ItemStack createSampleBlueprint() {
+        ItemStack[] matrix = new ItemStack[]{
                 new ItemStack(Material.IRON_INGOT), new ItemStack(Material.IRON_INGOT), new ItemStack(Material.IRON_INGOT),
                 null, new ItemStack(Material.STICK), null,
                 null, new ItemStack(Material.STICK), null
         };
-        RecipeData data = new RecipeData(matriz, new ItemStack(Material.IRON_PICKAXE, 1));
+        RecipeData data = new RecipeData(matrix, new ItemStack(Material.IRON_PICKAXE, 1));
         return Blueprints.toItem(data);
     }
 
+    /**
+     * [EN] Right clicking the crafter block opens CrafterMenu.
+     * [ES] Clic derecho en el bloque crafter abre CrafterMenu.
+     */
     @Test
-    void clicDerechoAbreCrafterMenu() {
-        Block crafter = colocarCrafter();
+    void rightClickOpensCrafterMenu() {
+        Block crafter = placeCrafter();
         PlayerInteractEvent interact = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK,
                 null, crafter, BlockFace.NORTH, EquipmentSlot.HAND, null);
         server.getPluginManager().callEvent(interact);
         assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof CrafterMenu,
-                "clic derecho al crafter abre CrafterMenu");
+                "right click on crafter opens CrafterMenu");
     }
 
+    /**
+     * [EN] Shift clicking a blueprint in player inventory installs it into the crafter.
+     * [ES] Shift-clic en un blueprint del inventario lo instala en el crafter.
+     */
     @Test
-    void shiftClickInstalaBlueprint() {
-        Block crafter = colocarCrafter();
-        ItemStack bp = crearBlueprintSample();
+    void shiftClickInstallsBlueprint() {
+        Block crafter = placeCrafter();
+        ItemStack bp = createSampleBlueprint();
         player.getInventory().setItem(0, bp);
 
         new CrafterMenu(plugin, player, crafter).openMenu();
@@ -90,16 +102,20 @@ class CrafterGuiTest {
         server.getPluginManager().callEvent(shift);
 
         NodeBlob blob = NodeStore.get(crafter);
-        assertEquals(1, blob.blueprintData.size(), "el blueprint se instala en el blob");
+        assertEquals(1, blob.blueprintData.size(), "blueprint is installed in blob");
         RecipeData decoded = Blueprints.decode(blob.blueprintData.get(0));
         assertNotNull(decoded);
         assertEquals(Material.IRON_PICKAXE, decoded.output.getType());
     }
 
+    /**
+     * [EN] Clicking an installed blueprint slot with empty cursor uninstalls it back to player.
+     * [ES] Clic sobre un blueprint instalado con el cursor vacío lo desinstala devolviéndolo al jugador.
+     */
     @Test
-    void clicSinCursorDesinstalaBlueprint() {
-        Block crafter = colocarCrafter();
-        ItemStack bp = crearBlueprintSample();
+    void clickWithEmptyCursorUninstallsBlueprint() {
+        Block crafter = placeCrafter();
+        ItemStack bp = createSampleBlueprint();
         RecipeData data = Blueprints.read(bp);
         NodeBlob blob = NodeStore.get(crafter);
         blob.blueprintData.add(Blueprints.encode(data));
@@ -113,13 +129,17 @@ class CrafterGuiTest {
         server.getPluginManager().callEvent(click);
 
         NodeBlob after = NodeStore.get(crafter);
-        assertTrue(after.blueprintData.isEmpty(), "clic sobre el blueprint instalado lo desinstala");
+        assertTrue(after.blueprintData.isEmpty(), "clicking installed blueprint slot uninstalls it");
     }
 
+    /**
+     * [EN] Clear button removes all installed blueprints and recipes.
+     * [ES] El botón Clear limpia todos los blueprints y recetas instaladas.
+     */
     @Test
-    void botonClearLimpiaTodosLosBlueprints() {
-        Block crafter = colocarCrafter();
-        ItemStack bp = crearBlueprintSample();
+    void clearButtonRemovesAllBlueprints() {
+        Block crafter = placeCrafter();
+        ItemStack bp = createSampleBlueprint();
         RecipeData data = Blueprints.read(bp);
         NodeBlob blob = NodeStore.get(crafter);
         blob.blueprintData.add(Blueprints.encode(data));
@@ -133,7 +153,7 @@ class CrafterGuiTest {
         server.getPluginManager().callEvent(clearClick);
 
         NodeBlob after = NodeStore.get(crafter);
-        assertTrue(after.blueprintData.isEmpty(), "clear debe vaciar blueprintData");
-        assertTrue(after.recipes.isEmpty(), "clear debe vaciar recipes");
+        assertTrue(after.blueprintData.isEmpty(), "clear must empty blueprintData");
+        assertTrue(after.recipes.isEmpty(), "clear must empty recipes");
     }
 }

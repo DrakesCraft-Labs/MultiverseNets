@@ -25,18 +25,16 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Blueprints: items que llevan una receta completa (matriz 3x3 + salida), como en NetworksV6.
+ * [EN] Blueprint Management & Recipe Resolution
+ * Blueprints store a full 3x3 crafting matrix and expected output item.
+ * Encoded in the Recipe Encoder, installed into Auto-Crafters, and resolved dynamically against Bukkit recipes.
  *
- * Se crean en el Encoder, se instalan en un Auto-Crafter y el crafter saca los ingredientes de
- * la red de forma atomica (todo o nada) en cada pasada.
+ * [ES] Gestión de Blueprints y Resolución de Recetas
+ * Los Blueprints almacenan una matriz de crafteo 3x3 completa y su ítem resultante.
+ * Se codifican en el Recipe Encoder, se instalan en Auto-Crafters y se resuelven contra la API de recetas de Bukkit.
  */
 public final class Blueprints {
 
-    /**
-     * Receta resuelta por matriz. La resolucion pregunta a Bukkit (caro), asi que se cachea por
-     * la matriz serializada; si los plugins cambian las recetas hay que reiniciar, mismo precio
-     * que el cache de BlueprintInstance de NetworksV6.
-     */
     private static final Map<String, Recipe> RECIPE_CACHE = new ConcurrentHashMap<>();
 
     private Blueprints() {

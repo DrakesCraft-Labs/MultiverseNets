@@ -13,7 +13,11 @@ import com.chagui68.multiversenets.util.Settings;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
-// No final: MockBukkit necesita hacerle subclase para cargar el plugin en los tests.
+/**
+ * MultiverseNets main plugin entry point and lifecycle manager.
+ *
+ * Punto de entrada principal y gestor del ciclo de vida del plugin MultiverseNets.
+ */
 public class MultiverseNets extends JavaPlugin {
 
     private static MultiverseNets instance;
@@ -21,10 +25,16 @@ public class MultiverseNets extends JavaPlugin {
     private NetworkManager networks;
     private NetworkTicker ticker;
 
+    /**
+     * @return Global singleton plugin instance / Instancia singleton global del plugin
+     */
     public static MultiverseNets instance() {
         return instance;
     }
 
+    /**
+     * @return Global network manager / Gestor global de redes
+     */
     public NetworkManager networks() {
         return networks;
     }
@@ -36,8 +46,7 @@ public class MultiverseNets extends JavaPlugin {
 
         Keys.init(this);
         Settings.refresh(this);
-        // Se resuelve una sola vez y antes de que arranque el ticker: si Slimefun esta, los
-        // grabbers y pushers podran hablar con sus maquinas; si no, el puente queda inerte.
+        // Slimefun integration initialization: active if present, dormant otherwise.
         com.chagui68.multiversenets.compat.SlimefunBridge.init(getLogger());
         Items.registerRecipes(this);
         NodeStore.init(this);

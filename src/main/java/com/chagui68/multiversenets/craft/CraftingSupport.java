@@ -18,16 +18,37 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Utility helper for network autocrafting operations (both recipe keys and blueprints).
+ *
+ * Clase utilitaria para operaciones de autocrafteo en la red (tanto claves de receta como planos).
+ */
 public final class CraftingSupport {
 
     private CraftingSupport() {
     }
 
+    /**
+     * Finds a registered Bukkit recipe from its NamespacedKey string.
+ *
+     * Busca una receta registrada de Bukkit a partir de su cadena de texto NamespacedKey.
+     *
+     * @param key String representation of NamespacedKey / Representación en texto de NamespacedKey
+     * @return Bukkit Recipe or null / Receta de Bukkit o null
+     */
     public static Recipe find(String key) {
         NamespacedKey nk = NamespacedKey.fromString(key);
         return nk == null ? null : Bukkit.getRecipe(nk);
     }
 
+    /**
+     * Extracts ingredient choices and their required counts from a Bukkit recipe.
+ *
+     * Extrae las opciones de ingredientes y sus cantidades requeridas de una receta Bukkit.
+     *
+     * @param recipe Target recipe / Receta objetivo
+     * @return List of RecipeChoice requirements / Lista de requisitos RecipeChoice
+     */
     public static List<Map.Entry<RecipeChoice, Integer>> requirements(Recipe recipe) {
         List<Map.Entry<RecipeChoice, Integer>> reqs = new ArrayList<>();
         if (recipe instanceof ShapedRecipe shaped) {
@@ -55,6 +76,15 @@ public final class CraftingSupport {
         return reqs;
     }
 
+    /**
+     * Attempts to craft the first viable recipe configured in the node blob.
+ *
+     * Intenta craftear la primera receta viable configurada en el blob del nodo.
+     *
+     * @param net Target network / Red objetivo
+     * @param blob Node configuration blob / Blob de configuración del nodo
+     * @return true if crafted / true si se crafteó
+     */
     public static boolean tryCraftAll(Network net, NodeBlob blob) {
         boolean crafted = false;
         for (String key : new ArrayList<>(blob.recipes)) {
@@ -70,6 +100,15 @@ public final class CraftingSupport {
         return crafted;
     }
 
+    /**
+     * Attempts a single craft of a given Bukkit recipe using network storage items.
+ *
+     * Intenta un único crafteo de una receta Bukkit usando ítems del almacenamiento de red.
+     *
+     * @param net Target network / Red objetivo
+     * @param recipe Bukkit recipe / Receta Bukkit
+     * @return true if crafted and deposited / true si se crafteó y depositó
+     */
     public static boolean tryCraftOnce(Network net, Recipe recipe) {
         var reqs = requirements(recipe);
         if (reqs.isEmpty()) {
@@ -96,16 +135,21 @@ public final class CraftingSupport {
     }
 
     /**
-     * Craftea una vez desde un Blueprint instalado (logica de NetworkAutoCrafter de NetworksV6):
-     *
-     *   1. Resuelve la receta de vanilla de la matriz y exige que su salida coincida con la del
-     *      blueprint; si el servidor ya no ofrece esa receta, el plano deja de craftear en vez
-     *      de producir otra cosa a escondidas.
-     *   2. Cuenta los ingredientes agrupados y comprueba que la red los tenga TODOS antes de
-     *      tocar nada (all-or-nothing).
-     *   3. Extrae ingrediente a ingrediente; si alguno falla a mitad, devuelve lo sacado.
-     *   4. Entrega el resultado a la red; si no cupo entero, revierte tambien los ingredientes
-     *      (como NetworksV6, que aborta cuando el output no cabe).
+     * Crafts once from an installed Blueprint (NetworksV6 auto-crafter logic):
+     * *   - Resolves the vanilla recipe from the matrix and asserts its output matches the blueprint.
+     *   - Aggregates ingredient requirements and checks all-or-nothing availability.
+     *   - Extracts ingredients item-by-item; rolls back if anything fails midway.
+     *   - Deposits the result; rolls back ingredients if output did not fit.
+     * * 
+     * Craftea una vez desde un Blueprint instalado (lógica de NetworkAutoCrafter):
+     * *   - Resuelve la receta de vanilla de la matriz y exige que su salida coincida con la del blueprint.
+     *   - Cuenta los ingredientes agrupados y comprueba disponibilidad antes de tocar nada (all-or-nothing).
+     *   - Extrae ingrediente a ingrediente; si alguno falla a mitad, devuelve lo sacado.
+     *   - Entrega el resultado a la red; si no cupo entero, revierte los ingredientes extraídos.
+     * *
+     * @param net Target network / Red objetivo
+     * @param data Blueprint recipe data / Datos de la receta del plano
+     * @return true if successfully crafted and deposited / true si se crafteó y depositó con éxito
      */
     public static boolean tryCraftBlueprint(Network net, RecipeData data) {
         if (data == null || Blueprints.isEmpty(data.inputs) || data.output == null) {
@@ -117,7 +161,6 @@ public final class CraftingSupport {
         }
         ItemStack result = recipe.getResult().clone();
 
-        // Ingredientes agrupados: un 2x2 de tablas gasta 4 maderas, no 4 extracciones sueltas.
         record Need(ItemStack sample, int amount) {
         }
         List<Need> needs = new ArrayList<>();
@@ -160,9 +203,6 @@ public final class CraftingSupport {
 
         int leftover = net.storage().deposit(result);
         if (leftover > 0) {
-            // La red no trago el resultado entero: se devuelven los ingredientes y se aborta.
-            // Como todo corre en el hilo principal dentro de la misma pasada, la red sigue
-            // teniendo el hueco que dejaron las extracciones y el rollback no puede fallar.
             net.storage().depositAll(taken);
             return false;
         }

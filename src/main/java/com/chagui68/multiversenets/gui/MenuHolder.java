@@ -9,6 +9,11 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 
+/**
+ * Base abstract class for all custom GUI menus in MultiverseNets.
+ *
+ * Clase base abstracta para todos los menús de interfaz gráfica (GUI) de MultiverseNets.
+ */
 public abstract class MenuHolder implements InventoryHolder {
 
     protected final MultiverseNets plugin;
@@ -25,6 +30,14 @@ public abstract class MenuHolder implements InventoryHolder {
         return inv;
     }
 
+    /**
+     * Creates and opens the backing Bukkit inventory.
+ *
+     * Crea y abre el inventario Bukkit correspondiente.
+     *
+     * @param size Inventory slot size / Tamaño en ranuras del inventario
+     * @param title Inventory title component / Componente de título del inventario
+     */
     protected void open(int size, Component title) {
         inv = Bukkit.createInventory(this, size, title);
         draw();
@@ -32,69 +45,99 @@ public abstract class MenuHolder implements InventoryHolder {
     }
 
     /**
-     * Redibuja en el siguiente tick conservando los huecos vanilla (lo que el jugador tenga
-     * ahi puesto no se toca). Antes se limpiaba el inventario entero y cada menu que delegaba
-     * se comia la entrada del usuario.
+     * Redraws the menu on the next tick while preserving items in vanilla-controlled slots.
+ *
+     * Redibuja el menú en el siguiente tick conservando los ítems en ranuras controladas por vanilla.
      */
     protected void refresh() {
         plugin.getServer().getScheduler().runTask(plugin, () -> {
             if (player.getOpenInventory().getTopInventory().getHolder(false) != this) {
                 return;
             }
-            java.util.Map<Integer, org.bukkit.inventory.ItemStack> conservados = new java.util.HashMap<>();
+            java.util.Map<Integer, org.bukkit.inventory.ItemStack> preserved = new java.util.HashMap<>();
             for (int slot : vanillaSlots()) {
                 org.bukkit.inventory.ItemStack it = inv.getItem(slot);
                 if (it != null) {
-                    conservados.put(slot, it);
+                    preserved.put(slot, it);
                 }
             }
             inv.clear();
             draw();
-            conservados.forEach(inv::setItem);
+            preserved.forEach(inv::setItem);
         });
     }
 
+    /**
+     * Renders items and UI buttons onto the inventory canvas.
+ *
+     * Renderiza ítems y botones de interfaz en el inventario.
+     */
     protected abstract void draw();
 
+    /**
+     * Handles an inventory click event triggered inside this menu.
+ *
+     * Procesa un evento de clic en el inventario dentro de este menú.
+     *
+     * @param event Inventory click event / Evento de clic en inventario
+     */
     protected abstract void click(InventoryClickEvent event);
 
     /**
-     * Al cerrar el inventario. Las clases con huecos vanilla (entrada/salida de la celda, de la
-     * terminal o del encoder) TIENEN que recuperar lo que quede dentro: sin esto, cerrar el
-     * menu con items puestos los borraba del mundo.
+     * Invoked when the player closes this inventory menu.
+ *
+     * Invocado cuando el jugador cierra este menú de inventario.
+     *
+     * @param event Inventory close event / Evento de cierre de inventario
      */
     protected void onClose(InventoryCloseEvent event) {
     }
 
     /**
-     * Devuelve un stack al jugador: primero a su inventario y lo que no quepa se suelta a sus
-     * pies. Usar siempre que un item "huérfano" de menu no tenga otro destino claro.
+     * Returns an item stack to the player's inventory or drops it naturally at their feet if full.
+ *
+     * Devuelve un stack al inventario del jugador o lo suelta a sus pies si está lleno.
+     *
+     * @param stack ItemStack to return / ItemStack a devolver
      */
-    protected void devolverAlJugador(org.bukkit.inventory.ItemStack stack) {
+    protected void giveOrDrop(org.bukkit.inventory.ItemStack stack) {
         if (stack == null || stack.getType().isAir() || stack.getAmount() <= 0) {
             return;
         }
-        var sobra = player.getInventory().addItem(stack);
-        for (var resto : sobra.values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), resto);
+        var leftover = player.getInventory().addItem(stack);
+        for (var remainder : leftover.values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), remainder);
         }
     }
 
-    /**
-     * El indice del inventario del jugador para un click sobre su zona. Se calcula desde el raw
-     * slot y NO con InventoryClickEvent.getSlot(), que para clicks al inventario inferior puede
-     * devolver cualquier cosa segun la implementacion del servidor (nos lo demostro el test:
-     * convertSlot daba 12 para el slot 3 y el "se limpia al insertar en la red" nunca limpiaba
-     * nada: dupe en potencia).
-     */
-    protected static int slotInventarioJugador(InventoryClickEvent event) {
-        return event.getRawSlot() - event.getView().getTopInventory().getSize();
+    /** Backward compatibility alias for {@link #giveOrDrop(org.bukkit.inventory.ItemStack)} */
+    protected void devolverAlJugador(org.bukkit.inventory.ItemStack stack) {
+        giveOrDrop(stack);
     }
 
     /**
-     * Huecos del inventario superior que quedan bajo control vanilla (colocar y sacar de
-     * verdad), vacio si ninguno. La grilla usa uno de entrada y el almacen de celda usa entrada
-     * y salida, igual que un Quantum Storage de Networks.
+     * Computes the player's inventory slot index from a raw click event.
+ *
+     * Calcula el índice de ranura del inventario del jugador a partir de un evento de clic.
+     *
+     * @param event Inventory click event / Evento de clic en inventario
+     * @return 0-indexed player inventory slot index / Índice de ranura del inventario del jugador (base 0)
+     */
+    protected static int playerInventorySlot(InventoryClickEvent event) {
+        return event.getRawSlot() - event.getView().getTopInventory().getSize();
+    }
+
+    /** Backward compatibility alias for {@link #playerInventorySlot(InventoryClickEvent)} */
+    protected static int slotInventarioJugador(InventoryClickEvent event) {
+        return playerInventorySlot(event);
+    }
+
+    /**
+     * Set of upper inventory slot indices that allow normal vanilla item placement and extraction.
+ *
+     * Conjunto de ranuras del inventario superior que permiten colocar y extraer ítems en modo vanilla normal.
+     *
+     * @return Set of slot indices / Conjunto de índices de ranuras
      */
     protected java.util.Set<Integer> vanillaSlots() {
         return java.util.Set.of();

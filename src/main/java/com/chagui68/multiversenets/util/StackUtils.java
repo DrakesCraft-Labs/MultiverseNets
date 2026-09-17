@@ -21,22 +21,37 @@ import org.bukkit.inventory.meta.TropicalFishBucketMeta;
 import java.util.Objects;
 
 /**
- * Comparacion profunda de items, puerto del StackUtils de NetworksV6 (sin la parte Slimefun).
+ * [EN] Deep ItemStack Comparison Engine
+ * Port of the specialized {@code StackUtils} matching engine from NetworksV6.
  *
- * Hace falta porque ItemStack.isSimilar delega en equals del meta, y para agregar la vista de la
- * red NO se puede usar hashCode de ItemStack: Bukkit calcula mal los hash y dos terracotas del
- * mismo color podian caer en cubos distintos (bug #226 de Networks). La regla es comparar de lo
- * barato a lo caro y solo devolver true si TODO coincide.
+ * Standard {@code ItemStack.isSimilar()} delegates to {@code ItemMeta.equals()}, and
+ * {@code ItemStack.hashCode()} in Bukkit can be unstable across identical items (Networks bug #226).
+ * This utility compares item components in order from cheapest to most expensive (material -> meta presence
+ * -> custom model data -> PDC tags -> enchantments -> flags -> lore -> display name -> custom meta types).
+ *
+ * [ES] Motor de Comparación Profunda de ItemStacks
+ * Motor de comparación profunda adaptado de NetworksV6 para evitar fallos de {@code hashCode} de Bukkit.
+ * Compara metadatos de menor a mayor coste computacional y garantiza igualdad exacta de ítems.
  */
 public final class StackUtils {
 
     private StackUtils() {
     }
 
+    /**
+     * EN: Deeply checks if two ItemStacks are identical (including lore and custom meta).
+ *
+     * ES: Comprueba si dos ItemStacks son idénticos en material y metadatos (incluyendo lore).
+     */
     public static boolean itemsMatch(ItemStack a, ItemStack b) {
         return itemsMatch(a, b, true);
     }
 
+    /**
+     * EN: Deeply checks if two ItemStacks match, with optional lore verification.
+ *
+     * ES: Comprueba si dos ItemStacks coinciden, con verificación opcional de lore.
+     */
     public static boolean itemsMatch(ItemStack a, ItemStack b, boolean checkLore) {
         if (a == null || b == null) {
             return a == b;
@@ -178,7 +193,15 @@ public final class StackUtils {
         return true;
     }
 
-    /** Copia del stack con cantidad fija (util para plantillas de a 1). */
+    /**
+     * EN: Returns a clone of the given ItemStack with the specified stack amount.
+ *
+     * ES: Devuelve un clon del ItemStack con la cantidad especificada.
+     *
+     * @param stack  The item to clone / ES: El ítem a clonar.
+     * @param amount Target amount / ES: Cantidad deseada.
+     * @return Cloned ItemStack / ES: Clon con nueva cantidad.
+     */
     public static ItemStack getAsQuantity(ItemStack stack, int amount) {
         ItemStack clone = stack.clone();
         clone.setAmount(amount);

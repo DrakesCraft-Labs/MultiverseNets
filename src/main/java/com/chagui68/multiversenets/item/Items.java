@@ -18,11 +18,24 @@ import org.bukkit.persistence.PersistentDataType;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Factory and registry for plugin items, custom tools, PDC metadata, and crafting recipes.
+ *
+ * Fábrica y registro de ítems del plugin, herramientas personalizadas, metadatos PDC y recetas de crafteo.
+ */
 public final class Items {
 
     private Items() {
     }
 
+    /**
+     * Creates a newly instantiated ItemStack for a device type with standard metadata and lore.
+ *
+     * Crea un nuevo ItemStack para un tipo de dispositivo con metadatos y lore estándar.
+     *
+     * @param type Device type / Tipo de dispositivo
+     * @return Prepared ItemStack / ItemStack preparado
+     */
     public static ItemStack create(DeviceType type) {
         ItemStack item = new ItemStack(type.material());
         ItemMeta meta = item.getItemMeta();
@@ -35,12 +48,29 @@ public final class Items {
             lore.add(Component.text("Capacity: " + formatAmount(capacityOf(type)), NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false));
         }
+        if (type == DeviceType.WIRELESS_TERMINAL) {
+            lore.add(Component.text("Status: ", NamedTextColor.GRAY)
+                    .append(Component.text("Unbound", NamedTextColor.RED))
+                    .decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("Shift+Right Click a Controller or Terminal", NamedTextColor.DARK_GRAY)
+                    .decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("to bind to a network.", NamedTextColor.DARK_GRAY)
+                    .decoration(TextDecoration.ITALIC, false));
+        }
         meta.lore(lore);
         meta.getPersistentDataContainer().set(Keys.DEVICE_TYPE, PersistentDataType.STRING, type.name());
         item.setItemMeta(meta);
         return item;
     }
 
+    /**
+     * Resolves the DeviceType of an ItemStack from its PersistentDataContainer.
+ *
+     * Resuelve el DeviceType de un ItemStack desde su PersistentDataContainer.
+     *
+     * @param item Target ItemStack / ItemStack objetivo
+     * @return Resolved DeviceType or null / DeviceType resuelto o null
+     */
     public static DeviceType typeOf(ItemStack item) {
         if (item == null || !item.hasItemMeta()) {
             return null;
@@ -50,9 +80,15 @@ public final class Items {
         return name == null ? null : DeviceType.parse(name);
     }
 
-    // ---------------------------------------------------------------- herramientas
+    // ---------------------------------------------------------------- Tools / Herramientas
 
-    /** Un rake nuevo con todos sus usos. */
+    /**
+     * Creates a fresh network rake tool with configured durability uses.
+ *
+     * Crea una herramienta de rastrillo de red nueva con los usos de durabilidad configurados.
+     *
+     * @return Rake ItemStack / ItemStack del rastrillo
+     */
     public static ItemStack rake() {
         ItemStack item = create(DeviceType.RAKE);
         var meta = item.getItemMeta();
@@ -66,6 +102,14 @@ public final class Items {
         return item;
     }
 
+    /**
+     * Retrieves remaining uses on a rake tool item.
+ *
+     * Obtiene los usos restantes de un rastrillo.
+     *
+     * @param item Rake ItemStack / ItemStack del rastrillo
+     * @return Remaining uses / Usos restantes
+     */
     public static int rakeUses(ItemStack item) {
         if (item == null || !item.hasItemMeta()) {
             return 0;
@@ -76,7 +120,12 @@ public final class Items {
     }
 
     /**
-     * Gasta un uso. Devuelve false cuando la herramienta se ha gastado del todo y hay que romperla.
+     * Decrements a use from a rake tool. Returns false if durability is depleted and the item should break.
+ *
+     * Gasta un uso de un rastrillo. Devuelve false cuando la herramienta se agota y debe romperse.
+     *
+     * @param item Rake ItemStack / ItemStack del rastrillo
+     * @return true if uses remain, false if broken / true si quedan usos, false si se rompió
      */
     public static boolean spendRakeUse(ItemStack item) {
         int uses = rakeUses(item) - 1;
@@ -91,19 +140,36 @@ public final class Items {
         return uses > 0;
     }
 
-    /** Configuracion copiada en el wrench: "WL:MAT1,MAT2" o "BL:MAT1,MAT2". */
+    /**
+     * Saves copied filter settings onto a configurator wrench item ("WL:MAT1,MAT2" or "BL:MAT1,MAT2").
+ *
+     * Guarda la configuración de filtros copiada en una llave de configuración ("WL:MAT1,MAT2" o "BL:MAT1,MAT2").
+     *
+     * @param item Configurator ItemStack / ItemStack de la llave
+     * @param mats List of material names / Lista de nombres de materiales
+     * @param blacklist true if blacklist mode, false if whitelist / true si es lista negra, false si es blanca
+     */
     public static void saveConfig(ItemStack item, java.util.List<String> mats, boolean blacklist) {
         var meta = item.getItemMeta();
         meta.getPersistentDataContainer().set(Keys.CONFIG_DATA, PersistentDataType.STRING,
                 (blacklist ? "BL:" : "WL:") + String.join(",", mats));
         meta.lore(java.util.List.of(
                 Component.text((blacklist ? "Blacklist: " : "Whitelist: ")
-                                + (mats.isEmpty() ? "(vacio)" : String.join(", ", mats)),
+                                + (mats.isEmpty() ? "(empty)" : String.join(", ", mats)),
                         NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
         item.setItemMeta(meta);
     }
 
-    /** Devuelve [datos-en-minusculas..., "bl"/"wl"], o null si el wrench no guarda nada. */
+    /**
+     * Reads copied filter configuration from a configurator wrench item.
+     * Returns array [mats..., "bl"/"wl"] or null if empty.
+ *
+     * Lee la configuración de filtros de una llave.
+     * Devuelve el array [mats..., "bl"/"wl"] o null si está vacía.
+     *
+     * @param item Configurator ItemStack / ItemStack de la llave
+     * @return Parsed configuration array or null / Array de configuración parseado o null
+     */
     public static String[] readConfig(ItemStack item) {
         if (item == null || !item.hasItemMeta()) {
             return null;
@@ -125,6 +191,15 @@ public final class Items {
         return out;
     }
 
+    /**
+     * Creates an encoded recipe blueprint item.
+ *
+     * Crea un ítem de plano de receta codificado.
+     *
+     * @param recipeKey Namespaced key string / Clave de receta namespaced
+     * @param resultName Display name of recipe output / Nombre legible del resultado de la receta
+     * @return Encoded blueprint ItemStack / ItemStack del plano codificado
+     */
     public static ItemStack blueprint(String recipeKey, String resultName) {
         ItemStack item = new ItemStack(DeviceType.BLUEPRINT.material());
         ItemMeta meta = item.getItemMeta();
@@ -139,6 +214,10 @@ public final class Items {
         return item;
     }
 
+    /**
+     * @param item Target item / Ítem objetivo
+     * @return true if item is an encoded blueprint / true si el ítem es un plano codificado
+     */
     public static boolean isBlueprint(ItemStack item) {
         if (item == null || !item.hasItemMeta()) {
             return false;
@@ -147,6 +226,10 @@ public final class Items {
                 .has(Keys.BLUEPRINT_RECIPE, PersistentDataType.STRING);
     }
 
+    /**
+     * @param item Target item / Ítem objetivo
+     * @return Encoded recipe key or null / Clave de receta codificada o null
+     */
     public static String readBlueprint(ItemStack item) {
         if (!isBlueprint(item)) {
             return null;
@@ -155,14 +238,45 @@ public final class Items {
                 .get(Keys.BLUEPRINT_RECIPE, PersistentDataType.STRING);
     }
 
+    /**
+     * Links a receiver item to a transmitter block location.
+ *
+     * Vincula un ítem receptor a la ubicación del bloque transmisor.
+     *
+     * @param item Receiver ItemStack / ItemStack del receptor
+     * @param transmitter Location of target transmitter / Ubicación del transmisor objetivo
+     */
     public static void linkReceiver(ItemStack item, Location transmitter) {
         ItemMeta meta = item.getItemMeta();
         meta.getPersistentDataContainer().set(Keys.RECEIVER_BIND, PersistentDataType.STRING,
                 transmitter.getWorld().getUID() + ";" + transmitter.getBlockX() + ";"
                         + transmitter.getBlockY() + ";" + transmitter.getBlockZ());
+        List<Component> lore = new ArrayList<>();
+        lore.add(Component.text("MultiverseNets", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("Status: ", NamedTextColor.GRAY)
+                .append(Component.text("Linked", NamedTextColor.GREEN))
+                .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("Transmitter: ", NamedTextColor.GRAY)
+                .append(Component.text(transmitter.getBlockX() + ", " + transmitter.getBlockY() + ", " + transmitter.getBlockZ(), NamedTextColor.YELLOW))
+                .decoration(TextDecoration.ITALIC, false));
+        if (transmitter.getWorld() != null) {
+            lore.add(Component.text("World: ", NamedTextColor.GRAY)
+                    .append(Component.text(transmitter.getWorld().getName(), NamedTextColor.AQUA))
+                    .decoration(TextDecoration.ITALIC, false));
+        }
+        meta.lore(lore);
         item.setItemMeta(meta);
     }
 
+    /**
+     * Reads bound transmitter location from a receiver item.
+ *
+     * Lee la ubicación del transmisor vinculado desde un ítem receptor.
+     *
+     * @param item Receiver ItemStack / ItemStack del receptor
+     * @return Bound transmitter Location or null / Ubicación del transmisor vinculado o null
+     */
     public static Location readReceiverBind(ItemStack item) {
         if (item == null || !item.hasItemMeta()) {
             return null;
@@ -184,13 +298,46 @@ public final class Items {
         return new Location(world, Integer.parseInt(parts[1]), Integer.parseInt(parts[2]), Integer.parseInt(parts[3]));
     }
 
+    /**
+     * Binds a wireless terminal item to a controller/terminal block location.
+ *
+     * Vincula una terminal inalámbrica a la ubicación de un controlador o terminal.
+     *
+     * @param item Wireless Terminal ItemStack / ItemStack de la terminal inalámbrica
+     * @param loc Target Controller/Terminal Location / Ubicación del controlador/terminal objetivo
+     */
     public static void bindWireless(ItemStack item, Location loc) {
         ItemMeta meta = item.getItemMeta();
         meta.getPersistentDataContainer().set(Keys.WIRELESS_BIND, PersistentDataType.STRING,
                 loc.getWorld().getUID() + ";" + loc.getBlockX() + ";" + loc.getBlockY() + ";" + loc.getBlockZ());
+        List<Component> lore = new ArrayList<>();
+        lore.add(Component.text("MultiverseNets", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("Status: ", NamedTextColor.GRAY)
+                .append(Component.text("Linked", NamedTextColor.GREEN))
+                .decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("Controller: ", NamedTextColor.GRAY)
+                .append(Component.text(loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ(), NamedTextColor.YELLOW))
+                .decoration(TextDecoration.ITALIC, false));
+        if (loc.getWorld() != null) {
+            lore.add(Component.text("World: ", NamedTextColor.GRAY)
+                    .append(Component.text(loc.getWorld().getName(), NamedTextColor.AQUA))
+                    .decoration(TextDecoration.ITALIC, false));
+        }
+        lore.add(Component.text("Right click to open terminal", NamedTextColor.DARK_GRAY)
+                .decoration(TextDecoration.ITALIC, false));
+        meta.lore(lore);
         item.setItemMeta(meta);
     }
 
+    /**
+     * Reads bound controller location from a wireless terminal item.
+ *
+     * Lee la ubicación del controlador vinculado desde una terminal inalámbrica.
+     *
+     * @param item Wireless Terminal ItemStack / ItemStack de la terminal inalámbrica
+     * @return Bound Location or null / Ubicación vinculada o null
+     */
     public static Location readWirelessBind(ItemStack item) {
         if (item == null || !item.hasItemMeta()) {
             return null;
@@ -200,6 +347,14 @@ public final class Items {
         return parseLocation(data);
     }
 
+    /**
+     * Retrieves storage capacity for a given device type.
+ *
+     * Obtiene la capacidad de almacenamiento para un tipo de dispositivo dado.
+     *
+     * @param type Target device type / Tipo de dispositivo objetivo
+     * @return Total capacity in items / Capacidad total en ítems
+     */
     public static long capacityOf(DeviceType type) {
         if (type == DeviceType.INFINITY_BARREL) {
             return 2_000_000_000L;
@@ -210,6 +365,14 @@ public final class Items {
         return com.chagui68.multiversenets.util.Settings.cellCapacity(type.cellTier());
     }
 
+    /**
+     * Formats large item counts into human-readable shorthand strings (e.g. 1.5k, 2.3M, 1B).
+ *
+     * Formatea grandes cantidades de ítems en texto abreviado legible (ej. 1.5k, 2.3M, 1B).
+     *
+     * @param amount Item count / Cantidad de ítems
+     * @return Formatted string / Cadena formateada
+     */
     public static String formatAmount(long amount) {
         if (amount >= 1_000_000_000L) {
             return trim(amount / 1_000_000_000.0) + "B";
@@ -227,6 +390,13 @@ public final class Items {
         return v >= 100 ? String.valueOf((long) v) : String.valueOf(Math.round(v * 10.0) / 10.0);
     }
 
+    /**
+     * Registers all plugin crafting recipes with the Bukkit server recipe manager.
+ *
+     * Registra todas las recetas de crafteo del plugin en el gestor de recetas del servidor Bukkit.
+     *
+     * @param plugin Main plugin instance / Instancia principal del plugin
+     */
     public static void registerRecipes(MultiverseNets plugin) {
         shaped(plugin, "controller", create(DeviceType.CONTROLLER), r -> {
             r.shape("III", "INI", "III");

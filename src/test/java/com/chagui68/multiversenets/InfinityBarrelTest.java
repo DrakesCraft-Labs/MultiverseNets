@@ -31,6 +31,10 @@ import org.mockbukkit.mockbukkit.world.WorldMock;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * [EN] Tests Infinity Barrel operations: 2-billion item capacity, depositing, withdrawing, and breaking/placing persistence.
+ * [ES] Pruebas de la Barrica Infinita: capacidad de 2 billones de items, depósitos, retiros y persistencia al romper/colocar.
+ */
 class InfinityBarrelTest {
 
     private ServerMock server;
@@ -51,14 +55,22 @@ class InfinityBarrelTest {
         MockBukkit.unmock();
     }
 
+    /**
+     * [EN] Infinity Barrel has a capacity of 2,000,000,000 items.
+     * [ES] La barrica infinita tiene una capacidad de 2,000,000,000 de items.
+     */
     @Test
-    void barrelTieneCapacidadDeDosBillones() {
+    void barrelHasTwoBillionCapacity() {
         assertEquals(2_000_000_000L, Items.capacityOf(DeviceType.INFINITY_BARREL),
-                "la barrica infinita debe tener capacidad de 2 billones");
+                "infinity barrel must have capacity of 2 billion");
     }
 
+    /**
+     * [EN] Opening the barrel menu, setting item template, and quick-depositing items.
+     * [ES] Abrir el menú de la barrica, fijar plantilla de item y hacer depósito rápido.
+     */
     @Test
-    void abrirBarrelYDepositarItems() {
+    void openBarrelAndDepositItems() {
         Block barrelBlock = world.getBlockAt(0, 64, 0);
         barrelBlock.setType(Material.BARREL);
         NodeStore.put(barrelBlock, NodeBlob.create(DeviceType.INFINITY_BARREL.name()));
@@ -66,41 +78,42 @@ class InfinityBarrelTest {
         BarrelMenu menu = new BarrelMenu(plugin, player, barrelBlock);
         menu.openMenu();
 
-        // 1) Establecer tipo con cursor
+        // 1) Set item template with cursor
         player.getOpenInventory().setCursor(new ItemStack(Material.EMERALD, 1));
         InventoryClickEvent clickSet = new InventoryClickEvent(player.getOpenInventory(),
                 InventoryType.SlotType.CONTAINER, BarrelMenu.SET_SLOT, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(clickSet);
 
         NodeBlob blob = NodeStore.get(barrelBlock);
-        assertNotNull(blob.cellSample, "el tipo de item debe haberse fijado");
+        assertNotNull(blob.cellSample, "item sample must be set");
         assertEquals(Material.EMERALD, blob.cellSample.getType());
 
-        // 2) Quick Deposit con 64 esmeraldas en el inventario del jugador
+        // 2) Quick Deposit with 64 emeralds in player inventory
         player.getInventory().setItem(0, new ItemStack(Material.EMERALD, 64));
         InventoryClickEvent clickDeposit = new InventoryClickEvent(player.getOpenInventory(),
                 InventoryType.SlotType.CONTAINER, BarrelMenu.DEPOSIT_ALL_SLOT, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(clickDeposit);
 
         blob = NodeStore.get(barrelBlock);
-        assertEquals(64, blob.cellAmount, "la barrica debe almacenar 64 esmeraldas");
-        assertNull(player.getInventory().getItem(0), "el inventario del jugador debe quedar vacio tras depositar");
+        assertEquals(64, blob.cellAmount, "barrel must store 64 emeralds");
+        assertNull(player.getInventory().getItem(0), "player inventory slot must be empty after deposit");
     }
 
+    /**
+     * [EN] Infinity Barrel integrates seamlessly into network storage for bulk deposit and withdrawal.
+     * [ES] La barrica infinita se integra en la red de almacenamiento para depósitos y retiros masivos.
+     */
     @Test
-    void barrelSeIntegraEnLaRedDeAlmacenamiento() {
-        // Controlador en (0,64,0)
+    void barrelIntegratesIntoNetworkStorage() {
         Block ctrl = world.getBlockAt(0, 64, 0);
         ctrl.setType(Material.LODESTONE);
         NodeStore.put(ctrl, NodeBlob.create(DeviceType.CONTROLLER.name()));
         plugin.networks().registerController(ctrl);
 
-        // Cable en (1,64,0)
         Block cable = world.getBlockAt(1, 64, 0);
         cable.setType(Material.GLASS);
         NodeStore.put(cable, NodeBlob.create(DeviceType.CABLE.name()));
 
-        // Infinity Barrel en (2,64,0)
         Block barrel = world.getBlockAt(2, 64, 0);
         barrel.setType(Material.BARREL);
         NodeStore.put(barrel, NodeBlob.create(DeviceType.INFINITY_BARREL.name()));
@@ -109,25 +122,29 @@ class InfinityBarrelTest {
         assertNotNull(net);
         net.scan();
 
-        // Depositar 5000 diamantes a la red
+        // Deposit 5000 diamonds into network
         int leftover = net.storage().deposit(new ItemStack(Material.DIAMOND, 5000));
-        assertEquals(0, leftover, "todos los diamantes deben entrar a la barrica infinita de la red");
+        assertEquals(0, leftover, "all diamonds must enter infinity barrel");
 
         NodeBlob blob = NodeStore.get(barrel);
-        assertEquals(5000, blob.cellAmount, "la barrica debe guardar los 5000 diamantes");
+        assertEquals(5000, blob.cellAmount, "barrel stores 5000 diamonds");
         assertEquals(Material.DIAMOND, blob.cellSample.getType());
 
-        // Retirar 64 diamantes de la red
-        ItemStack sacado = net.storage().withdraw(item -> item.getType() == Material.DIAMOND, 64);
-        assertNotNull(sacado);
-        assertEquals(64, sacado.getAmount());
+        // Withdraw 64 diamonds
+        ItemStack withdrawn = net.storage().withdraw(item -> item.getType() == Material.DIAMOND, 64);
+        assertNotNull(withdrawn);
+        assertEquals(64, withdrawn.getAmount());
 
         blob = NodeStore.get(barrel);
-        assertEquals(4936, blob.cellAmount, "deben quedar 4936 diamantes en la barrica");
+        assertEquals(4936, blob.cellAmount, "4936 diamonds must remain in barrel");
     }
 
+    /**
+     * [EN] Breaking and placing an Infinity Barrel preserves stored item amount and type.
+     * [ES] Romper y colocar una barrica infinita preserva la cantidad y tipo de items guardados.
+     */
     @Test
-    void romperYColocarBarrelPreservaLosItemsGuardados() {
+    void breakAndPlaceBarrelPreservesStoredItems() {
         Block barrelBlock = world.getBlockAt(0, 64, 0);
         barrelBlock.setType(Material.BARREL);
         NodeBlob blob = NodeBlob.create(DeviceType.INFINITY_BARREL.name());
@@ -135,11 +152,11 @@ class InfinityBarrelTest {
         blob.cellAmount = 15000;
         NodeStore.put(barrelBlock, blob);
 
-        // Romper
+        // Break
         BlockBreakEvent breakEvent = new BlockBreakEvent(barrelBlock, player);
         server.getPluginManager().callEvent(breakEvent);
 
-        // Simular colocar de nuevo el bloque con el ítem caído
+        // Simulate placing item with embedded cargo
         ItemStack itemDropped = Items.create(DeviceType.INFINITY_BARREL);
         var meta = itemDropped.getItemMeta();
         meta.getPersistentDataContainer().set(Keys.CELL_CARGO, PersistentDataType.STRING, NodeStore.encode(blob));
@@ -152,8 +169,8 @@ class InfinityBarrelTest {
         server.getPluginManager().callEvent(placeEvent);
 
         NodeBlob restored = NodeStore.get(newPos);
-        assertNotNull(restored, "el blob colocado debe existir");
-        assertEquals(15000, restored.cellAmount, "la cantidad de 15000 netherite ingots debe preservarse");
+        assertNotNull(restored, "placed blob must exist");
+        assertEquals(15000, restored.cellAmount, "amount of 15000 netherite ingots must be preserved");
         assertEquals(Material.NETHERITE_INGOT, restored.cellSample.getType());
     }
 }

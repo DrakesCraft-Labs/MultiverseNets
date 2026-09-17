@@ -13,24 +13,27 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /**
- * Almacenamiento agregado de la red: la suma de todas las celdas (T1-T6) y greedy cells.
+ * [EN] Network Storage Engine
+ * Aggregated virtual storage summing all Quantum Cells (T1-T6), Greedy Cells, and Infinity Barrels.
+ * - Insertion priority: Greedy cells matching type -> Normal cells matching type -> Empty cells.
+ * - Extraction priority: Normal cells first -> Greedy cells last (acting as output buffers).
+ * - Linear deduplication: Aggregated view is merged using {@link StackUtils#itemsMatch} to avoid Bukkit ItemStack hash bugs.
  *
- * Modelo calcado del NetworkRoot de NetworksV6, adaptado a que aqui las celdas son virtuales
- * (muestra + cantidad en el blob, estilo Quantum Storage) en vez de inventarios de bloque:
- *
- *   - Insercion: greedy cells que ya guarden ese tipo -> celdas con el mismo tipo -> celdas
- *     vacias (que adoptan el tipo). Las greedy con muestra solo reciben si coincide.
- *   - Extraccion: celdas normales primero, greedy al final.
- *   - La vista agregada se cachea 500 ms y se fusiona por comparacion lineal con
- *     StackUtils.itemsMatch, no por hashCode: Bukkit calcula mal los hash de ItemStack y la
- *     grilla partia un mismo item en dos filas (bug #226 de Networks).
- *   - Cada operacion decodifica el blob de cada celda UNA sola vez; antes el orden previo a la
- *     insercion releia y re-decodificaba cada celda por comparacion del sort.
+ * [ES] Motor de Almacenamiento Agregado de Red
+ * Almacenamiento virtual agregado que suma todas las celdas (T1-T6), celdas greedy y barriles infinitos.
+ * - Prioridad de inserción: Greedy cells con muestra -> Celdas normales con muestra -> Celdas vacías.
+ * - Prioridad de extracción: Celdas normales primero -> Greedy cells al final.
+ * - Deduplicación lineal: Fusión de vista mediante {@link StackUtils#itemsMatch} para evitar fallos de hash.
  */
 public class NetworkStorage {
 
     private static final long VIEW_CACHE_MS = 500;
 
+    /**
+     * EN: Consolidated view entry for an item sample and its total network count.
+ *
+     * ES: Entrada de vista consolidada para una muestra de ítem y su conteo total en la red.
+     */
     public record View(ItemStack sample, long amount) {
     }
 

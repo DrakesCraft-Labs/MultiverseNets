@@ -23,15 +23,9 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Menú de Quantum Storage Cell:
+ * GUI menu for Quantum Storage Cells (T1-T6 and Greedy Cell): high-capacity storage for a single item type.
  *
- *   [ fondo ][ fondo ][ fondo ][ fondo ][DISPLAY][ fondo ][ fondo ][ fondo ][ fondo ]
- *   [ fondo ][ fondo ][DEPOSIT][ fondo ][SET ITEM][ fondo ][EXTRACT][ fondo ][ fondo ]
- *
- *   - DISPLAY (4): ítem guardado con monto y porcentaje; clic izquierdo saca 1, derecho 64, shift llena el inventario.
- *   - SET ITEM (13): registra el tipo con el cursor cuando está vacía; shift alterna vaciado (void).
- *   - QUICK DEPOSIT (11): deposita automáticamente todos los ítems coincidentes del inventario.
- *   - QUICK EXTRACT (15): atajos rápidos para retirar ítems.
+ * Menú de interfaz para Celdas Cuánticas (T1-T6 y Greedy Cell): almacén de alta capacidad para un solo tipo de ítem.
  */
 public class CellMenu extends MenuHolder {
 
@@ -66,17 +60,17 @@ public class CellMenu extends MenuHolder {
 
     @Override
     protected void draw() {
-        ItemStack fondo = panel(Material.GRAY_STAINED_GLASS_PANE, " ");
+        ItemStack background = panel(Material.GRAY_STAINED_GLASS_PANE, " ");
         for (int slot : BACKGROUND_SLOTS) {
-            inv.setItem(slot, fondo);
+            inv.setItem(slot, background);
         }
 
         ItemStack setItem = new ItemStack(Material.LIME_STAINED_GLASS_PANE);
         var metaSet = setItem.getItemMeta();
         metaSet.displayName(Component.text("Set Item", NamedTextColor.GREEN).decoration(TextDecoration.ITALIC, false));
         metaSet.lore(List.of(
-                passivo("Click with an item on your cursor to register it."),
-                passivo("Only works while the cell is empty."),
+                passiveText("Click with an item on your cursor to register it."),
+                passiveText("Only works while the cell is empty."),
                 Component.empty(),
                 Component.text("Shift+Click: Toggle void excess", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false)));
         setItem.setItemMeta(metaSet);
@@ -86,8 +80,8 @@ public class CellMenu extends MenuHolder {
         var metaDep = depositAll.getItemMeta();
         metaDep.displayName(Component.text("Quick Deposit", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
         metaDep.lore(List.of(
-                passivo("Click to deposit all matching items"),
-                passivo("from your inventory into this cell.")));
+                passiveText("Click to deposit all matching items"),
+                passiveText("from your inventory into this cell.")));
         depositAll.setItemMeta(metaDep);
         inv.setItem(DEPOSIT_ALL_SLOT, depositAll);
 
@@ -95,26 +89,26 @@ public class CellMenu extends MenuHolder {
         var metaExt = extractAll.getItemMeta();
         metaExt.displayName(Component.text("Quick Take Out", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
         metaExt.lore(List.of(
-                passivo("Left Click: Fill inventory with stored items"),
-                passivo("Right Click: Take 1 item"),
-                passivo("Shift+Right Click: Take 64 items (1 stack)")));
+                passiveText("Left Click: Fill inventory with stored items"),
+                passiveText("Right Click: Take 1 item"),
+                passiveText("Shift+Right Click: Take 64 items (1 stack)")));
         extractAll.setItemMeta(metaExt);
         inv.setItem(EXTRACT_ALL_SLOT, extractAll);
 
-        actualizarDisplay();
+        updateDisplay();
     }
 
-    private Component passivo(String texto) {
-        return Component.text(texto, NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false);
+    private Component passiveText(String text) {
+        return Component.text(text, NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false);
     }
 
-    private void actualizarDisplay() {
+    private void updateDisplay() {
         NodeBlob blob = NodeStore.get(block);
         long cap = Items.capacityOf(type);
-        ItemStack icono;
+        ItemStack icon;
         if (blob == null || blob.cellSample == null || blob.cellAmount <= 0) {
-            icono = new ItemStack(Material.RED_STAINED_GLASS_PANE);
-            var meta = icono.getItemMeta();
+            icon = new ItemStack(Material.RED_STAINED_GLASS_PANE);
+            var meta = icon.getItemMeta();
             meta.displayName(Component.text("No Registered Item", NamedTextColor.RED)
                     .decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
@@ -122,11 +116,11 @@ public class CellMenu extends MenuHolder {
                     Component.text("Stores a single item type", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
                     Component.empty(),
                     Component.text("Click with item on cursor to set", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false)));
-            icono.setItemMeta(meta);
+            icon.setItemMeta(meta);
         } else {
-            icono = blob.cellSample.clone();
-            icono.setAmount(1);
-            var meta = icono.getItemMeta();
+            icon = blob.cellSample.clone();
+            icon.setAmount(1);
+            var meta = icon.getItemMeta();
             meta.lore(List.of(
                     Component.empty(),
                     Component.text("Amount: " + blob.cellAmount + " / " + Items.formatAmount(cap),
@@ -137,12 +131,12 @@ public class CellMenu extends MenuHolder {
                     Component.text("Left Click: Take 1 item", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false),
                     Component.text("Right Click: Take 64 items (1 stack)", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false),
                     Component.text("Shift+Click: Fill inventory", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false)));
-            icono.setItemMeta(meta);
+            icon.setItemMeta(meta);
         }
-        inv.setItem(ITEM_SLOT, icono);
+        inv.setItem(ITEM_SLOT, icon);
     }
 
-    private boolean absorberEnCelda(NodeBlob blob, ItemStack stack) {
+    private boolean absorbIntoCell(NodeBlob blob, ItemStack stack) {
         if (stack == null || stack.getType().isAir() || stack.getAmount() <= 0) {
             return false;
         }
@@ -150,19 +144,19 @@ public class CellMenu extends MenuHolder {
         if (blob.cellSample != null && !StackUtils.itemsMatch(blob.cellSample, stack)) {
             return false;
         }
-        long espacio = cap - blob.cellAmount;
-        if (espacio <= 0) {
+        long space = cap - blob.cellAmount;
+        if (space <= 0) {
             return false;
         }
-        int tomar = (int) Math.min(Math.min(espacio, stack.getAmount()), Integer.MAX_VALUE);
-        if (tomar <= 0) {
+        int take = (int) Math.min(Math.min(space, stack.getAmount()), Integer.MAX_VALUE);
+        if (take <= 0) {
             return false;
         }
         if (blob.cellSample == null) {
             blob.cellSample = StackUtils.getAsQuantity(stack, 1);
         }
-        blob.cellAmount += tomar;
-        stack.setAmount(stack.getAmount() - tomar);
+        blob.cellAmount += take;
+        stack.setAmount(stack.getAmount() - take);
         NodeStore.put(block, blob);
         return true;
     }
@@ -175,7 +169,6 @@ public class CellMenu extends MenuHolder {
             return;
         }
 
-        // 1) Hueco SET_SLOT (13)
         if (raw == SET_SLOT) {
             if (event.getClick() == ClickType.SHIFT_LEFT || event.getClick() == ClickType.SHIFT_RIGHT) {
                 blob.filterBlacklist = !blob.filterBlacklist;
@@ -195,69 +188,65 @@ public class CellMenu extends MenuHolder {
             }
             blob.cellSample = StackUtils.getAsQuantity(cursor, 1);
             NodeStore.put(block, blob);
-            actualizarDisplay();
+            updateDisplay();
             player.sendMessage(Text.msg("Stored item set to: " + blob.cellSample.getType().name(), NamedTextColor.GREEN));
             return;
         }
 
-        // 2) Hueco QUICK DEPOSIT (11)
         if (raw == DEPOSIT_ALL_SLOT) {
-            realizarQuickDeposit(blob);
-            actualizarDisplay();
+            performQuickDeposit(blob);
+            updateDisplay();
             return;
         }
 
-        // 3) Hueco QUICK EXTRACT (15)
         if (raw == EXTRACT_ALL_SLOT) {
-            realizarQuickExtract(blob, event.getClick());
-            actualizarDisplay();
+            performQuickExtract(blob, event.getClick());
+            updateDisplay();
             return;
         }
 
-        // 4) Hueco DISPLAY / ITEM_SLOT (4)
         if (raw == ITEM_SLOT) {
             if (blob.cellSample == null || blob.cellAmount <= 0) {
                 ItemStack cursor = event.getView().getCursor();
                 if (cursor != null && !cursor.getType().isAir()) {
                     blob.cellSample = StackUtils.getAsQuantity(cursor, 1);
                     NodeStore.put(block, blob);
-                    actualizarDisplay();
+                    updateDisplay();
                     player.sendMessage(Text.msg("Stored item set to: " + blob.cellSample.getType().name(), NamedTextColor.GREEN));
                 }
                 return;
             }
             ClickType click = event.getClick();
             if (click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT) {
-                extraerHaciaInventario(blob, Integer.MAX_VALUE);
+                extractToInventory(blob, Integer.MAX_VALUE);
             } else if (click == ClickType.RIGHT) {
-                extraerHaciaCursorOInventario(blob, Math.min(blob.cellSample.getMaxStackSize(), 64), event);
+                extractToCursorOrInventory(blob, Math.min(blob.cellSample.getMaxStackSize(), 64), event);
             } else {
-                extraerHaciaCursorOInventario(blob, 1, event);
+                extractToCursorOrInventory(blob, 1, event);
             }
-            actualizarDisplay();
+            updateDisplay();
             return;
         }
 
-        // 5) Shift-click desde el inventario del jugador hacia la celda
         if (raw >= inv.getSize() && (event.getClick() == ClickType.SHIFT_LEFT || event.getClick() == ClickType.SHIFT_RIGHT)) {
             ItemStack mover = event.getCurrentItem();
             if (mover == null || mover.getType().isAir()) {
                 return;
             }
-            int slotJugador = slotInventarioJugador(event);
-            ItemStack clon = mover.clone();
-            if (absorberEnCelda(blob, clon)) {
-                if (clon.getAmount() <= 0) {
-                    player.getInventory().setItem(slotJugador, null);
+            int playerSlot = playerInventorySlot(event);
+            ItemStack clone = mover.clone();
+            if (absorbIntoCell(blob, clone)) {
+                if (clone.getAmount() <= 0) {
+                    player.getInventory().setItem(playerSlot, null);
                 } else {
-                    player.getInventory().setItem(slotJugador, clon);
+                    player.getInventory().setItem(playerSlot, clone);
                 }
-                actualizarDisplay();
+                updateDisplay();
             }
         }
     }
 
-    private void realizarQuickDeposit(NodeBlob blob) {
+    private void performQuickDeposit(NodeBlob blob) {
         if (blob.cellSample == null) {
             player.sendMessage(Text.msg("Set an item type before using Quick Deposit.", NamedTextColor.YELLOW));
             return;
@@ -296,21 +285,21 @@ public class CellMenu extends MenuHolder {
         }
     }
 
-    private void realizarQuickExtract(NodeBlob blob, ClickType click) {
+    private void performQuickExtract(NodeBlob blob, ClickType click) {
         if (blob.cellSample == null || blob.cellAmount <= 0) {
             player.sendMessage(Text.msg("The cell is empty.", NamedTextColor.YELLOW));
             return;
         }
         if (click == ClickType.SHIFT_RIGHT || click == ClickType.SHIFT_LEFT) {
-            extraerHaciaInventario(blob, Math.min(blob.cellSample.getMaxStackSize(), 64));
+            extractToInventory(blob, Math.min(blob.cellSample.getMaxStackSize(), 64));
         } else if (click == ClickType.RIGHT) {
-            extraerHaciaInventario(blob, 1);
+            extractToInventory(blob, 1);
         } else {
-            extraerHaciaInventario(blob, Integer.MAX_VALUE);
+            extractToInventory(blob, Integer.MAX_VALUE);
         }
     }
 
-    private void extraerHaciaInventario(NodeBlob blob, int maxWant) {
+    private void extractToInventory(NodeBlob blob, int maxWant) {
         if (blob.cellSample == null || blob.cellAmount <= 0) {
             return;
         }
@@ -343,7 +332,7 @@ public class CellMenu extends MenuHolder {
         NodeStore.put(block, blob);
     }
 
-    private void extraerHaciaCursorOInventario(NodeBlob blob, int want, InventoryClickEvent event) {
+    private void extractToCursorOrInventory(NodeBlob blob, int want, InventoryClickEvent event) {
         if (blob.cellSample == null || blob.cellAmount <= 0) {
             return;
         }
@@ -362,7 +351,7 @@ public class CellMenu extends MenuHolder {
             cursor.setAmount(cursor.getAmount() + toTake);
             blob.cellAmount -= toTake;
         } else {
-            extraerHaciaInventario(blob, want);
+            extractToInventory(blob, want);
             return;
         }
 
@@ -375,13 +364,12 @@ public class CellMenu extends MenuHolder {
 
     @Override
     protected void onClose(InventoryCloseEvent event) {
-        // No hay slots físicos vanilla en el menú
     }
 
-    private ItemStack panel(Material material, String nombre) {
+    private ItemStack panel(Material material, String name) {
         ItemStack item = new ItemStack(material);
         var meta = item.getItemMeta();
-        meta.displayName(Component.text(nombre, NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+        meta.displayName(Component.text(name, NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
         item.setItemMeta(meta);
         return item;
     }

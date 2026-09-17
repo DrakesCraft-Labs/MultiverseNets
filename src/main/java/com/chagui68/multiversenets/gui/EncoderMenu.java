@@ -23,16 +23,9 @@ import org.bukkit.inventory.Recipe;
 import java.util.List;
 
 /**
- * El Encoder de NetworksV6, version standalone: 45 huecos con la misma distribucion.
+ * Recipe Encoder GUI: encodes 3x3 crafting patterns and recipes onto blank Blueprint items.
  *
- *   Matriz 3x3 en 12-14 / 21-23 / 30-32 (plantillas: clic con item lo apunta, clic sin item lo
- *   borra; nunca consume items), blueprint en blanco en 19 (hueco VANILLA: el item va y viene
- *   de verdad), boton de codificar en 16, salida en 34 (vanilla) y vista previa del resultado
- *   en 25.
- *
- * Codificar consume 1 blueprint en blanco y escribe la receta completa (matriz + salida) en un
- * item de Blueprint que cae en la salida. La matriz se guarda en el blob del bloque y sobrevive
- * al cerrar el menu.
+ * Menú del Codificador de Recetas: codifica patrones de crafteo 3x3 y recetas en planos en blanco.
  */
 public class EncoderMenu extends MenuHolder {
 
@@ -66,15 +59,13 @@ public class EncoderMenu extends MenuHolder {
 
     @Override
     protected void draw() {
-        ItemStack fondo = panel(Material.GRAY_STAINED_GLASS_PANE, " ");
+        ItemStack background = panel(Material.GRAY_STAINED_GLASS_PANE, " ");
         for (int i = 0; i < inv.getSize(); i++) {
-            // Los huecos vanilla (blank/output) NO se rellenan de paneles: son reales.
             if (i == BLANK_SLOT || i == OUTPUT_SLOT) {
                 continue;
             }
-            inv.setItem(i, fondo);
+            inv.setItem(i, background);
         }
-        // La matriz plantilla guardada en el bloque.
         NodeBlob blob = blob();
         for (int i = 0; i < MATRIX_SLOTS.length; i++) {
             ItemStack tpl = blob.craftingMatrix[i];
@@ -98,11 +89,11 @@ public class EncoderMenu extends MenuHolder {
         encode.setItemMeta(em);
         inv.setItem(ENCODE_SLOT, encode);
 
-        RecipeData actual = recetaActual();
-        if (actual != null) {
-            ItemStack preview = actual.output.clone();
+        RecipeData current = currentRecipe();
+        if (current != null) {
+            ItemStack preview = current.output.clone();
             var pm = preview.getItemMeta();
-            pm.lore(List.of(Component.text("Result: " + Blueprints.readableName(actual.output),
+            pm.lore(List.of(Component.text("Result: " + Blueprints.readableName(current.output),
                     NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
             preview.setItemMeta(pm);
             inv.setItem(PREVIEW_SLOT, preview);
@@ -112,8 +103,12 @@ public class EncoderMenu extends MenuHolder {
         inv.setItem(OUTPUT_SLOT + 9, panel(Material.ORANGE_STAINED_GLASS_PANE, "Output above"));
     }
 
-    /** La receta que saldria de la matriz actual, o null si no casa con nada de vanilla. */
-    private RecipeData recetaActual() {
+    /**
+     * Resolves the crafting recipe for the current matrix pattern, or null if none matches.
+ *
+     * Resuelve la receta de crafteo para la matriz actual, o null si ninguna coincide.
+     */
+    private RecipeData currentRecipe() {
         NodeBlob blob = blob();
         if (Blueprints.isEmpty(blob.craftingMatrix)) {
             return null;
@@ -130,34 +125,33 @@ public class EncoderMenu extends MenuHolder {
         int raw = event.getRawSlot();
         for (int i = 0; i < MATRIX_SLOTS.length; i++) {
             if (MATRIX_SLOTS[i] == raw) {
-                editarMatriz(i, event);
+                editMatrix(i, event);
                 return;
             }
         }
         if (raw == ENCODE_SLOT) {
-            codificar();
+            encodeBlueprint();
             return;
         }
-        // Shift sobre un blueprint en blanco del propio inventario: va directo a su hueco.
         if (raw >= inv.getSize()) {
-            ItemStack mover = event.getCurrentItem();
-            if (mover == null || Items.typeOf(mover) != DeviceType.BLUEPRINT || Blueprints.read(mover) != null) {
+            ItemStack moving = event.getCurrentItem();
+            if (moving == null || Items.typeOf(moving) != DeviceType.BLUEPRINT || Blueprints.read(moving) != null) {
                 return;
             }
-            int slotJugador = slotInventarioJugador(event);
-            ItemStack actual = inv.getItem(BLANK_SLOT);
-            if (actual == null || actual.getType().isAir()) {
-                inv.setItem(BLANK_SLOT, mover);
-                player.getInventory().setItem(slotJugador, null);
-            } else if (Items.typeOf(actual) == DeviceType.BLUEPRINT && Blueprints.read(actual) == null) {
-                int pasan = Math.min(actual.getMaxStackSize() - actual.getAmount(), mover.getAmount());
-                if (pasan <= 0) {
+            int playerSlot = playerInventorySlot(event);
+            ItemStack current = inv.getItem(BLANK_SLOT);
+            if (current == null || current.getType().isAir()) {
+                inv.setItem(BLANK_SLOT, moving);
+                player.getInventory().setItem(playerSlot, null);
+            } else if (Items.typeOf(current) == DeviceType.BLUEPRINT && Blueprints.read(current) == null) {
+                int transferred = Math.min(current.getMaxStackSize() - current.getAmount(), moving.getAmount());
+                if (transferred <= 0) {
                     return;
                 }
-                actual.setAmount(actual.getAmount() + pasan);
-                mover.setAmount(mover.getAmount() - pasan);
-                if (mover.getAmount() <= 0) {
-                    player.getInventory().setItem(slotJugador, null);
+                current.setAmount(current.getAmount() + transferred);
+                moving.setAmount(moving.getAmount() - transferred);
+                if (moving.getAmount() <= 0) {
+                    player.getInventory().setItem(playerSlot, null);
                 }
             }
             return;
@@ -165,20 +159,20 @@ public class EncoderMenu extends MenuHolder {
         refresh();
     }
 
-    private void editarMatriz(int indice, InventoryClickEvent event) {
+    private void editMatrix(int index, InventoryClickEvent event) {
         NodeBlob blob = blob();
         ItemStack cursor = event.getView().getCursor();
         if (cursor == null || cursor.getType().isAir()) {
-            blob.craftingMatrix[indice] = null;
+            blob.craftingMatrix[index] = null;
         } else {
-            blob.craftingMatrix[indice] = StackUtils.getAsQuantity(cursor, 1);
+            blob.craftingMatrix[index] = StackUtils.getAsQuantity(cursor, 1);
         }
         NodeStore.put(block, blob);
         refresh();
     }
 
-    private void codificar() {
-        RecipeData data = recetaActual();
+    private void encodeBlueprint() {
+        RecipeData data = currentRecipe();
         if (data == null) {
             player.sendMessage(Text.msg("That arrangement does not match any vanilla recipe.",
                     NamedTextColor.RED));
@@ -191,16 +185,16 @@ public class EncoderMenu extends MenuHolder {
                     NamedTextColor.RED));
             return;
         }
-        ItemStack codificado = Blueprints.toItem(data);
-        ItemStack salida = inv.getItem(OUTPUT_SLOT);
-        if (salida != null && !salida.getType().isAir()) {
-            if (!StackUtils.itemsMatch(salida, codificado) || salida.getAmount() >= salida.getMaxStackSize()) {
+        ItemStack encoded = Blueprints.toItem(data);
+        ItemStack outputItem = inv.getItem(OUTPUT_SLOT);
+        if (outputItem != null && !outputItem.getType().isAir()) {
+            if (!StackUtils.itemsMatch(outputItem, encoded) || outputItem.getAmount() >= outputItem.getMaxStackSize()) {
                 player.sendMessage(Text.msg("The output slot is full.", NamedTextColor.RED));
                 return;
             }
-            salida.setAmount(salida.getAmount() + 1);
+            outputItem.setAmount(outputItem.getAmount() + 1);
         } else {
-            inv.setItem(OUTPUT_SLOT, codificado);
+            inv.setItem(OUTPUT_SLOT, encoded);
         }
         blank.setAmount(blank.getAmount() - 1);
         if (blank.getAmount() <= 0) {
@@ -211,22 +205,21 @@ public class EncoderMenu extends MenuHolder {
         refresh();
     }
 
-    /** Al cerrar, lo que quede en los huecos vanilla vuelve al jugador. */
     @Override
     protected void onClose(InventoryCloseEvent event) {
         for (int slot : new int[]{BLANK_SLOT, OUTPUT_SLOT}) {
-            ItemStack contenido = inv.getItem(slot);
-            if (contenido != null && !contenido.getType().isAir()) {
+            ItemStack content = inv.getItem(slot);
+            if (content != null && !content.getType().isAir()) {
                 inv.setItem(slot, null);
-                devolverAlJugador(contenido);
+                giveOrDrop(content);
             }
         }
     }
 
-    private ItemStack panel(Material material, String nombre) {
+    private ItemStack panel(Material material, String name) {
         ItemStack item = new ItemStack(material);
         var meta = item.getItemMeta();
-        meta.displayName(Component.text(nombre, NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+        meta.displayName(Component.text(name, NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
         item.setItemMeta(meta);
         return item;
     }

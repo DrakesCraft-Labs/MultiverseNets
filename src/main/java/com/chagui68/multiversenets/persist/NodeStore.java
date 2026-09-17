@@ -21,6 +21,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * [EN] Chunk Persistent Storage & Network Registry
+ * Handles serialization/deserialization of {@link NodeBlob} data into chunk PDC containers,
+ * and maintains the persistent controller position registry in {@code networks.yml}.
+ *
+ * [ES] Almacenamiento Persistente en Chunks y Registro de Redes
+ * Gestiona la serialización y deserialización de objetos {@link NodeBlob} en los contenedores PDC de chunks,
+ * y mantiene el registro de controladores persistente en {@code networks.yml}.
+ */
 public final class NodeStore {
 
     private static MultiverseNets plugin;
@@ -30,6 +39,11 @@ public final class NodeStore {
     private NodeStore() {
     }
 
+    /**
+     * EN: Initializes the controller registry file and loads saved network coordinates.
+ *
+     * ES: Inicializa el archivo de registro de controladores y carga las coordenadas guardadas.
+     */
     public static void init(MultiverseNets pl) {
         plugin = pl;
         registryFile = new File(pl.getDataFolder(), "networks.yml");
@@ -73,7 +87,8 @@ public final class NodeStore {
             NodeBlob blob = (NodeBlob) in.readObject();
             normalize(blob);
             return blob;
-        } catch (IOException | ClassNotFoundException | ClassCastException e) {
+        } catch (Throwable e) {
+            e.printStackTrace();
             return null;
         }
     }

@@ -8,25 +8,28 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
- * El puente con Slimefun, cuando Slimefun no esta.
+ * Unit tests verifying SlimefunBridge fallback behavior when Slimefun is absent.
  *
- * Es la mitad del contrato que sostiene el plugin: MultiverseNets se vende como standalone, y un
- * servidor sin Slimefun tiene que poder usarlo entero. Si alguna de estas llamadas lanzara en vez
- * de responder en vacio, cada pasada del ticker moriria en el primer vecino que no fuera un cofre.
- *
- * No se llama a init() a proposito: sin servidor arrancado no hay PluginManager, y ese es
- * exactamente el estado en el que el puente debe comportarse como si Slimefun no existiera.
+ * Pruebas unitarias que verifican el comportamiento seguro del SlimefunBridge cuando Slimefun no está presente.
  */
 class SlimefunBridgeTest {
 
     @Test
-    void sinSlimefunElPuenteSeDeclaraNoDisponible() {
+    void withoutSlimefunBridgeIsUnavailable() {
+        assertFalse(SlimefunBridge.isAvailable(),
+                "Without init() and without server, bridge must report unavailable");
         assertFalse(SlimefunBridge.disponible(),
-                "sin init() y sin servidor, el puente no puede darse por bueno");
+                "Backward compatibility alias must report unavailable");
     }
 
     @Test
-    void consultarUnBloqueNuloNoLanza() {
+    void queryingNullBlockOrItemDoesNotThrow() {
+        assertFalse(SlimefunBridge.isMachine(null));
+        assertNull(SlimefunBridge.getId((org.bukkit.block.Block) null));
+        assertNull(SlimefunBridge.getId((org.bukkit.inventory.ItemStack) null));
+        assertFalse(SlimefunBridge.isSlimefunItem(null));
+
+        // Alias verification
         assertFalse(SlimefunBridge.esMaquina(null));
         assertNull(SlimefunBridge.idDe((org.bukkit.block.Block) null));
         assertNull(SlimefunBridge.idDe((org.bukkit.inventory.ItemStack) null));
@@ -34,16 +37,18 @@ class SlimefunBridgeTest {
     }
 
     @Test
-    void extraerSinSlimefunDevuelveNadaEnVezDeLanzar() {
+    void extractWithoutSlimefunReturnsNullSafely() {
+        assertNull(SlimefunBridge.extract(null, item -> true, 64));
+        assertNull(SlimefunBridge.extract(null, null, 0));
+
+        // Alias verification
         assertNull(SlimefunBridge.extraer(null, item -> true, 64));
-        assertNull(SlimefunBridge.extraer(null, null, 0));
     }
 
     @Test
-    void insertarSinSlimefunDevuelveTodoComoNoCabido() {
-        // Devolver 0 seria mentir: diria que el item se entrego cuando no hay donde. El llamante
-        // usa ese numero para devolverlo al almacen, asi que un 0 aqui borraria items.
-        org.bukkit.inventory.ItemStack nulo = null;
-        assertEquals(0, SlimefunBridge.insertar(null, nulo));
+    void insertWithoutSlimefunHandlesNullSafely() {
+        org.bukkit.inventory.ItemStack nullItem = null;
+        assertEquals(0, SlimefunBridge.insert(null, nullItem));
+        assertEquals(0, SlimefunBridge.insertar(null, nullItem));
     }
 }

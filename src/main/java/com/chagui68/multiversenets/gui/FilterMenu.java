@@ -25,16 +25,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Menú de configuración de filtro y selección direccional:
+ * Configuration GUI for item filters (whitelist / blacklist) and directional target faces.
  *
- *   [Filtro 0..16] .................................................... [Modo: 17]
- *   [DOWN: 18] [UP: 19] [NORTH: 20] [SOUTH: 21] [WEST: 22] [EAST: 23] [ALL: 24] [Clear: 25] [Help: 26]
- *
- *   - Huecos 0..16: casillas de filtro con placeholders claros si están vacías.
- *   - Hueco 17: botón de alternar modo Whitelist (Permitir solo) / Blacklist (Bloquear lista).
- *   - Huecos 18..24 (en Grabbers y Pushers): selección del bloque y cara adyacente específica (o ALL).
- *   - Hueco 25: botón para limpiar todos los filtros.
- *   - Hueco 26: guía explicativa.
+ * Menú de configuración de filtro de ítems (lista blanca / negra) y caras objetivo direccionales.
  */
 public class FilterMenu extends MenuHolder {
 
@@ -75,7 +68,6 @@ public class FilterMenu extends MenuHolder {
         if (blob.filterMaterials == null) {
             blob.filterMaterials = new ArrayList<>();
         }
-        // Sincronizar desde filterMaterials si filterItems está vacío
         if (blob.filterItems.isEmpty() && !blob.filterMaterials.isEmpty()) {
             for (String matName : blob.filterMaterials) {
                 Material mat = Material.matchMaterial(matName);
@@ -91,7 +83,6 @@ public class FilterMenu extends MenuHolder {
     protected void draw() {
         NodeBlob blob = blob();
 
-        // 1) Dibujar casillas de filtro (0..16)
         for (int i = 0; i < MAX_FILTER_SLOTS; i++) {
             if (i < blob.filterItems.size()) {
                 ItemStack item = blob.filterItems.get(i);
@@ -112,7 +103,6 @@ public class FilterMenu extends MenuHolder {
                     continue;
                 }
             }
-            // Hueco de filtro vacío
             ItemStack emptySlot = new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE);
             var metaEmpty = emptySlot.getItemMeta();
             metaEmpty.displayName(Component.text("Empty Filter Slot", NamedTextColor.DARK_GRAY)
@@ -124,7 +114,6 @@ public class FilterMenu extends MenuHolder {
             inv.setItem(i, emptySlot);
         }
 
-        // 2) Botón de Modo Whitelist / Blacklist (Slot 17)
         boolean isBlacklist = blob.filterBlacklist;
         ItemStack mode = new ItemStack(isBlacklist ? Material.RED_STAINED_GLASS_PANE : Material.LIME_STAINED_GLASS_PANE);
         var metaMode = mode.getItemMeta();
@@ -139,7 +128,6 @@ public class FilterMenu extends MenuHolder {
         mode.setItemMeta(metaMode);
         inv.setItem(MODE_SLOT, mode);
 
-        // 3) Fila inferior: Selección direccional de bloque (18..24) en Grabbers y Pushers
         if (type.isDirectional()) {
             for (int i = 0; i < DIRECTION_FACES.length; i++) {
                 BlockFace f = DIRECTION_FACES[i];
@@ -161,8 +149,8 @@ public class FilterMenu extends MenuHolder {
                     lore.add(Component.text("Relative: " + f.name() + " (" + adj.getX() + ", " + adj.getY() + ", " + adj.getZ() + ")",
                             NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
                     lore.add(Component.text("Block: " + adj.getType().name(), NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-                    if (SlimefunBridge.esMaquina(adj)) {
-                        String sf = SlimefunBridge.idDe(adj);
+                    if (SlimefunBridge.isMachine(adj)) {
+                        String sf = SlimefunBridge.getId(adj);
                         if (sf != null) {
                             lore.add(Component.text("Machine: " + sf, NamedTextColor.LIGHT_PURPLE).decoration(TextDecoration.ITALIC, false));
                         }
@@ -181,7 +169,6 @@ public class FilterMenu extends MenuHolder {
                 inv.setItem(slot, icon);
             }
 
-            // Slot 24: ALL (Cualquier contenedor adyacente)
             boolean isAllSelected = blob.targetFace == null || blob.targetFace.equalsIgnoreCase("ALL");
             ItemStack allIcon = new ItemStack(isAllSelected ? Material.COMPASS : Material.RECOVERY_COMPASS);
             var metaAll = allIcon.getItemMeta();
@@ -204,14 +191,12 @@ public class FilterMenu extends MenuHolder {
             }
             inv.setItem(ALL_DIRECTIONS_SLOT, allIcon);
         } else {
-            // Paneles de fondo estándar para dispositivos no direccionales
             ItemStack border = panel(Material.GRAY_STAINED_GLASS_PANE, " ");
             for (int slot : BOTTOM_BORDER_SLOTS) {
                 inv.setItem(slot, border);
             }
         }
 
-        // 4) Botón de limpiar filtro (Slot 25)
         ItemStack clear = new ItemStack(Material.BARRIER);
         var metaClear = clear.getItemMeta();
         metaClear.displayName(Component.text("Clear Filter", NamedTextColor.RED)
@@ -222,7 +207,6 @@ public class FilterMenu extends MenuHolder {
         clear.setItemMeta(metaClear);
         inv.setItem(CLEAR_SLOT, clear);
 
-        // 5) Botón de ayuda (Slot 26)
         ItemStack help = new ItemStack(Material.BOOK);
         var metaHelp = help.getItemMeta();
         metaHelp.displayName(Component.text("How Filter & Targeting Works", NamedTextColor.GOLD)
@@ -242,7 +226,6 @@ public class FilterMenu extends MenuHolder {
         int raw = event.getRawSlot();
         NodeBlob blob = blob();
 
-        // 1) Shift-click desde el inventario del jugador: añade el ítem al filtro sin consumirlo
         if (raw >= inv.getSize()) {
             ItemStack mover = event.getCurrentItem();
             if (mover == null || mover.getType().isAir()) {
@@ -252,7 +235,6 @@ public class FilterMenu extends MenuHolder {
             return;
         }
 
-        // 2) Botón de Modo Whitelist / Blacklist (Slot 17)
         if (raw == MODE_SLOT) {
             blob.filterBlacklist = !blob.filterBlacklist;
             NodeStore.put(block, blob);
@@ -262,7 +244,6 @@ public class FilterMenu extends MenuHolder {
             return;
         }
 
-        // 3) Selección de Dirección / Bloque objetivo (Slots 18..24) en Grabbers y Pushers
         if (type.isDirectional() && raw >= 18 && raw <= 24) {
             if (raw == ALL_DIRECTIONS_SLOT) {
                 blob.targetFace = "ALL";
@@ -288,7 +269,6 @@ public class FilterMenu extends MenuHolder {
             }
         }
 
-        // 4) Botón de Limpiar Filtro (Slot 25)
         if (raw == CLEAR_SLOT) {
             blob.filterItems.clear();
             blob.filterMaterials.clear();
@@ -298,13 +278,11 @@ public class FilterMenu extends MenuHolder {
             return;
         }
 
-        // 5) Botón de Ayuda (Slot 26)
         if (raw == HELP_SLOT) {
             draw();
             return;
         }
 
-        // 6) Clic en casillas de filtro (0..16)
         if (raw >= 0 && raw < MAX_FILTER_SLOTS) {
             ItemStack cursor = event.getView().getCursor();
             boolean hasCursor = cursor != null && !cursor.getType().isAir();
@@ -377,8 +355,8 @@ public class FilterMenu extends MenuHolder {
         if (b == null || b.getType().isAir()) {
             return "Air";
         }
-        if (SlimefunBridge.esMaquina(b)) {
-            String sfId = SlimefunBridge.idDe(b);
+        if (SlimefunBridge.isMachine(b)) {
+            String sfId = SlimefunBridge.getId(b);
             if (sfId != null) {
                 return sfId;
             }
@@ -394,7 +372,7 @@ public class FilterMenu extends MenuHolder {
         if (dev != null) {
             return dev.display();
         }
-        String sfId = SlimefunBridge.idDe(item);
+        String sfId = SlimefunBridge.getId(item);
         if (sfId != null) {
             return sfId;
         }
@@ -404,10 +382,10 @@ public class FilterMenu extends MenuHolder {
         return item.getType().name();
     }
 
-    private ItemStack panel(Material material, String nombre) {
+    private ItemStack panel(Material material, String name) {
         ItemStack item = new ItemStack(material);
         var meta = item.getItemMeta();
-        meta.displayName(Component.text(nombre, NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+        meta.displayName(Component.text(name, NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
         item.setItemMeta(meta);
         return item;
     }

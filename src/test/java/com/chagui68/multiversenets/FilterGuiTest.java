@@ -30,8 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * La GUI de filtro (pusher, grabber, vacuum, purgador, greedy, receptor) cubierta con clicks
- * de verdad: anadir, quitar y el toggle whitelist/blacklist.
+ * [EN] Tests FilterMenu GUI interactions: adding items, removing filters, toggling whitelist/blacklist, shift-clicking, and directional faces.
+ * [ES] Pruebas de la GUI FilterMenu: añadir items, retirar filtros, alternar whitelist/blacklist, shift-clic y caras direccionales.
  */
 class FilterGuiTest {
 
@@ -53,10 +53,10 @@ class FilterGuiTest {
         MockBukkit.unmock();
     }
 
-    private Block colocar(DeviceType tipo) {
+    private Block place(DeviceType type) {
         Block block = world.getBlockAt(0, 64, 0);
-        block.setType(tipo.material());
-        NodeStore.put(block, NodeBlob.create(tipo.name()));
+        block.setType(type.material());
+        NodeStore.put(block, NodeBlob.create(type.name()));
         return block;
     }
 
@@ -66,19 +66,27 @@ class FilterGuiTest {
         server.getPluginManager().callEvent(click);
     }
 
+    /**
+     * [EN] Right clicking a pusher opens its FilterMenu GUI.
+     * [ES] Clic derecho en un pusher abre su menú FilterMenu.
+     */
     @Test
-    void elPusherAbreSuMenuDeFiltro() {
-        Block pusher = colocar(DeviceType.PUSHER);
+    void pusherOpensFilterMenu() {
+        Block pusher = place(DeviceType.PUSHER);
         PlayerInteractEvent interact = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK,
                 null, pusher, BlockFace.NORTH, EquipmentSlot.HAND, null);
         server.getPluginManager().callEvent(interact);
         assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof FilterMenu,
-                "clic derecho al pusher abre su menu de filtro");
+                "right click on pusher opens its filter menu");
     }
 
+    /**
+     * [EN] Clicking a filter slot with an item on cursor adds the material without consuming the item.
+     * [ES] Clic con un item en el cursor añade el material sin consumir el item.
+     */
     @Test
-    void clicConItemAniadeElMaterial() {
-        Block pusher = colocar(DeviceType.PUSHER);
+    void clickWithItemAddsMaterialToFilter() {
+        Block pusher = place(DeviceType.PUSHER);
         new FilterMenu(plugin, player, pusher, DeviceType.PUSHER).openMenu();
         player.getOpenInventory().setCursor(new ItemStack(Material.DIAMOND, 7));
 
@@ -86,39 +94,50 @@ class FilterGuiTest {
 
         NodeBlob blob = NodeStore.get(pusher);
         assertTrue(blob.filterMaterials.contains("DIAMOND"),
-                "clic con item en el cursor anade su material al filtro");
-        assertEquals(7, player.getItemOnCursor().getAmount(), "el item del cursor no se consume");
+                "cursor item material must be added to filter");
+        assertEquals(7, player.getItemOnCursor().getAmount(), "cursor item must not be consumed");
     }
 
+    /**
+     * [EN] Clicking an existing filter icon with empty cursor removes it from the filter.
+     * [ES] Clic sobre un icono existente con el cursor vacío lo elimina del filtro.
+     */
     @Test
-    void clicSinCursorSobreIconoLoQuita() {
-        Block pusher = colocar(DeviceType.PUSHER);
+    void clickWithEmptyCursorRemovesMaterial() {
+        Block pusher = place(DeviceType.PUSHER);
         NodeBlob blob = NodeStore.get(pusher);
         blob.filterMaterials.add("DIAMOND");
         NodeStore.put(pusher, blob);
 
         new FilterMenu(plugin, player, pusher, DeviceType.PUSHER).openMenu();
-        // El icono del diamante esta en el hueco 0.
         player.getOpenInventory().setCursor(null);
         clickTop(0, ClickType.LEFT, InventoryAction.PICKUP_ALL);
 
         assertFalse(NodeStore.get(pusher).filterMaterials.contains("DIAMOND"),
-                "clic sin cursor sobre el icono retira el material");
+                "click with empty cursor removes material from filter");
     }
 
+    /**
+     * [EN] Clicking mode toggle switches between whitelist and blacklist modes.
+     * [ES] Clic en el botón de modo alterna entre whitelist y blacklist.
+     */
     @Test
-    void elBotonDeModoAlternaBlacklist() {
-        Block pusher = colocar(DeviceType.PUSHER);
+    void modeButtonTogglesBlacklist() {
+        Block pusher = place(DeviceType.PUSHER);
         new FilterMenu(plugin, player, pusher, DeviceType.PUSHER).openMenu();
         clickTop(17, ClickType.LEFT, InventoryAction.PICKUP_ALL);
-        assertTrue(NodeStore.get(pusher).filterBlacklist, "una pulsacion activa la blacklist");
+        assertTrue(NodeStore.get(pusher).filterBlacklist, "first click activates blacklist mode");
         clickTop(17, ClickType.LEFT, InventoryAction.PICKUP_ALL);
-        assertFalse(NodeStore.get(pusher).filterBlacklist, "la segunda la desactiva");
+        assertFalse(NodeStore.get(pusher).filterBlacklist, "second click deactivates blacklist mode");
     }
 
+    /**
+     * [EN] Shift clicking a player inventory stack adds it to filter without moving the item.
+     * [ES] Shift-clic en un item del inventario del jugador lo añade al filtro sin moverlo.
+     */
     @Test
-    void shiftClickSobreUnStackPropioLoAnadeAlFiltroSinMoverlo() {
-        Block pusher = colocar(DeviceType.PUSHER);
+    void shiftClickOnOwnStackAddsToFilterWithoutMoving() {
+        Block pusher = place(DeviceType.PUSHER);
         player.getInventory().setItem(0, new ItemStack(Material.REDSTONE, 16));
         new FilterMenu(plugin, player, pusher, DeviceType.PUSHER).openMenu();
 
@@ -128,45 +147,54 @@ class FilterGuiTest {
 
         NodeBlob blob = NodeStore.get(pusher);
         assertTrue(blob.filterMaterials.contains("REDSTONE"),
-                "shift+clic sobre un stack propio lo anade al filtro");
-        assertTrue(shift.isCancelled(), "el stack no se mueve a la GUI pintada");
-        assertEquals(16, player.getInventory().getItem(0).getAmount(), "el stack se queda donde estaba");
+                "shift click adds material to filter");
+        assertTrue(shift.isCancelled(), "item move event cancelled to prevent dragging into GUI");
+        assertEquals(16, player.getInventory().getItem(0).getAmount(), "player stack remains intact");
     }
 
+    /**
+     * [EN] Player inventory remains interactive while menu is open.
+     * [ES] El inventario del jugador permanece interactivo mientras el menú está abierto.
+     */
     @Test
-    void elInventarioDelJugadorQuedaLibreConElMenuAbierto() {
-        Block pusher = colocar(DeviceType.PUSHER);
+    void playerInventoryRemainsInteractiveWithMenuOpen() {
+        Block pusher = place(DeviceType.PUSHER);
         player.getInventory().setItem(0, new ItemStack(Material.STONE, 3));
         new FilterMenu(plugin, player, pusher, DeviceType.PUSHER).openMenu();
-        // Clic normal sobre el inventario propio (raw 27+): vanilla, no cancelado.
         InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
                 InventoryType.SlotType.CONTAINER, 27, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(click);
         assertFalse(click.isCancelled(),
-                "los clics sobre el inventario del jugador no se tocan (no mas GUI congelada)");
+                "player inventory clicks should not be blocked");
     }
 
+    /**
+     * [EN] Filter matcher distinguishes Quantum Cell custom item from vanilla terracotta.
+     * [ES] El matcher distingue un item custom Quantum Cell de terracota vanilla.
+     */
     @Test
-    void filtroDistingueQuantumCellDeTerracotaVanilla() {
+    void filterDistinguishesQuantumCellFromVanillaTerracotta() {
         ItemStack cellT1 = com.chagui68.multiversenets.item.Items.create(DeviceType.CELL_T1);
         ItemStack vanillaTerracotta = new ItemStack(Material.CYAN_TERRACOTTA);
 
-        // Comprobar matcher con template de Quantum Cell T1
         assertTrue(com.chagui68.multiversenets.net.NetworkManager.matchesFilter(cellT1, cellT1.clone()),
-                "Quantum Cell T1 debe coincidir consigo misma");
+                "Quantum Cell T1 matches itself");
         assertFalse(com.chagui68.multiversenets.net.NetworkManager.matchesFilter(cellT1, vanillaTerracotta),
-                "Quantum Cell T1 NO debe coincidir con terracota vanilla");
+                "Quantum Cell T1 does not match vanilla terracotta");
 
-        // Comprobar matcher con template de terracota vanilla
         assertTrue(com.chagui68.multiversenets.net.NetworkManager.matchesFilter(vanillaTerracotta, vanillaTerracotta.clone()),
-                "Terracota vanilla debe coincidir con terracota vanilla");
+                "Vanilla terracotta matches itself");
         assertFalse(com.chagui68.multiversenets.net.NetworkManager.matchesFilter(vanillaTerracotta, cellT1),
-                "Terracota vanilla NO debe coincidir con Quantum Cell T1");
+                "Vanilla terracotta does not match Quantum Cell T1");
     }
 
+    /**
+     * [EN] Filter registers custom items into filterItems list upon shift click.
+     * [ES] El filtro registra items custom en filterItems con shift-clic.
+     */
     @Test
-    void filtroRegistraItemsPersonalizadosConShiftClick() {
-        Block grabber = colocar(DeviceType.GRABBER);
+    void filterRegistersCustomItemsWithShiftClick() {
+        Block grabber = place(DeviceType.GRABBER);
         ItemStack cellT1 = com.chagui68.multiversenets.item.Items.create(DeviceType.CELL_T1);
         player.getInventory().setItem(0, cellT1);
 
@@ -177,14 +205,18 @@ class FilterGuiTest {
         server.getPluginManager().callEvent(shift);
 
         NodeBlob blob = NodeStore.get(grabber);
-        assertFalse(blob.filterItems.isEmpty(), "blob.filterItems debe registrar el item custom");
+        assertFalse(blob.filterItems.isEmpty(), "filterItems must register custom item");
         assertEquals(DeviceType.CELL_T1, com.chagui68.multiversenets.item.Items.typeOf(blob.filterItems.get(0)),
-                "el item registrado en filterItems debe ser CELL_T1");
+                "registered item in filterItems must match CELL_T1");
     }
 
+    /**
+     * [EN] Clear button empties both filterItems and filterMaterials lists.
+     * [ES] El botón Clear vacía tanto filterItems como filterMaterials.
+     */
     @Test
-    void botonClearLimpiaTodosLosFiltros() {
-        Block pusher = colocar(DeviceType.PUSHER);
+    void clearButtonClearsAllFilters() {
+        Block pusher = place(DeviceType.PUSHER);
         NodeBlob blob = NodeStore.get(pusher);
         blob.filterItems.add(new ItemStack(Material.IRON_INGOT));
         blob.filterMaterials.add("IRON_INGOT");
@@ -194,43 +226,47 @@ class FilterGuiTest {
         clickTop(FilterMenu.CLEAR_SLOT, ClickType.LEFT, InventoryAction.PICKUP_ALL);
 
         NodeBlob after = NodeStore.get(pusher);
-        assertTrue(after.filterItems.isEmpty(), "clear debe vaciar filterItems");
-        assertTrue(after.filterMaterials.isEmpty(), "clear debe vaciar filterMaterials");
+        assertTrue(after.filterItems.isEmpty(), "clear must empty filterItems");
+        assertTrue(after.filterMaterials.isEmpty(), "clear must empty filterMaterials");
     }
 
+    /**
+     * [EN] Clicking a directional face button sets targetFace on advanced devices.
+     * [ES] Clic en un botón de dirección establece targetFace en dispositivos avanzados.
+     */
     @Test
-    void seleccionDeDireccionEstableceTargetFace() {
-        Block grabber = colocar(DeviceType.GRABBER_HT);
-        // Colocar cofre al Norte
+    void directionalSelectionSetsTargetFace() {
+        Block grabber = place(DeviceType.GRABBER_HT);
         Block northBlock = world.getBlockAt(0, 64, -1);
         northBlock.setType(Material.CHEST);
 
         new FilterMenu(plugin, player, grabber, DeviceType.GRABBER_HT).openMenu();
 
-        // Slot 20 corresponde a NORTH
         clickTop(20, ClickType.LEFT, InventoryAction.PICKUP_ALL);
 
         NodeBlob blob = NodeStore.get(grabber);
-        assertEquals("NORTH", blob.targetFace, "hacer clic en el slot de NORTH establece targetFace en NORTH");
+        assertEquals("NORTH", blob.targetFace, "clicking NORTH slot sets targetFace to NORTH");
 
-        // Slot 24 corresponde a ALL
         clickTop(FilterMenu.ALL_DIRECTIONS_SLOT, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         NodeBlob blobAll = NodeStore.get(grabber);
-        assertEquals("ALL", blobAll.targetFace, "hacer clic en ALL establece targetFace en ALL");
+        assertEquals("ALL", blobAll.targetFace, "clicking ALL slot sets targetFace to ALL");
     }
 
+    /**
+     * [EN] Simple grabber does not show interactive directional buttons.
+     * [ES] El grabber simple no muestra botones direccionales interactivos.
+     */
     @Test
-    void simpleGrabberNoMuestraBotonesDireccionales() {
-        Block grabber = colocar(DeviceType.GRABBER);
+    void simpleGrabberDoesNotShowDirectionalButtons() {
+        Block grabber = place(DeviceType.GRABBER);
         new FilterMenu(plugin, player, grabber, DeviceType.GRABBER).openMenu();
 
-        // En simple grabber, slot 20 es un panel gris decorativo (no direccion)
         ItemStack slot20 = player.getOpenInventory().getTopInventory().getItem(20);
         assertNotNull(slot20);
         assertEquals(Material.GRAY_STAINED_GLASS_PANE, slot20.getType());
 
         clickTop(20, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         NodeBlob blob = NodeStore.get(grabber);
-        assertNull(blob.targetFace, "el click en el panel decorativo no modifica targetFace");
+        assertNull(blob.targetFace, "clicking decorative pane must not modify targetFace");
     }
 }
