@@ -34,21 +34,23 @@ public class NetworkStorage {
     public record View(ItemStack sample, long amount) {
     }
 
-    private record CellRef(long pos, int tier, boolean greedy) {
+    private record CellRef(long pos, int tier, boolean greedy, boolean barrel) {
     }
 
     /** Una celda con su blob ya decodificado para una operacion concreta. */
     private static final class CellState {
         private final long pos;
         private final boolean greedy;
+        private final boolean barrel;
         private final Block block;
         private final NodeBlob blob;
         private final long capacity;
         private boolean dirty;
 
-        private CellState(long pos, boolean greedy, Block block, NodeBlob blob, long capacity) {
+        private CellState(long pos, boolean greedy, boolean barrel, Block block, NodeBlob blob, long capacity) {
             this.pos = pos;
             this.greedy = greedy;
+            this.barrel = barrel;
             this.block = block;
             this.blob = blob;
             this.capacity = capacity;
@@ -80,9 +82,11 @@ public class NetworkStorage {
             for (var entry : network.nodes().entrySet()) {
                 DeviceType type = entry.getValue();
                 if (type.isCell()) {
-                    cells.add(new CellRef(entry.getKey(), type.cellTier(), false));
+                    cells.add(new CellRef(entry.getKey(), type.cellTier(), false, false));
                 } else if (type == DeviceType.GREEDY_CELL) {
-                    cells.add(new CellRef(entry.getKey(), 0, true));
+                    cells.add(new CellRef(entry.getKey(), 0, true, false));
+                } else if (type == DeviceType.INFINITY_BARREL) {
+                    cells.add(new CellRef(entry.getKey(), 0, false, true));
                 }
             }
         }
@@ -109,12 +113,22 @@ public class NetworkStorage {
                 continue;
             }
             DeviceType real = DeviceType.parse(blob.typeName);
-            boolean stillValid = ref.greedy() ? real == DeviceType.GREEDY_CELL : real != null && real.isCell();
+            boolean stillValid;
+            long cap;
+            if (ref.greedy()) {
+                stillValid = real == DeviceType.GREEDY_CELL;
+                cap = Settings.greedyCapacity();
+            } else if (ref.barrel()) {
+                stillValid = real == DeviceType.INFINITY_BARREL;
+                cap = 2_000_000_000L;
+            } else {
+                stillValid = real != null && real.isCell();
+                cap = Settings.cellCapacity(ref.tier());
+            }
             if (!stillValid) {
                 continue;
             }
-            long cap = ref.greedy() ? Settings.greedyCapacity() : Settings.cellCapacity(ref.tier());
-            states.add(new CellState(ref.pos(), ref.greedy(), block, blob, cap));
+            states.add(new CellState(ref.pos(), ref.greedy(), ref.barrel(), block, blob, cap));
         }
         return states;
     }

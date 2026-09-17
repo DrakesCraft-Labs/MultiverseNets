@@ -47,25 +47,33 @@ public class GuiListener implements Listener {
         ClickType type = event.getClick();
         InventoryAction action = event.getAction();
 
-        // Prohibiciones tomadas literalmente del guard de NetworksV6 (#230): son gestos que
-        // operan sobre la vista entera saltandose los handlers por slot.
-        if (type == ClickType.DOUBLE_CLICK || type == ClickType.MIDDLE
+        // Prohibiciones tomadas del guard de NetworksV6: gestos que
+        // operan sobre la vista entera o atajos de teclado saltándose los handlers por slot.
+        if (type == ClickType.DOUBLE_CLICK
+                || type == ClickType.MIDDLE
+                || type == ClickType.NUMBER_KEY
+                || type == ClickType.SWAP_OFFHAND
+                || type == ClickType.DROP
+                || type == ClickType.CONTROL_DROP
                 || type == ClickType.CREATIVE
                 || action == InventoryAction.COLLECT_TO_CURSOR
                 || action == InventoryAction.HOTBAR_MOVE_AND_READD
                 || action == InventoryAction.HOTBAR_SWAP
                 || action == InventoryAction.DROP_ALL_CURSOR
-                || action == InventoryAction.DROP_ALL_SLOT) {
+                || action == InventoryAction.DROP_ALL_SLOT
+                || action == InventoryAction.DROP_ONE_CURSOR
+                || action == InventoryAction.DROP_ONE_SLOT
+                || action == InventoryAction.CLONE_STACK
+                || action == InventoryAction.UNKNOWN) {
             event.setCancelled(true);
             return;
         }
 
         boolean esTop = event.getClickedInventory() != null && event.getClickedInventory().equals(top);
         if (!esTop) {
-            // Inventario del jugador: LIBRE como en Networks (antes se congelaba entero y no se
-            // podia ni coger un item al cursor para definir el tipo de la celda). Lo unico
-            // peligroso es el shift, que saltaria a los huecos pintados del menu: se cancela y
-            // se deja en manos del menu, que decide adonde va ese stack.
+            // Inventario del jugador: libre para mover ítems dentro de su inventario,
+            // excepto shift-clicks que intenten saltar al inventario superior:
+            // se cancelan y se delegan al menú para procesarlos de forma segura.
             if (type == ClickType.SHIFT_LEFT || type == ClickType.SHIFT_RIGHT) {
                 event.setCancelled(true);
                 if (!ChatPrompts.isPending((Player) event.getWhoClicked())) {

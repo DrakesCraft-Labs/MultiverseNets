@@ -1,12 +1,14 @@
 package com.chagui68.multiversenets.listen;
 
 import com.chagui68.multiversenets.MultiverseNets;
+import com.chagui68.multiversenets.gui.BarrelMenu;
 import com.chagui68.multiversenets.gui.CellMenu;
 import com.chagui68.multiversenets.gui.CrafterMenu;
 import com.chagui68.multiversenets.gui.CraftingGridMenu;
 import com.chagui68.multiversenets.gui.EncoderMenu;
 import com.chagui68.multiversenets.gui.FilterMenu;
 import com.chagui68.multiversenets.gui.MonitorMenu;
+import com.chagui68.multiversenets.gui.QuantumWorkbenchMenu;
 import com.chagui68.multiversenets.gui.TerminalMenu;
 import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.item.Items;
@@ -284,6 +286,8 @@ public class BlockListener implements Listener {
             case RECEIVER -> openReceiver(player, block);
             case CELL_T1, CELL_T2, CELL_T3, CELL_T4, CELL_T5, CELL_T6 ->
                     new CellMenu(plugin, player, block, type).openMenu();
+            case INFINITY_BARREL -> new BarrelMenu(plugin, player, block).openMenu();
+            case QUANTUM_WORKBENCH -> new QuantumWorkbenchMenu(plugin, player, block).openMenu();
             case ENCODER -> new EncoderMenu(plugin, player, block).openMenu();
             case CRAFTER -> new CrafterMenu(plugin, player, block).openMenu();
             case CRAFTING_GRID -> {
@@ -322,8 +326,8 @@ public class BlockListener implements Listener {
             player.sendMessage(Text.msg("The rake cannot remove a controller.", NamedTextColor.RED));
             return;
         }
-        if ((type.isCell() || type == DeviceType.GREEDY_CELL) && blob.cellAmount > 0) {
-            player.sendMessage(Text.msg("The cell has cargo; empty it before raking.", NamedTextColor.RED));
+        if ((type.isCell() || type == DeviceType.GREEDY_CELL || type == DeviceType.INFINITY_BARREL) && blob.cellAmount > 0) {
+            player.sendMessage(Text.msg("The storage has cargo; empty it before raking.", NamedTextColor.RED));
             return;
         }
         block.setType(Material.AIR);

@@ -19,45 +19,32 @@ public enum DeviceType {
     CELL_T5(Material.CYAN_TERRACOTTA, "Quantum Cell T5", true, 5),
     CELL_T6(Material.PURPLE_TERRACOTTA, "Quantum Cell T6", true, 6),
     GREEDY_CELL(Material.SLIME_BLOCK, "Greedy Cell", true, -1),
-    GRABBER(Material.OBSERVER, "Importer (Grabber)", true, -1),
-    GRABBER_HT(Material.STICKY_PISTON, "HT Importer (Grabber)", true, -1),
-    PUSHER(Material.TARGET, "Exporter (Pusher)", true, -1),
-    PUSHER_HT(Material.PISTON, "HT Exporter (Pusher)", true, -1),
-    VACUUM(Material.SPONGE, "Vacuum Catcher", true, -1),
+    INFINITY_BARREL(Material.BARREL, "Infinity Barrel", true, -1),
+    GRABBER(Material.OBSERVER, "Network Grabber", true, -1),
+    GRABBER_HT(Material.STICKY_PISTON, "Advanced Grabber", true, -1),
+    PUSHER(Material.TARGET, "Network Pusher", true, -1),
+    PUSHER_HT(Material.PISTON, "Advanced Pusher", true, -1),
+    VACUUM(Material.SPONGE, "Network Vacuum", true, -1),
 
     /*
      * Purgador. Descarta de la red lo que case con su filtro.
-     *
-     * Sin algo asi una red se atasca sola: cualquier maquina que genere un residuo --grava del
-     * cuarzo, semillas de una cosechadora-- acaba llenando las celdas y bloqueando lo que si
-     * interesa. Networks lo resolvia con dos items distintos, TRASH y PURGER; aqui basta uno,
-     * porque el filtro ya decide que se va.
-     *
-     * Es bloque y no item: nacio como LAVA_BUCKET y colocarlo vertia lava de verdad.
      */
     PURGER(Material.MAGMA_BLOCK, "Network Purger", true, -1),
 
     /*
      * Sonda. Clic derecho a un bloque y dice de que red es y que tipo tiene.
-     *
-     * /mvnets doctor resume la salud de todas las redes, pero no responde la pregunta que uno se
-     * hace de pie delante de una maquina que no trabaja: "esta esto conectado a algo?". Eso es lo
-     * que contesta la sonda, y es la diferencia entre diagnosticar y adivinar.
      */
     PROBE(Material.SPYGLASS, "Network Probe", false, -1),
     CRAFTER(Material.CRAFTING_TABLE, "Auto-Crafter", true, -1),
     ENCODER(Material.SMITHING_TABLE, "Recipe Encoder", true, -1),
-    CRAFTING_GRID(Material.CARTOGRAPHY_TABLE, "Crafting Grid", true, -1),
-    TRANSMITTER(Material.CONDUIT, "Wireless Transmitter", true, -1),
-    RECEIVER(Material.REDSTONE_LAMP, "Wireless Receiver", true, -1),
+    CRAFTING_GRID(Material.CARTOGRAPHY_TABLE, "Network Crafting Grid", true, -1),
+    QUANTUM_WORKBENCH(Material.BRAIN_CORAL_BLOCK, "Quantum Workbench", true, -1),
+    TRANSMITTER(Material.CONDUIT, "Network Wireless Transmitter", true, -1),
+    RECEIVER(Material.REDSTONE_LAMP, "Network Wireless Receiver", true, -1),
     WIRELESS_TERMINAL(Material.NETHER_STAR, "Wireless Terminal", false, -1),
     BLUEPRINT(Material.BOOK, "Blueprint", false, -1),
     /*
      * Herramientas de mano traidas de NetworksV6. No se colocan: existen en el inventario.
-     *
-     * CONFIGURATOR copia y pega configuraciones entre dispositivos con filtro.
-     * RAKE desmonta nodos al instante con usos limitados (no controladores ni celdas cargadas).
-     * CRAYON marca una red para que sus maquinas echen particulas al trabajar.
      */
     CONFIGURATOR(Material.COMPARATOR, "Configuration Wrench", false, -1),
     RAKE(Material.DEAD_BUSH, "Network Rake", false, -1),
@@ -89,6 +76,10 @@ public enum DeviceType {
 
     public boolean isCell() {
         return cellTier > 0;
+    }
+
+    public boolean isBarrel() {
+        return this == INFINITY_BARREL;
     }
 
     public int cellTier() {

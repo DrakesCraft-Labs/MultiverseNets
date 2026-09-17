@@ -31,7 +31,7 @@ public final class Items {
         List<Component> lore = new ArrayList<>();
         lore.add(Component.text("MultiverseNets", NamedTextColor.DARK_GRAY)
                 .decoration(TextDecoration.ITALIC, false));
-        if (type.isCell()) {
+        if (type.isCell() || type == DeviceType.INFINITY_BARREL || type == DeviceType.GREEDY_CELL) {
             lore.add(Component.text("Capacity: " + formatAmount(capacityOf(type)), NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false));
         }
@@ -201,6 +201,12 @@ public final class Items {
     }
 
     public static long capacityOf(DeviceType type) {
+        if (type == DeviceType.INFINITY_BARREL) {
+            return 2_000_000_000L;
+        }
+        if (type == DeviceType.GREEDY_CELL) {
+            return com.chagui68.multiversenets.util.Settings.greedyCapacity();
+        }
         return com.chagui68.multiversenets.util.Settings.cellCapacity(type.cellTier());
     }
 
@@ -360,6 +366,17 @@ public final class Items {
             r.shape("C", "S");
             r.setIngredient('C', Material.CYAN_DYE);
             r.setIngredient('S', Material.STICK);
+        });
+        shaped(plugin, "quantum_workbench", create(DeviceType.QUANTUM_WORKBENCH), r -> {
+            r.shape("DDD", "DCD", "DDD");
+            r.setIngredient('D', Material.DIAMOND);
+            r.setIngredient('C', Material.CRAFTING_TABLE);
+        });
+        shaped(plugin, "infinity_barrel", create(DeviceType.INFINITY_BARREL), r -> {
+            r.shape("NDN", "DBD", "NDN");
+            r.setIngredient('N', Material.NETHERITE_INGOT);
+            r.setIngredient('D', Material.DIAMOND_BLOCK);
+            r.setIngredient('B', Material.BARREL);
         });
     }
 
