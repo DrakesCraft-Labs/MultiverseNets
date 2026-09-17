@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="MultiverseNets">
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0B1220"/>
+      <stop offset="100%" stop-color="#131C2E"/>
+    </linearGradient>
+    <linearGradient id="acG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22D3EE"/>
+      <stop offset="100%" stop-color="#A855F7"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="50%" cy="42%" r="55%">
+      <stop offset="0%" stop-color="#22D3EE" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#22D3EE" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Fondo redondeado: Modrinth recorta a circulo en las tarjetas, asi que el contenido
+       importante se mantiene dentro del 70% central para que no se pierda al recortar. -->
+  <rect width="512" height="512" rx="96" fill="url(#fondo)"/>
+  <rect width="512" height="512" rx="96" fill="url(#halo)"/>
+  <rect x="4" y="4" width="504" height="504" rx="92" fill="none" stroke="url(#acG)" stroke-width="6" opacity="0.55"/>
+
+  <g transform="translate(256,248) scale(2.45)">
+
+    <line x1="0" y1="0" x2="0" y2="-38" stroke="url(#acG)" stroke-width="3"/>
+    <line x1="0" y1="0" x2="34" y2="18" stroke="url(#acG)" stroke-width="3"/>
+    <line x1="0" y1="0" x2="-34" y2="18" stroke="url(#acG)" stroke-width="3"/>
+    <rect x="-13" y="-13" width="26" height="26" rx="6" fill="#0F172A" stroke="url(#acG)" stroke-width="3.5"/>
+    <circle cx="0" cy="0" r="5" fill="#22D3EE"/>
+    <circle cx="0" cy="-38" r="7" fill="#A855F7"/>
+    <circle cx="34" cy="18" r="7" fill="#A855F7"/>
+    <circle cx="-34" cy="18" r="7" fill="#A855F7"/>
+  </g>
+</svg>
