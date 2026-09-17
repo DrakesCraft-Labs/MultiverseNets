@@ -1,16 +1,8 @@
-<div align="center">
-
-<img src="docs/banner.svg" alt="MultiverseNets" width="100%"/>
-
-# 🌌 MultiverseNets
+# 🌌 MultiverseNets (English)
 
 **Standalone digital logistics networks and massive storage for Paper — no Slimefun.**
 
-<img src="https://img.shields.io/badge/Paper-1.21.11-38BDF8?style=for-the-badge&logo=minecraft&logoColor=white" alt="Paper 1.21.11"/>
-<img src="https://img.shields.io/badge/Java-21-F89820?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java 21"/>
-<img src="https://img.shields.io/badge/Author-Chagui68-22C55E?style=for-the-badge" alt="Chagui68"/>
-
-</div>
+> Wiki index: [README](README.md) · [Project structure](Structure.md) · [Recipes & functions](Recipes.md)
 
 ---
 
@@ -120,11 +112,8 @@ Alias: `/mvn`
 | Items | own, via PDC, with vanilla recipes | Slimefun's (`NTW_*`) |
 
 Networks doesn't register any vanilla recipe — theirs go through the Slimefun crafting table — so
-the 20 here don't clash either.
-
-There are **five tests** that pin this down (`ConvivenciaConNetworksTest`). They aren't there for
-show: what breaks coexistence isn't the code but the identifiers, and those get changed by accident
-when renaming something.
+the 20 here don't clash either. There are five tests (`ConvivenciaConNetworksTest`) that pin this
+down; what breaks coexistence isn't the code but the identifiers.
 
 **One interaction to keep in mind.** With the Slimefun integration active, a MultiverseNets Grabber
 can pull from a Networks block, because those are Slimefun items with their own menu. That's
@@ -141,57 +130,29 @@ What the four Networks variants had and was missing here, chosen for real useful
 completing the checklist:
 
 * **Network Purger** — discards from the network whatever matches its filter. Without something like
-  this a network jams by itself: any machine that produces waste (quartz gravel, seeds from a
-  harvester) ends up filling the cells and blocking what really matters. Networks spread this
-  between `TRASH` and `PURGER`; here one is enough because the filter already decides what goes.
-  **Without a configured filter it removes nothing**, on purpose: a purger that ate everything by
-  default would be an inventory shredder waiting for someone to place it without looking.
-* **Network Probe** — right-click on a block and it tells you which network it belongs to, how many
-  nodes it has, and where its controller is. `/mvnets doctor` summarizes the health of all networks;
-  the probe answers the specific question you ask yourself standing in front of a stopped machine:
-  *is this connected to anything?*. It also works on blocks that are **not** nodes, which is exactly
-  when it's most needed.
+  this a network jams by itself. **Without a configured filter it removes nothing**, on purpose.
+* **Network Probe** — right-click on a block (whether it is a node or not) and it tells you which
+  network it belongs to, how many nodes it has, and where its controller is.
 
 ## 🔗 Slimefun integration (optional)
 
 MultiverseNets **does not depend on Slimefun** and works fully without it. But if it's installed, it
 detects it at startup and the **Grabbers, Pushers, and Auto-Crafters can work with Slimefun
 machines** just like with a chest: pull the product out of an electric smeltery, feed an arc furnace,
-empty a harvester.
-
-Details that matter:
-
-* **Adds no dependency.** Everything is resolved via reflection at startup. Without Slimefun the
-  bridge stays inert and the rest of the plugin doesn't know.
-* **Works for both Slimefun flavors.** It recognizes the repackaged DrakesCraft fork and the
-  original by thebusybiscuit, so the same jar works on both.
-* **Respects each machine's design.** Only the slots that the machine itself declares for input and
-  output are used, not all the menu slots. Putting coal in a smeltery's output slot jams it, and
-  pulling from its input robs what it was processing.
+empty a harvester. Everything is resolved via reflection at startup, works for both the DrakesCraft
+fork and the original Slimefun, and only the machine's declared input/output slots are used.
 
 To check whether the integration is active: `/mvnets doctor` says so on the first line.
 
 ## 🔍 How it differs from Networks
 
-MultiverseNets is not a trimmed-down Networks: it solves the same problem with a different
-architecture, and that decision has concrete consequences.
-
 | | Networks (Slimefun addon) | MultiverseNets |
 |---|---|---|
 | Dependencies | Slimefun + its chain | None, only the Paper API |
 | Network membership | Each node stores its root | Recalculated by BFS from the controller |
-| Orphan nodes | Possible: a node can keep pointing to a root its controller already replaced | **Structurally impossible**: every scan rebuilds the whole topology |
+| Orphan nodes | Possible | **Structurally impossible** |
 | Diagnosis | Added later (`/networks doctor`) | `/mvnets doctor` from day one |
 | Ticker | Depends on the Slimefun cycle | Own, with per-operation intervals in the config |
-
-The core difference is in the third row. In Networks, "I have everything connected and the machine
-doesn't work" is a real symptom that appears when a node returns to the registry but not to its
-network; we've been chasing it for months. That can't happen here, because there is no per-node
-state that survives a scan.
-
-The price is that scanning costs: one BFS over up to `max-nodes` blocks every
-`scan-interval-ticks`. It's a deliberate trade-off — you pay predictable, bounded work in exchange
-for no state that can be corrupted.
 
 ## 🛠️ Building
 
