@@ -161,7 +161,7 @@ jobs:
         id: jar
         run: |
           set -euo pipefail
-          RUTA="$(find target build/libs -maxdepth 2 -name '*.jar' \
+          RUTA="$(find target -maxdepth 2 -name '*.jar' \
                   ! -name 'original-*' ! -name '*-sources.jar' ! -name '*-javadoc.jar' \
                   | head -n1)"
           if [ -z "$RUTA" ]; then echo "No se encontro el jar compilado"; exit 1; fi
