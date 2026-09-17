@@ -143,6 +143,7 @@ public class EncoderMenu extends MenuHolder {
             if (current == null || current.getType().isAir()) {
                 inv.setItem(BLANK_SLOT, moving);
                 player.getInventory().setItem(playerSlot, null);
+                player.updateInventory();
             } else if (Items.typeOf(current) == DeviceType.BLUEPRINT && Blueprints.read(current) == null) {
                 int transferred = Math.min(current.getMaxStackSize() - current.getAmount(), moving.getAmount());
                 if (transferred <= 0) {
@@ -152,7 +153,10 @@ public class EncoderMenu extends MenuHolder {
                 moving.setAmount(moving.getAmount() - transferred);
                 if (moving.getAmount() <= 0) {
                     player.getInventory().setItem(playerSlot, null);
+                } else {
+                    player.getInventory().setItem(playerSlot, moving);
                 }
+                player.updateInventory();
             }
             return;
         }

@@ -53,7 +53,7 @@ public class FilterMenu extends MenuHolder {
     }
 
     public void openMenu() {
-        open(27, Component.text(type.display() + " - Filter & Target", NamedTextColor.DARK_AQUA)
+        open(27, Component.text(type.display() + " - Filter", NamedTextColor.DARK_AQUA)
                 .decoration(TextDecoration.ITALIC, false));
     }
 
@@ -209,13 +209,12 @@ public class FilterMenu extends MenuHolder {
 
         ItemStack help = new ItemStack(Material.BOOK);
         var metaHelp = help.getItemMeta();
-        metaHelp.displayName(Component.text("How Filter & Targeting Works", NamedTextColor.GOLD)
+        metaHelp.displayName(Component.text("How Filter Works", NamedTextColor.GOLD)
                 .decoration(TextDecoration.ITALIC, false));
         metaHelp.lore(List.of(
                 Component.text("• Shift-Click an item in your inventory to register it.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
                 Component.text("• Click any registered item above to remove it.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
                 Component.text("• Toggle Whitelist / Blacklist with the mode button.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                Component.text("• Click adjacent blocks below to restrict direction (or ALL).", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
                 Component.text("• If filter is empty, Whitelist transfers everything.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
         help.setItemMeta(metaHelp);
         inv.setItem(HELP_SLOT, help);

@@ -76,6 +76,7 @@ class FilterGuiTest {
         PlayerInteractEvent interact = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK,
                 null, pusher, BlockFace.NORTH, EquipmentSlot.HAND, null);
         server.getPluginManager().callEvent(interact);
+        assertTrue(interact.isCancelled(), "interact event must be cancelled to prevent block placement");
         assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof FilterMenu,
                 "right click on pusher opens its filter menu");
     }

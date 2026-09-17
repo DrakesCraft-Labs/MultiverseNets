@@ -26,6 +26,9 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ShapedRecipe;
+import net.kyori.adventure.text.Component;
+import org.bukkit.persistence.PersistentDataType;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -168,6 +171,51 @@ class GuiFlowsTest {
         clickBottomShift(3);
         assertEquals(10, net.storage().count(i -> i.getType() == Material.GOLD_INGOT));
         assertNull(player.getInventory().getItem(3));
+    }
+
+    /**
+     * [EN] Terminal allows withdrawing custom items with custom ID in PDC and lore.
+     * [ES] La terminal permite extraer items custom con ID personalizado en PDC y lore.
+     */
+    @Test
+    void terminalWithdrawsCustomItemWithCustomIdAndLore() {
+        Network net = networkWithCell();
+        ItemStack custom = new ItemStack(Material.STICK, 10);
+        var meta = custom.getItemMeta();
+        meta.displayName(Component.text("Magic Wand"));
+        meta.lore(List.of(Component.text("Custom ID: magic_wand"), Component.text("Tier: Legendary")));
+        NamespacedKey customKey = new NamespacedKey(plugin, "custom_id");
+        meta.getPersistentDataContainer().set(customKey, PersistentDataType.STRING, "magic_wand");
+        custom.setItemMeta(meta);
+
+        assertEquals(0, net.storage().deposit(custom));
+        plugin.networks().invalidateNear(world.getBlockAt(1, 64, 0));
+
+        rightClick(world.getBlockAt(0, 64, 1));
+
+        // 1) Left click withdraws 1 custom item onto cursor
+        clickTop(0, ClickType.LEFT);
+        ItemStack onCursor = player.getItemOnCursor();
+        assertNotNull(onCursor, "item on cursor must not be null");
+        assertEquals(Material.STICK, onCursor.getType());
+        assertEquals(1, onCursor.getAmount());
+        assertTrue(onCursor.hasItemMeta());
+        assertEquals("magic_wand", onCursor.getItemMeta().getPersistentDataContainer().get(customKey, PersistentDataType.STRING),
+                "custom ID in PDC must be fully preserved");
+        assertEquals(2, onCursor.getItemMeta().lore().size(),
+                "original lore must be fully preserved");
+
+        // 2) Shift click withdraws remaining custom items into inventory
+        player.setItemOnCursor(null);
+        clickTop(0, ClickType.SHIFT_LEFT);
+        ItemStack inPlayerInv = player.getInventory().getItem(0);
+        assertNotNull(inPlayerInv, "shift click must withdraw custom items to inventory");
+        assertEquals(9, inPlayerInv.getAmount());
+        assertEquals("magic_wand", inPlayerInv.getItemMeta().getPersistentDataContainer().get(customKey, PersistentDataType.STRING),
+                "custom ID in PDC preserved on shift-click withdrawal");
+        assertEquals(2, inPlayerInv.getItemMeta().lore().size(),
+                "original lore preserved on shift-click withdrawal");
+        assertEquals(0, net.storage().count(i -> i.getType() == Material.STICK));
     }
 
     // ------------------------------------------------------------ encoder + crafter

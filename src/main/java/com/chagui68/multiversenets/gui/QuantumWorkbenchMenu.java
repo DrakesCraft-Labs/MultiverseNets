@@ -101,6 +101,7 @@ public class QuantumWorkbenchMenu extends MenuHolder {
                 if (inSlot == null || inSlot.getType().isAir()) {
                     inv.setItem(rSlot, moving.clone());
                     player.getInventory().setItem(playerSlot, null);
+                    player.updateInventory();
                     return;
                 } else if (inSlot.isSimilar(moving) && inSlot.getAmount() < inSlot.getMaxStackSize()) {
                     int space = inSlot.getMaxStackSize() - inSlot.getAmount();
@@ -112,6 +113,7 @@ public class QuantumWorkbenchMenu extends MenuHolder {
                     } else {
                         player.getInventory().setItem(playerSlot, moving);
                     }
+                    player.updateInventory();
                     return;
                 }
             }

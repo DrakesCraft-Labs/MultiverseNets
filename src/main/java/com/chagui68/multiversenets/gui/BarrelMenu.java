@@ -239,6 +239,7 @@ public class BarrelMenu extends MenuHolder {
                     player.getInventory().setItem(playerSlot, clone);
                 }
                 updateDisplay();
+                player.updateInventory();
             }
         }
     }
@@ -326,6 +327,7 @@ public class BarrelMenu extends MenuHolder {
             blob.cellSample = null;
         }
         NodeStore.put(block, blob);
+        player.updateInventory();
     }
 
     private void extractToCursorOrInventory(NodeBlob blob, int want, InventoryClickEvent event) {
@@ -345,6 +347,7 @@ public class BarrelMenu extends MenuHolder {
             int room = maxStack - cursor.getAmount();
             int toTake = (int) Math.min(Math.min(want, room), blob.cellAmount);
             cursor.setAmount(cursor.getAmount() + toTake);
+            view.setCursor(cursor);
             blob.cellAmount -= toTake;
         } else {
             extractToInventory(blob, want);
@@ -356,6 +359,7 @@ public class BarrelMenu extends MenuHolder {
             blob.cellSample = null;
         }
         NodeStore.put(block, blob);
+        player.updateInventory();
     }
 
     @Override

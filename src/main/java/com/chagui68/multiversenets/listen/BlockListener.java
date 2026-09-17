@@ -294,8 +294,12 @@ public class BlockListener implements Listener {
             case CONTROLLER -> {
                 // The controller is the brain/heart of the network; no inventory GUI.
             }
-            case TERMINAL, TRANSMITTER -> openTerminal(player, block);
+            case TERMINAL, TRANSMITTER -> {
+                event.setCancelled(true);
+                openTerminal(player, block);
+            }
             case MONITOR -> {
+                event.setCancelled(true);
                 Network net = manager.networkAt(block);
                 if (net == null) {
                     player.sendMessage(Text.msg("This monitor is not part of a network.", NamedTextColor.RED));
@@ -303,14 +307,32 @@ public class BlockListener implements Listener {
                 }
                 new MonitorMenu(plugin, player, net, block).openMenu();
             }
-            case RECEIVER -> openReceiver(player, block);
-            case CELL_T1, CELL_T2, CELL_T3, CELL_T4, CELL_T5, CELL_T6 ->
-                    new CellMenu(plugin, player, block, type).openMenu();
-            case INFINITY_BARREL -> new BarrelMenu(plugin, player, block).openMenu();
-            case QUANTUM_WORKBENCH -> new QuantumWorkbenchMenu(plugin, player, block).openMenu();
-            case ENCODER -> new EncoderMenu(plugin, player, block).openMenu();
-            case CRAFTER -> new CrafterMenu(plugin, player, block).openMenu();
+            case RECEIVER -> {
+                event.setCancelled(true);
+                openReceiver(player, block);
+            }
+            case CELL_T1, CELL_T2, CELL_T3, CELL_T4, CELL_T5, CELL_T6 -> {
+                event.setCancelled(true);
+                new CellMenu(plugin, player, block, type).openMenu();
+            }
+            case INFINITY_BARREL -> {
+                event.setCancelled(true);
+                new BarrelMenu(plugin, player, block).openMenu();
+            }
+            case QUANTUM_WORKBENCH -> {
+                event.setCancelled(true);
+                new QuantumWorkbenchMenu(plugin, player, block).openMenu();
+            }
+            case ENCODER -> {
+                event.setCancelled(true);
+                new EncoderMenu(plugin, player, block).openMenu();
+            }
+            case CRAFTER -> {
+                event.setCancelled(true);
+                new CrafterMenu(plugin, player, block).openMenu();
+            }
             case CRAFTING_GRID -> {
+                event.setCancelled(true);
                 Network net = manager.networkAt(block);
                 if (net == null) {
                     player.sendMessage(Text.msg("This grid is not part of a network.", NamedTextColor.RED));
@@ -320,6 +342,7 @@ public class BlockListener implements Listener {
             }
             default -> {
                 if (type.filterable()) {
+                    event.setCancelled(true);
                     new FilterMenu(plugin, player, block, type).openMenu();
                 }
             }

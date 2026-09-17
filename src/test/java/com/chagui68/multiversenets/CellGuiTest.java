@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -207,5 +208,31 @@ class CellGuiTest {
         NodeBlob after = NodeStore.get(cell);
         assertEquals(Material.COBBLESTONE, after.cellSample.getType(),
                 "cell with items cannot have its template changed");
+    }
+
+    /**
+     * [EN] Shift clicking item from player inventory into cell deposits it into cell storage.
+     * [ES] Shift-clic en un item del inventario del jugador hacia la celda lo deposita en su almacenamiento.
+     */
+    @Test
+    void shiftClickFromPlayerInventoryDepositsIntoCell() {
+        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
+        NodeBlob blob = NodeStore.get(cell);
+        blob.cellSample = new ItemStack(Material.COBBLESTONE);
+        blob.cellAmount = 0;
+        NodeStore.put(cell, blob);
+
+        player.getInventory().setItem(0, new ItemStack(Material.COBBLESTONE, 32));
+
+        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.CELL_T1);
+        menu.openMenu();
+
+        InventoryClickEvent shift = new InventoryClickEvent(player.getOpenInventory(),
+                InventoryType.SlotType.CONTAINER, 18, ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        server.getPluginManager().callEvent(shift);
+
+        NodeBlob after = NodeStore.get(cell);
+        assertEquals(32, after.cellAmount, "cell should have absorbed 32 cobblestone");
+        assertNull(player.getInventory().getItem(0), "player inventory slot 0 should be cleared");
     }
 }

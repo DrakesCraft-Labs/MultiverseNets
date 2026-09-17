@@ -6,6 +6,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.entity.Player;
 
 import java.util.Map;
@@ -71,5 +72,21 @@ public class ChatPrompts implements Listener {
             }
             callback.accept(text);
         });
+    }
+
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        PENDING.remove(event.getPlayer().getUniqueId());
+    }
+
+    /**
+     * Clears any pending chat prompt for the specified player.
+     *
+     * Cancela y elimina cualquier solicitud de chat pendiente para el jugador especificado.
+     *
+     * @param player Target player / Jugador objetivo
+     */
+    public static void clear(Player player) {
+        PENDING.remove(player.getUniqueId());
     }
 }

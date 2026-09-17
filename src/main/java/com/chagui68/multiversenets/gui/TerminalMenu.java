@@ -6,6 +6,7 @@ import com.chagui68.multiversenets.net.Network;
 import com.chagui68.multiversenets.net.NetworkManager;
 import com.chagui68.multiversenets.net.NetworkStorage;
 import com.chagui68.multiversenets.util.Keys;
+import com.chagui68.multiversenets.util.StackUtils;
 import com.chagui68.multiversenets.util.Text;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -53,6 +54,7 @@ public class TerminalMenu extends MenuHolder {
     private enum SortOrder {ALPHABETIC, AMOUNT}
 
     private final Network network;
+    private final ItemStack[] displayedSamples = new ItemStack[54];
     private int page = 0;
     private String query = "";
     private SortOrder sortOrder = SortOrder.ALPHABETIC;
@@ -85,6 +87,7 @@ public class TerminalMenu extends MenuHolder {
         inv.setItem(PREV_SLOT, panel(Material.RED_STAINED_GLASS_PANE, "Previous Page"));
         inv.setItem(NEXT_SLOT, panel(Material.RED_STAINED_GLASS_PANE, "Next Page"));
 
+        java.util.Arrays.fill(displayedSamples, null);
         List<NetworkStorage.View> list = filteredItems();
         int pages = Math.max(1, (list.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         if (page >= pages) {
@@ -92,11 +95,14 @@ public class TerminalMenu extends MenuHolder {
         }
         int start = page * PAGE_SIZE;
         for (int i = 0; i < DISPLAY_SLOTS.length; i++) {
+            int slot = DISPLAY_SLOTS[i];
             int index = start + i;
             if (index < list.size()) {
-                inv.setItem(DISPLAY_SLOTS[i], gridIcon(list.get(index)));
+                NetworkStorage.View view = list.get(index);
+                displayedSamples[slot] = view.sample();
+                inv.setItem(slot, gridIcon(view));
             } else {
-                inv.setItem(DISPLAY_SLOTS[i], background);
+                inv.setItem(slot, background);
             }
         }
     }
@@ -112,9 +118,42 @@ public class TerminalMenu extends MenuHolder {
             return out;
         }
         String q = query.toLowerCase();
-        out.removeIf(v -> !readableName(v.sample()).toLowerCase().contains(q)
-                && !v.sample().getType().name().toLowerCase().contains(q));
+        out.removeIf(v -> !matchesSearch(v.sample(), q));
         return out;
+    }
+
+    private boolean matchesSearch(ItemStack item, String q) {
+        if (readableName(item).toLowerCase().contains(q)) {
+            return true;
+        }
+        if (item.getType().name().toLowerCase().contains(q)) {
+            return true;
+        }
+        if (item.hasItemMeta()) {
+            var meta = item.getItemMeta();
+            if (meta.hasLore() && meta.lore() != null) {
+                for (Component line : meta.lore()) {
+                    String plain = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(line);
+                    if (plain.toLowerCase().contains(q)) {
+                        return true;
+                    }
+                }
+            }
+            var pdc = meta.getPersistentDataContainer();
+            for (org.bukkit.NamespacedKey key : pdc.getKeys()) {
+                if (key.getKey().toLowerCase().contains(q) || key.toString().toLowerCase().contains(q)) {
+                    return true;
+                }
+                try {
+                    String val = pdc.get(key, PersistentDataType.STRING);
+                    if (val != null && val.toLowerCase().contains(q)) {
+                        return true;
+                    }
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+        }
+        return false;
     }
 
     private String readableName(ItemStack item) {
@@ -129,13 +168,17 @@ public class TerminalMenu extends MenuHolder {
         ItemStack icon = view.sample().clone();
         icon.setAmount(1);
         var meta = icon.getItemMeta();
-        List<Component> lore = new ArrayList<>();
+        List<Component> lore = meta != null && meta.hasLore() && meta.lore() != null
+                ? new ArrayList<>(meta.lore())
+                : new ArrayList<>();
         lore.add(Component.empty());
         lore.add(Component.text(AMOUNT_PREFIX + Items.formatAmount(view.amount()), NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, false));
-        meta.lore(lore);
-        meta.getPersistentDataContainer().set(Keys.TERMINAL_DISPLAY, PersistentDataType.BYTE, (byte) 1);
-        icon.setItemMeta(meta);
+        if (meta != null) {
+            meta.lore(lore);
+            meta.getPersistentDataContainer().set(Keys.TERMINAL_DISPLAY, PersistentDataType.BYTE, (byte) 1);
+            icon.setItemMeta(meta);
+        }
         return icon;
     }
 
@@ -216,14 +259,16 @@ public class TerminalMenu extends MenuHolder {
         if (!isGridStack(icon)) {
             return;
         }
-        ItemStack clean = cleanStack(icon);
+        int raw = event.getRawSlot();
+        ItemStack sample = (raw >= 0 && raw < displayedSamples.length) ? displayedSamples[raw] : null;
+        ItemStack target = sample != null ? sample : cleanStack(icon);
         Predicate<ItemStack> matches =
-                item -> com.chagui68.multiversenets.util.StackUtils.itemsMatch(item, clean);
+                item -> com.chagui68.multiversenets.util.StackUtils.itemsMatch(item, target);
         ClickType click = event.getClick();
         boolean shift = click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT;
 
         if (shift) {
-            int want = Math.min(clean.getMaxStackSize(), 64);
+            int want = Math.min(target.getMaxStackSize(), 64);
             ItemStack withdrawn = network.storage().withdraw(matches, want);
             if (withdrawn != null) {
                 int leftover = NetworkManager.insertInto(player.getInventory(), withdrawn);
@@ -233,6 +278,7 @@ public class TerminalMenu extends MenuHolder {
                 }
             }
             draw();
+            player.updateInventory();
             return;
         }
 
@@ -241,18 +287,20 @@ public class TerminalMenu extends MenuHolder {
         boolean right = click == ClickType.RIGHT;
 
         if (cursor == null || cursor.getType().isAir()) {
-            int want = right ? Math.min(clean.getMaxStackSize(), 64) : 1;
+            int want = right ? Math.min(target.getMaxStackSize(), 64) : 1;
             ItemStack withdrawn = network.storage().withdraw(matches, want);
             if (withdrawn != null) {
                 view.setCursor(withdrawn);
             }
-        } else if (!right && clean.isSimilar(cursor) && cursor.getAmount() < cursor.getMaxStackSize()) {
+        } else if (!right && StackUtils.itemsMatch(target, cursor) && cursor.getAmount() < cursor.getMaxStackSize()) {
             ItemStack single = network.storage().withdraw(matches, 1);
             if (single != null) {
                 cursor.setAmount(Math.min(cursor.getMaxStackSize(), cursor.getAmount() + 1));
+                view.setCursor(cursor);
             }
         }
         draw();
+        player.updateInventory();
     }
 
     private void insertPlayerStack(InventoryClickEvent event) {
@@ -279,6 +327,7 @@ public class TerminalMenu extends MenuHolder {
             player.getInventory().setItem(playerSlot, returned);
         }
         draw();
+        player.updateInventory();
     }
 
     private void liveTick() {
@@ -332,9 +381,18 @@ public class TerminalMenu extends MenuHolder {
     private ItemStack cleanStack(ItemStack icon) {
         ItemStack clean = icon.clone();
         var meta = clean.getItemMeta();
-        meta.lore((List<Component>) null);
-        meta.getPersistentDataContainer().remove(Keys.TERMINAL_DISPLAY);
-        clean.setItemMeta(meta);
+        if (meta != null) {
+            if (meta.hasLore() && meta.lore() != null) {
+                List<Component> lore = new ArrayList<>(meta.lore());
+                if (lore.size() >= 2) {
+                    lore.remove(lore.size() - 1);
+                    lore.remove(lore.size() - 1);
+                }
+                meta.lore(lore.isEmpty() ? null : lore);
+            }
+            meta.getPersistentDataContainer().remove(Keys.TERMINAL_DISPLAY);
+            clean.setItemMeta(meta);
+        }
         return clean;
     }
 }

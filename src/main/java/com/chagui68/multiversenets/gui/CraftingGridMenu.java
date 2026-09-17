@@ -379,6 +379,7 @@ public class CraftingGridMenu extends MenuHolder {
                     NamedTextColor.GREEN));
         }
         refresh();
+        player.updateInventory();
     }
 
     private ItemStack panel(Material material, String name) {

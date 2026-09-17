@@ -84,7 +84,7 @@ public final class StackUtils {
         if (am.hasCustomModelData() && am.getCustomModelData() != bm.getCustomModelData()) {
             return false;
         }
-        if (!am.getPersistentDataContainer().equals(bm.getPersistentDataContainer())) {
+        if (!pdcMatches(am.getPersistentDataContainer(), bm.getPersistentDataContainer())) {
             return false;
         }
         if (!am.getEnchants().equals(bm.getEnchants())) {
@@ -189,6 +189,75 @@ public final class StackUtils {
         if (am instanceof BannerMeta abn && bm instanceof BannerMeta bbn
                 && !abn.getPatterns().equals(bbn.getPatterns())) {
             return false;
+        }
+        return true;
+    }
+
+    /**
+     * EN: Safely compares two PersistentDataContainers, ignoring transient GUI markers.
+     *
+     * ES: Compara de forma segura dos PersistentDataContainers ignorando marcadores transitorios de GUI.
+     */
+    public static boolean pdcMatches(org.bukkit.persistence.PersistentDataContainer a,
+                                     org.bukkit.persistence.PersistentDataContainer b) {
+        if (a == b) {
+            return true;
+        }
+        if (a == null || b == null) {
+            return false;
+        }
+        if (a.isEmpty() && b.isEmpty()) {
+            return true;
+        }
+        if (a.equals(b)) {
+            return true;
+        }
+        var aKeys = new java.util.HashSet<>(a.getKeys());
+        var bKeys = new java.util.HashSet<>(b.getKeys());
+        if (Keys.TERMINAL_DISPLAY != null) {
+            aKeys.remove(Keys.TERMINAL_DISPLAY);
+            bKeys.remove(Keys.TERMINAL_DISPLAY);
+        }
+        if (!aKeys.equals(bKeys)) {
+            return false;
+        }
+        for (var key : aKeys) {
+            if (!pdcTagMatches(a, b, key)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean pdcTagMatches(org.bukkit.persistence.PersistentDataContainer a,
+                                         org.bukkit.persistence.PersistentDataContainer b,
+                                         org.bukkit.NamespacedKey key) {
+        try {
+            if (a.has(key, org.bukkit.persistence.PersistentDataType.STRING)) {
+                return Objects.equals(a.get(key, org.bukkit.persistence.PersistentDataType.STRING),
+                        b.get(key, org.bukkit.persistence.PersistentDataType.STRING));
+            }
+            if (a.has(key, org.bukkit.persistence.PersistentDataType.INTEGER)) {
+                return Objects.equals(a.get(key, org.bukkit.persistence.PersistentDataType.INTEGER),
+                        b.get(key, org.bukkit.persistence.PersistentDataType.INTEGER));
+            }
+            if (a.has(key, org.bukkit.persistence.PersistentDataType.BYTE)) {
+                return Objects.equals(a.get(key, org.bukkit.persistence.PersistentDataType.BYTE),
+                        b.get(key, org.bukkit.persistence.PersistentDataType.BYTE));
+            }
+            if (a.has(key, org.bukkit.persistence.PersistentDataType.LONG)) {
+                return Objects.equals(a.get(key, org.bukkit.persistence.PersistentDataType.LONG),
+                        b.get(key, org.bukkit.persistence.PersistentDataType.LONG));
+            }
+            if (a.has(key, org.bukkit.persistence.PersistentDataType.DOUBLE)) {
+                return Objects.equals(a.get(key, org.bukkit.persistence.PersistentDataType.DOUBLE),
+                        b.get(key, org.bukkit.persistence.PersistentDataType.DOUBLE));
+            }
+            if (a.has(key, org.bukkit.persistence.PersistentDataType.BYTE_ARRAY)) {
+                return java.util.Arrays.equals(a.get(key, org.bukkit.persistence.PersistentDataType.BYTE_ARRAY),
+                        b.get(key, org.bukkit.persistence.PersistentDataType.BYTE_ARRAY));
+            }
+        } catch (IllegalArgumentException ignored) {
         }
         return true;
     }

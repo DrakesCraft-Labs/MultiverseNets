@@ -51,7 +51,8 @@ public abstract class MenuHolder implements InventoryHolder {
      */
     protected void refresh() {
         plugin.getServer().getScheduler().runTask(plugin, () -> {
-            if (player.getOpenInventory().getTopInventory().getHolder(false) != this) {
+            Inventory top = player.getOpenInventory().getTopInventory();
+            if (inv == null || !top.equals(inv)) {
                 return;
             }
             java.util.Map<Integer, org.bukkit.inventory.ItemStack> preserved = new java.util.HashMap<>();
@@ -116,15 +117,37 @@ public abstract class MenuHolder implements InventoryHolder {
     }
 
     /**
-     * Computes the player's inventory slot index from a raw click event.
- *
+     * Computes the player's inventory slot index from an inventory click event.
+     * Accurately resolves the actual clicked slot in the player's inventory (supporting hotbar 0-8
+     * and storage rows 9-35) without assuming linear raw slot mapping, preventing duplication glitches.
+     *
      * Calcula el índice de ranura del inventario del jugador a partir de un evento de clic.
+     * Resuelve con precisión la ranura cliqueada en el inventario del jugador (soportando hotbar 0-8
+     * y almacenamiento 9-35) sin asumir mapeo lineal de slots raw, previniendo errores de duplicación.
      *
      * @param event Inventory click event / Evento de clic en inventario
      * @return 0-indexed player inventory slot index / Índice de ranura del inventario del jugador (base 0)
      */
     protected static int playerInventorySlot(InventoryClickEvent event) {
-        return event.getRawSlot() - event.getView().getTopInventory().getSize();
+        int slot = event.getSlot();
+        org.bukkit.inventory.ItemStack current = event.getCurrentItem();
+        if (slot >= 0 && slot < 36) {
+            org.bukkit.inventory.ItemStack inSlot = event.getWhoClicked().getInventory().getItem(slot);
+            if (inSlot != null && current != null && inSlot.isSimilar(current)) {
+                return slot;
+            }
+        }
+        int rawOffset = event.getRawSlot() - event.getView().getTopInventory().getSize();
+        if (rawOffset >= 0 && rawOffset < 36) {
+            org.bukkit.inventory.ItemStack inRaw = event.getWhoClicked().getInventory().getItem(rawOffset);
+            if (inRaw != null && current != null && inRaw.isSimilar(current)) {
+                return rawOffset;
+            }
+        }
+        if (slot >= 0 && slot < 36) {
+            return slot;
+        }
+        return Math.max(0, Math.min(35, rawOffset));
     }
 
     /** Backward compatibility alias for {@link #playerInventorySlot(InventoryClickEvent)} */
