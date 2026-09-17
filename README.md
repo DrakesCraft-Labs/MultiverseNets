@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/banner.svg" alt="MultiverseNets" width="100%"/>
+<img src="docs/banner-en.svg" alt="MultiverseNets" width="100%"/>
 
 # 🌌 MultiverseNets
 
@@ -210,5 +210,3 @@ The jar is generated at `target/MultiverseNets-v<version>.jar`.
 | **Dependencies** | None (standalone) |
 
 ---
-
-**Author:** Chagui68 · Review and tuning: Jack · A [DrakesCraft Labs](https://github.com/DrakesCraft-Labs) project

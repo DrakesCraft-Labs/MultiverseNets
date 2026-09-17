@@ -1,5 +1,11 @@
 # 🌌 MultiverseNets (English)
 
+<div align="center">
+
+<img src="../docs/banner-en.svg" alt="MultiverseNets" width="100%"/>
+
+</div>
+
 **Standalone digital logistics networks and massive storage for Paper — no Slimefun.**
 
 > Wiki index: [README](README.md) · [Project structure](Structure.md) · [Recipes & functions](Recipes.md)
