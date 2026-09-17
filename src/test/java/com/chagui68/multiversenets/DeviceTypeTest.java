@@ -29,4 +29,21 @@ class DeviceTypeTest {
         assertFalse(DeviceType.BLUEPRINT.placeable());
         assertFalse(DeviceType.WIRELESS_TERMINAL.placeable());
     }
+
+    @Test
+    void direccionalSoloAvanzados() {
+        assertTrue(DeviceType.GRABBER_HT.isDirectional());
+        assertTrue(DeviceType.PUSHER_HT.isDirectional());
+        assertFalse(DeviceType.GRABBER.isDirectional());
+        assertFalse(DeviceType.PUSHER.isDirectional());
+        assertFalse(DeviceType.VACUUM.isDirectional());
+    }
+
+    @Test
+    void nombresSimplesYAvanzados() {
+        org.junit.jupiter.api.Assertions.assertEquals("Simple Grabber", DeviceType.GRABBER.display());
+        org.junit.jupiter.api.Assertions.assertEquals("Advanced Grabber", DeviceType.GRABBER_HT.display());
+        org.junit.jupiter.api.Assertions.assertEquals("Simple Pusher", DeviceType.PUSHER.display());
+        org.junit.jupiter.api.Assertions.assertEquals("Advanced Pusher", DeviceType.PUSHER_HT.display());
+    }
 }

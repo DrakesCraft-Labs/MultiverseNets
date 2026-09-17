@@ -25,6 +25,8 @@ import org.mockbukkit.mockbukkit.world.WorldMock;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -198,12 +200,12 @@ class FilterGuiTest {
 
     @Test
     void seleccionDeDireccionEstableceTargetFace() {
-        Block grabber = colocar(DeviceType.GRABBER);
+        Block grabber = colocar(DeviceType.GRABBER_HT);
         // Colocar cofre al Norte
         Block northBlock = world.getBlockAt(0, 64, -1);
         northBlock.setType(Material.CHEST);
 
-        new FilterMenu(plugin, player, grabber, DeviceType.GRABBER).openMenu();
+        new FilterMenu(plugin, player, grabber, DeviceType.GRABBER_HT).openMenu();
 
         // Slot 20 corresponde a NORTH
         clickTop(20, ClickType.LEFT, InventoryAction.PICKUP_ALL);
@@ -215,5 +217,20 @@ class FilterGuiTest {
         clickTop(FilterMenu.ALL_DIRECTIONS_SLOT, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         NodeBlob blobAll = NodeStore.get(grabber);
         assertEquals("ALL", blobAll.targetFace, "hacer clic en ALL establece targetFace en ALL");
+    }
+
+    @Test
+    void simpleGrabberNoMuestraBotonesDireccionales() {
+        Block grabber = colocar(DeviceType.GRABBER);
+        new FilterMenu(plugin, player, grabber, DeviceType.GRABBER).openMenu();
+
+        // En simple grabber, slot 20 es un panel gris decorativo (no direccion)
+        ItemStack slot20 = player.getOpenInventory().getTopInventory().getItem(20);
+        assertNotNull(slot20);
+        assertEquals(Material.GRAY_STAINED_GLASS_PANE, slot20.getType());
+
+        clickTop(20, ClickType.LEFT, InventoryAction.PICKUP_ALL);
+        NodeBlob blob = NodeStore.get(grabber);
+        assertNull(blob.targetFace, "el click en el panel decorativo no modifica targetFace");
     }
 }

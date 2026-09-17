@@ -317,7 +317,7 @@ class FlujosBloquesTest {
         plugin.networks().registerController(ctrl);
         Block cell = colocar(1, 64, 0, DeviceType.CELL_T1);
         plugin.networks().invalidateNear(cell);
-        Block grabber = colocar(0, 64, 1, DeviceType.GRABBER);
+        Block grabber = colocar(0, 64, 1, DeviceType.GRABBER_HT);
         plugin.networks().invalidateNear(grabber);
 
         // Cofre al Oeste del grabber (-1, 64, 1) con diamantes

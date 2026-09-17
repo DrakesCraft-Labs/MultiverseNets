@@ -20,9 +20,9 @@ public enum DeviceType {
     CELL_T6(Material.PURPLE_TERRACOTTA, "Quantum Cell T6", true, 6),
     GREEDY_CELL(Material.SLIME_BLOCK, "Greedy Cell", true, -1),
     INFINITY_BARREL(Material.BARREL, "Infinity Barrel", true, -1),
-    GRABBER(Material.OBSERVER, "Network Grabber", true, -1),
+    GRABBER(Material.OBSERVER, "Simple Grabber", true, -1),
     GRABBER_HT(Material.STICKY_PISTON, "Advanced Grabber", true, -1),
-    PUSHER(Material.TARGET, "Network Pusher", true, -1),
+    PUSHER(Material.TARGET, "Simple Pusher", true, -1),
     PUSHER_HT(Material.PISTON, "Advanced Pusher", true, -1),
     VACUUM(Material.SPONGE, "Network Vacuum", true, -1),
 
@@ -102,7 +102,7 @@ public enum DeviceType {
     }
 
     public boolean isDirectional() {
-        return this == GRABBER || this == GRABBER_HT || this == PUSHER || this == PUSHER_HT;
+        return this == GRABBER_HT || this == PUSHER_HT;
     }
 
     public static DeviceType parse(String name) {
