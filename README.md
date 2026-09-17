@@ -57,32 +57,38 @@
 * Networks-style anti-dupe guards in all menus (no double-click, no drags over painted slots, no shift+right-click into the void) and **recovery of anything left in the real slots on close**.
 * `/mvnets doctor` rescans and diagnoses all networks; `/mvnets inspect` and `/mvnets repair` inspect and rescan the block you are looking at.
 
-## 🍳 Recipes
+## 🍳 Recipes (crafting grid)
 
-| Device | Recipe |
-|---|---|
-| Controller | 8 iron blocks + nether star |
-| Cable x16 | 8 glass + redstone |
-| Terminal | beacon + ender pearls + glass |
-| Cell T1 | 8 glass + diamond |
-| Cell Tn+1 | 8 diamonds + previous cell |
-| Importer | 4 observers + 4 iron + redstone block |
-| Exporter | 4 droppers + 4 iron + redstone block |
-| Vacuum | sponge + hopper + string + redstone |
-| Auto-Crafter | crafting table + target + iron + redstone |
-| Wireless Terminal | nether star + pearl + compass |
-| Network Monitor | 8 glass panes + comparator |
-| Transmitter | conduit + 4 redstone blocks + 4 iron |
-| Receiver | redstone lamp + 4 pearls + 4 iron |
-| Greedy Cell | slime block + 2 hoppers + 4 gold |
-| Grabber HT | observer + sticky piston + observer |
-| Pusher HT | dropper + piston + dropper |
-| Recipe Encoder | smithing table + paper + ink |
-| Crafting Grid | cartography table + crafting tables + redstone |
-| Blueprint x4 | 8 paper + blue dye |
-| Configuration Wrench | 4 iron + comparator |
-| Network Rake | 2 dead bushes + 2 sticks |
-| Network Crayon | 2 cyan dyes + stick |
+Each device is crafted on a standard 3×3 crafting table. `·` marks an empty slot.
+
+| Device | Grid (3×3) | Ingredients |
+|---|---|---|
+| Controller | <pre>I I I<br/>I N I<br/>I I I</pre> | I = Iron Block · N = Nether Star |
+| Cable ×16 | <pre>G G G<br/>G R G<br/>G G G</pre> | G = Glass · R = Redstone |
+| Terminal | <pre>G E G<br/>E B E<br/>G E G</pre> | G = Glass · E = Ender Pearl · B = Beacon |
+| Cell T1 | <pre>G G G<br/>G D G<br/>G G G</pre> | G = Glass · D = Diamond |
+| Cell Tn+1 | <pre>D D D<br/>D P D<br/>D D D</pre> | D = Diamond · P = Previous cell (exact item) |
+| Importer | <pre>I O I<br/>O R O<br/>I O I</pre> | I = Iron Ingot · O = Observer · R = Redstone Block |
+| Exporter | <pre>I D I<br/>D R D<br/>I D I</pre> | I = Iron Ingot · D = Dropper · R = Redstone Block |
+| Vacuum | <pre>S R S<br/>R H R<br/>S R S</pre> | S = String · R = Redstone · H = Hopper |
+| Auto-Crafter | <pre>R C R<br/>I T I<br/>R C R</pre> | R = Redstone · C = Crafting Table · I = Iron Ingot · T = Target |
+| Wireless Terminal | <pre>· P ·<br/>P N P<br/>· C ·</pre> | P = Ender Pearl · N = Nether Star · C = Compass |
+| Network Monitor | <pre>G G G<br/>G C G<br/>G G G</pre> | G = Glass Pane · C = Comparator |
+| Transmitter | <pre>I R I<br/>R C R<br/>I R I</pre> | I = Iron Ingot · R = Redstone Block · C = Conduit |
+| Receiver | <pre>I P I<br/>P L P<br/>I P I</pre> | I = Iron Ingot · P = Ender Pearl · L = Redstone Lamp |
+| Greedy Cell | <pre>G H G<br/>H S H<br/>G H G</pre> | G = Gold Ingot · H = Hopper · S = Slime Block |
+| Grabber HT | <pre>O P O</pre> | O = Observer · P = Sticky Piston |
+| Pusher HT | <pre>D P D</pre> | D = Dropper · P = Piston |
+| Recipe Encoder | <pre>K P K<br/>P S P<br/>K P K</pre> | K = Ink Sac · P = Paper · S = Smithing Table |
+| Crafting Grid | <pre>C R C<br/>R G R<br/>C R C</pre> | C = Crafting Table · R = Redstone · G = Cartography Table |
+| Blueprint ×4 | <pre>P P P<br/>P B P<br/>P P P</pre> | P = Paper · B = Blue Dye |
+| Configuration Wrench | <pre>I · I<br/>· C ·<br/>· I ·</pre> | I = Iron Ingot · C = Comparator |
+| Network Rake | <pre>D · D<br/>· S ·<br/>· S ·</pre> | D = Dead Bush · S = Stick |
+| Network Crayon | <pre>C<br/>S</pre> | C = Cyan Dye · S = Stick |
+| Network Purger | <pre>I L I<br/>L H L<br/>I L I</pre> | I = Iron Ingot · L = Magma Block · H = Hopper |
+| Network Probe | <pre>· A ·<br/>A S A<br/>· A ·</pre> | A = Amethyst Shard · S = Spyglass |
+| Quantum Workbench | <pre>D D D<br/>D C D<br/>D D D</pre> | D = Diamond · C = Crafting Table |
+| Infinity Barrel | <pre>N D N<br/>D B D<br/>N D N</pre> | N = Netherite Ingot · D = Diamond Block · B = Barrel |
 
 ## ⌨️ Commands
 

@@ -55,32 +55,38 @@
 * Guardias anti‑dupe de Networks en todos los menús (sin double‑click, sin drags sobre huecos pintados, sin shift+clic derecho al vacío) y **recuperación de lo dejado en los huecos reales al cerrar**.
 * `/mvnets doctor` reescanea y diagnostica todas las redes; `/mvnets inspect` y `/mvnets repair` inspeccionan y reescanean el bloque mirado.
 
-## 🍳 Recetas
+## 🍳 Recetas (mesa de crafteo)
 
-| Dispositivo | Receta |
-|---|---|
-| Controlador | 8 bloques de hierro + estrella del Nether |
-| Cable x16 | 8 vidrios + redstone |
-| Terminal | beacon + perlas ender + vidrio |
-| Celda T1 | 8 vidrios + diamante |
-| Celda Tn+1 | 8 diamantes + celda anterior |
-| Importador | 4 observadores + 4 hierros + bloque de redstone |
-| Exportador | 4 soltados + 4 hierros + bloque de redstone |
-| Aspirador | esponja + embudo + hilo + redstone |
-| Autocrafteador | mesa de crafteo + target + hierro + redstone |
-| Terminal inalámbrico | estrella del Nether + perla + brújula |
-| Network Monitor | 8 vidrio + comparador |
-| Transmisor | conducto + 4 bloques redstone + 4 hierros |
-| Receptor | lámpara redstone + 4 perlas + 4 hierros |
-| Greedy Cell | bloque slime + 2 embudos + 4 oro |
-| Grabber HT | observador + pistón pegajoso + observador |
-| Pusher HT | soltador + pistón + soltador |
-| Recipe Encoder | mesa herrería + papel + tinta |
-| Crafting Grid | cartografía + mesas crafteo + redstone |
-| Blueprint en blanco x4 | 8 papeles + tinta azul |
-| Configuration Wrench | 4 hierros + comparador |
-| Network Rake | 2 dead bushes + 2 palos |
-| Network Crayon | 2 tintes cian + palo |
+Cada dispositivo se fabrica en una mesa de crafteo 3×3 estándar. `·` marca el hueco vacío.
+
+| Dispositivo | Cuadrícula (3×3) | Ingredientes |
+|---|---|---|
+| Controlador | <pre>I I I<br/>I N I<br/>I I I</pre> | I = Bloque de hierro · N = Estrella del Nether |
+| Cable ×16 | <pre>G G G<br/>G R G<br/>G G G</pre> | G = Vidrio · R = Redstone |
+| Terminal | <pre>G E G<br/>E B E<br/>G E G</pre> | G = Vidrio · E = Perla ender · B = Beacon |
+| Celda T1 | <pre>G G G<br/>G D G<br/>G G G</pre> | G = Vidrio · D = Diamante |
+| Celda Tn+1 | <pre>D D D<br/>D P D<br/>D D D</pre> | D = Diamante · P = Celda anterior (ítem exacto) |
+| Importador | <pre>I O I<br/>O R O<br/>I O I</pre> | I = Lingote de hierro · O = Observador · R = Bloque de redstone |
+| Exportador | <pre>I D I<br/>D R D<br/>I D I</pre> | I = Lingote de hierro · D = Soltador · R = Bloque de redstone |
+| Aspirador | <pre>S R S<br/>R H R<br/>S R S</pre> | S = Hilo · R = Redstone · H = Embudo |
+| Autocrafteador | <pre>R C R<br/>I T I<br/>R C R</pre> | R = Redstone · C = Mesa de crafteo · I = Lingote de hierro · T = Target |
+| Terminal inalámbrico | <pre>· P ·<br/>P N P<br/>· C ·</pre> | P = Perla ender · N = Estrella del Nether · C = Brújula |
+| Network Monitor | <pre>G G G<br/>G C G<br/>G G G</pre> | G = Panel de vidrio · C = Comparador |
+| Transmisor | <pre>I R I<br/>R C R<br/>I R I</pre> | I = Lingote de hierro · R = Bloque de redstone · C = Conducto |
+| Receptor | <pre>I P I<br/>P L P<br/>I P I</pre> | I = Lingote de hierro · P = Perla ender · L = Lámpara de redstone |
+| Greedy Cell | <pre>G H G<br/>H S H<br/>G H G</pre> | G = Lingote de oro · H = Embudo · S = Bloque slime |
+| Grabber HT | <pre>O P O</pre> | O = Observador · P = Pistón pegajoso |
+| Pusher HT | <pre>D P D</pre> | D = Soltador · P = Pistón |
+| Recipe Encoder | <pre>K P K<br/>P S P<br/>K P K</pre> | K = Tinta · P = Papel · S = Mesa de herrería |
+| Crafting Grid | <pre>C R C<br/>R G R<br/>C R C</pre> | C = Mesa de crafteo · R = Redstone · G = Mesa de cartografía |
+| Blueprint ×4 | <pre>P P P<br/>P B P<br/>P P P</pre> | P = Papel · B = Tinte azul |
+| Configuration Wrench | <pre>I · I<br/>· C ·<br/>· I ·</pre> | I = Lingote de hierro · C = Comparador |
+| Network Rake | <pre>D · D<br/>· S ·<br/>· S ·</pre> | D = Dead bush · S = Palo |
+| Network Crayon | <pre>C<br/>S</pre> | C = Tinte cian · S = Palo |
+| Network Purger | <pre>I L I<br/>L H L<br/>I L I</pre> | I = Lingote de hierro · L = Bloque de magma · H = Embudo |
+| Network Probe | <pre>· A ·<br/>A S A<br/>· A ·</pre> | A = Fragmento de amatista · S = Catalejo |
+| Quantum Workbench | <pre>D D D<br/>D C D<br/>D D D</pre> | D = Diamante · C = Mesa de crafteo |
+| Infinity Barrel | <pre>N D N<br/>D B D<br/>N D N</pre> | N = Lingote de netherita · D = Bloque de diamante · B = Barril |
 
 ## ⌨️ Comandos
 
