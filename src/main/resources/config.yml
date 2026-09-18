@@ -1,51 +1,123 @@
-# ------------------------------------------------------------
-#  MultiverseNets - main configuration
-#  Author: Chagui68
-# ------------------------------------------------------------
+# -------------------------------------------------------------------------------------
+#  MultiverseNets - Configuration File / Archivo de Configuración
+#  Plugin Author / Autor: Chagui68
+# -------------------------------------------------------------------------------------
 
+# [EN] Enable verbose debug logging to console.
+# [ES] Habilita registros de depuración detallados en la consola.
 debug: false
+
+# [EN] Preferred language code (en / es).
+# [ES] Idioma preferido para los mensajes (en / es).
 language: en
 
-# Convivencia con otros plugins.
+# -------------------------------------------------------------------------------------
+#  Plugin Compatibility / Compatibilidad con Otros Plugins
+# -------------------------------------------------------------------------------------
 compat:
-  # Dejar que grabbers y pushers usen maquinas de Slimefun.
-  #
-  # Ponlo en false si tienes Networks (u otro plugin de logistica) instalado a la vez y prefieres
-  # que cada red se ocupe solo de lo suyo. Los bloques de Networks son items de Slimefun con su
-  # propio menu, asi que con esto en true un grabber de MultiverseNets puede sacar de un
-  # almacenamiento de Networks. Es interoperabilidad, no un fallo, pero conviene poder apagarla.
+  # [EN] Allow grabbers and pushers to interact with Slimefun machines and containers.
+  #      Set to false if you are running Networks or prefer MultiverseNets to manage
+  #      only vanilla and native containers.
+  # [ES] Permite que los grabbers y pushers interactúen con máquinas de Slimefun.
+  #      Ponlo en false si tienes Networks u otro plugin de logística instalado
+  #      y prefieres que cada red gestione únicamente sus propios contenedores.
   slimefun: true
 
+# -------------------------------------------------------------------------------------
+#  Network Topology & Timing / Topología y Tiempos de Red
+# -------------------------------------------------------------------------------------
 network:
-  # How often (in ticks) each network topology is rescanned.
+  # [EN] Frequency (in server ticks, 20 ticks = 1 second) between network cable scans.
+  # [ES] Frecuencia (en ticks de servidor, 20 ticks = 1 segundo) de escaneo de cables.
   scan-interval-ticks: 20
-  # Max nodes per network (protection against giant loops).
+
+  # [EN] Maximum total connected nodes (devices + cables) allowed in a single network.
+  #      Protects the server from infinite loops and massive builds.
+  # [ES] Cantidad máxima de nodos conectados (máquinas + cables) permitidos por red.
+  #      Protege al servidor contra bucles infinitos o sobrecargas de rendimiento.
   max-nodes: 4096
+
+  # [EN] Operation intervals (in ticks) for active network machines.
+  # [ES] Intervalos de operación (en ticks) para las máquinas activas de la red.
   op-interval-ticks:
+    # [EN] Item transfer frequency for Grabbers (Importers) and Pushers (Exporters).
+    # [ES] Frecuencia de transferencia de Grabbers (Importadores) y Pushers (Exportadores).
     transfer: 5
+    # [EN] Pickup cycle frequency for Network Vacuums.
+    # [ES] Frecuencia del ciclo de recolección para los Network Vacuums.
     vacuum: 10
+    # [EN] Crafting cycle frequency for Auto-Crafters.
+    # [ES] Frecuencia del ciclo de crafteo para los Auto-Crafters.
     craft: 20
 
+# -------------------------------------------------------------------------------------
+#  Item Logistics / Transferencia de Ítems
+# -------------------------------------------------------------------------------------
 transfer:
+  # [EN] Base amount of items moved per operation by standard Grabbers and Pushers.
+  # [ES] Cantidad base de ítems transferidos por operación en Grabbers y Pushers normales.
   items-per-op: 64
-  # Speed multiplier for HT (High-Throughput) importers/exporters.
+
+  # [EN] Speed multiplier for High-Throughput (HT) Grabbers and Pushers (e.g. 64 * 8 = 512).
+  # [ES] Multiplicador de velocidad para Grabbers y Pushers de alto rendimiento (HT).
   ht-multiplier: 8
 
+# -------------------------------------------------------------------------------------
+#  Machine Settings / Configuración de Dispositivos y Máquinas
+# -------------------------------------------------------------------------------------
+
+# [EN] Greedy Cell settings (High-priority dedicated output buffer / sink).
+# [ES] Ajustes de la Greedy Cell (Búfer / sumidero de alta prioridad para un ítem).
 greedy:
-  # Buffer capacity of a Greedy Cell.
+  # [EN] Storage capacity of a Greedy Cell.
+  # [ES] Capacidad máxima de almacenamiento de una Greedy Cell.
   capacity: 262144
 
-crafter:
-  max-recipes: 26
+# [EN] Infinity Barrel settings (Single-type massive bulk storage).
+# [ES] Ajustes de la Barrica Infinita (Almacenamiento masivo para un único tipo de ítem).
+barrel:
+  # [EN] Storage capacity of an Infinity Barrel.
+  # [ES] Capacidad máxima de almacenamiento de una Barrica Infinita.
+  capacity: 2000000000
 
+# [EN] Auto-Crafter settings.
+# [ES] Ajustes del Auto-Crafter.
+crafter:
+  # [EN] Maximum installed blueprints/recipes per Auto-Crafter (18 matches GUI slots).
+  # [ES] Cantidad máxima de recetas instalables en el Auto-Crafter (18 ranuras de GUI).
+  max-recipes: 18
+
+# [EN] Network Vacuum settings (Suction funnel for world item drops).
+# [ES] Ajustes del Network Vacuum (Embudo de succión para ítems caídos en el mundo).
 vacuum:
+  # [EN] Suction radius in blocks around the vacuum block.
+  # [ES] Radio de succión en bloques alrededor del bloque del vacuum.
   radius: 4.0
 
-# Herramientas.
+# [EN] Tool durability settings.
+# [ES] Ajustes de durabilidad de herramientas.
 rake:
-  # Usos de un Network Rake recien crafteado.
+  # [EN] Maximum durability uses for a freshly crafted Network Rake.
+  # [ES] Usos de durabilidad máxima para un Network Rake recién crafteado.
   uses: 250
 
+# -------------------------------------------------------------------------------------
+#  Quantum Storage Cells / Celdas Cuánticas de Almacenamiento
+# -------------------------------------------------------------------------------------
 cells:
-  # Capacity per tier (T1..T6).
+  # [EN] Capacity in items per cell tier (Tier 1 through Tier 6).
+  #      T1: 65,536 items      (1,024 stacks)
+  #      T2: 262,144 items     (4,096 stacks)
+  #      T3: 1,048,576 items   (16,384 stacks)
+  #      T4: 16,777,216 items  (262,144 stacks)
+  #      T5: 268,435,456 items (4,194,304 stacks)
+  #      T6: 2,000,000,000 items (Bulk storage)
+  #
+  # [ES] Capacidad en ítems por nivel de celda (Tier 1 a Tier 6).
+  #      T1: 65,536 ítems      (1,024 stacks)
+  #      T2: 262,144 ítems     (4,096 stacks)
+  #      T3: 1,048,576 ítems   (16,384 stacks)
+  #      T4: 16,777,216 ítems  (262,144 stacks)
+  #      T5: 268,435,456 ítems (4,194,304 stacks)
+  #      T6: 2,000,000,000 ítems (Almacenamiento masivo)
   capacities: [65536, 262144, 1048576, 16777216, 268435456, 2000000000]

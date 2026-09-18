@@ -357,7 +357,7 @@ public final class Items {
      */
     public static long capacityOf(DeviceType type) {
         if (type == DeviceType.INFINITY_BARREL) {
-            return 2_000_000_000L;
+            return com.chagui68.multiversenets.util.Settings.barrelCapacity();
         }
         if (type == DeviceType.GREEDY_CELL) {
             return com.chagui68.multiversenets.util.Settings.greedyCapacity();

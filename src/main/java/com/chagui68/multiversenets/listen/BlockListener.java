@@ -537,7 +537,7 @@ public class BlockListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPistonExtend(BlockPistonExtendEvent event) {
         for (Block block : event.getBlocks()) {
-            if (NodeStore.get(block) != null) {
+            if (NodeStore.chunkHasNodes(block.getChunk()) && NodeStore.hasNode(block)) {
                 event.setCancelled(true);
                 return;
             }
@@ -547,7 +547,7 @@ public class BlockListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onPistonRetract(BlockPistonRetractEvent event) {
         for (Block block : event.getBlocks()) {
-            if (NodeStore.get(block) != null) {
+            if (NodeStore.chunkHasNodes(block.getChunk()) && NodeStore.hasNode(block)) {
                 event.setCancelled(true);
                 return;
             }
@@ -556,11 +556,11 @@ public class BlockListener implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onEntityExplode(EntityExplodeEvent event) {
-        event.blockList().removeIf(block -> NodeStore.get(block) != null);
+        event.blockList().removeIf(block -> NodeStore.chunkHasNodes(block.getChunk()) && NodeStore.hasNode(block));
     }
 
     @EventHandler(ignoreCancelled = true)
     public void onBlockExplode(BlockExplodeEvent event) {
-        event.blockList().removeIf(block -> NodeStore.get(block) != null);
+        event.blockList().removeIf(block -> NodeStore.chunkHasNodes(block.getChunk()) && NodeStore.hasNode(block));
     }
 }

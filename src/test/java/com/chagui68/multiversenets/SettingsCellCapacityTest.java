@@ -90,4 +90,79 @@ class SettingsCellCapacityTest {
         assertTrue(Settings.cellCapacity(0) > 0, "tier 0 should not yield negative capacity");
         assertTrue(Settings.cellCapacity(-5) > 0, "negative tier should not yield negative capacity");
     }
+
+    /**
+     * [EN] Barrel capacity returns 2 Billion by default or custom value when configured.
+     * [ES] La capacidad de la barrica devuelve 2.000.000.000 por defecto o el valor configurado.
+     */
+    @Test
+    void barrelCapacityHandlesDefaultAndCustom() throws Exception {
+        YamlConfiguration config = new YamlConfiguration();
+        injectConfig(config);
+        assertEquals(2_000_000_000L, Settings.barrelCapacity());
+
+        config.set("barrel.capacity", 500_000_000L);
+        assertEquals(500_000_000L, Settings.barrelCapacity());
+    }
+
+    /**
+     * [EN] Auto-Crafter max recipes clamps correctly to GUI bounds [1, 18].
+     * [ES] El número máximo de recetas del Auto-Crafter se ajusta a los límites de la GUI [1, 18].
+     */
+    @Test
+    void maxBlueprintsClampsCorrectly() throws Exception {
+        YamlConfiguration config = new YamlConfiguration();
+        injectConfig(config);
+        assertEquals(18, Settings.maxBlueprints());
+
+        config.set("crafter.max-recipes", 9);
+        assertEquals(9, Settings.maxBlueprints());
+
+        config.set("crafter.max-recipes", 50);
+        assertEquals(18, Settings.maxBlueprints(), "values over 18 must clamp to 18 GUI slots");
+
+        config.set("crafter.max-recipes", -5);
+        assertEquals(1, Settings.maxBlueprints(), "non-positive values must clamp to 1");
+    }
+
+    /**
+     * [EN] Long list capacities with values up to 2 Billion are preserved without 32-bit overflow.
+     * [ES] Las capacidades de celdas con valores hasta 2.000.000.000 se preservan sin desbordamiento de 32 bits.
+     */
+    @Test
+    void longCellCapacitiesHandledWithoutOverflow() throws Exception {
+        YamlConfiguration config = new YamlConfiguration();
+        config.set("cells.capacities", List.of(65536L, 262144L, 1048576L, 16777216L, 268435456L, 2000000000L));
+        injectConfig(config);
+
+        assertEquals(65536L, Settings.cellCapacity(1));
+        assertEquals(2000000000L, Settings.cellCapacity(6));
+    }
+
+    /**
+     * [EN] Settings methods do not throw NullPointerException when config is uninitialized/null.
+     * [ES] Los métodos de Settings no lanzan NullPointerException si el config es nulo.
+     */
+    @Test
+    void nullConfigIsCompletelySafe() throws Exception {
+        Field field = Settings.class.getDeclaredField("cfg");
+        field.setAccessible(true);
+        field.set(null, null);
+
+        assertEquals(20, Settings.scanIntervalTicks());
+        assertEquals(4096, Settings.maxNodes());
+        assertEquals(5, Settings.transferIntervalTicks());
+        assertEquals(10, Settings.vacuumIntervalTicks());
+        assertEquals(20, Settings.craftIntervalTicks());
+        assertEquals(64, Settings.itemsPerOp());
+        assertEquals(8, Settings.htMultiplier());
+        assertEquals(262144L, Settings.greedyCapacity());
+        assertEquals(2_000_000_000L, Settings.barrelCapacity());
+        assertEquals(18, Settings.maxBlueprints());
+        assertEquals(4.0, Settings.vacuumRadius());
+        assertEquals(65536L, Settings.cellCapacity(1));
+        assertTrue(Settings.compatSlimefun());
+        org.junit.jupiter.api.Assertions.assertFalse(Settings.debug());
+        assertEquals(250, Settings.rakeUses());
+    }
 }

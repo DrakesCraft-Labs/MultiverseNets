@@ -5,11 +5,14 @@ import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
 import com.chagui68.multiversenets.util.Settings;
 import com.chagui68.multiversenets.util.StackUtils;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Predicate;
 
 /**
@@ -123,7 +126,7 @@ public class NetworkStorage {
                 cap = Settings.greedyCapacity();
             } else if (ref.barrel()) {
                 stillValid = real == DeviceType.INFINITY_BARREL;
-                cap = 2_000_000_000L;
+                cap = Settings.barrelCapacity();
             } else {
                 stillValid = real != null && real.isCell();
                 cap = Settings.cellCapacity(ref.tier());
@@ -300,27 +303,34 @@ public class NetworkStorage {
         if (viewCache != null && now - viewCacheAt < VIEW_CACHE_MS) {
             return new ArrayList<>(viewCache);
         }
-        List<View> merged = new ArrayList<>();
+        Map<Material, List<View>> buckets = new EnumMap<>(Material.class);
         for (CellState state : load()) {
             if (blobEmpty(state.blob)) {
                 continue;
             }
+            ItemStack sample = state.blob.cellSample;
+            Material mat = sample.getType();
+            List<View> bucket = buckets.computeIfAbsent(mat, k -> new ArrayList<>());
             boolean found = false;
-            for (int i = 0; i < merged.size(); i++) {
-                View v = merged.get(i);
-                if (StackUtils.itemsMatch(v.sample(), state.blob.cellSample)) {
+            for (int i = 0; i < bucket.size(); i++) {
+                View v = bucket.get(i);
+                if (StackUtils.itemsMatch(v.sample(), sample)) {
                     long sum = v.amount() + state.blob.cellAmount;
                     if (sum < 0) {
                         sum = Long.MAX_VALUE;
                     }
-                    merged.set(i, new View(v.sample(), sum));
+                    bucket.set(i, new View(v.sample(), sum));
                     found = true;
                     break;
                 }
             }
             if (!found) {
-                merged.add(new View(StackUtils.getAsQuantity(state.blob.cellSample, 1), state.blob.cellAmount));
+                bucket.add(new View(StackUtils.getAsQuantity(sample, 1), state.blob.cellAmount));
             }
+        }
+        List<View> merged = new ArrayList<>();
+        for (List<View> bucket : buckets.values()) {
+            merged.addAll(bucket);
         }
         viewCache = new ArrayList<>(merged);
         viewCacheAt = now;

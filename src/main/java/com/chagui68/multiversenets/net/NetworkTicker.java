@@ -13,6 +13,7 @@ import com.chagui68.multiversenets.util.Settings;
 import com.chagui68.multiversenets.util.StackUtils;
 import org.bukkit.Color;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -75,7 +76,7 @@ public class NetworkTicker {
         vacuumIn -= 5;
         craftIn -= 5;
         for (Network net : manager.all()) {
-            if (scanIn <= 0) {
+            if (net.isDirty() || scanIn <= 0) {
                 net.scan();
             }
             if (transferIn <= 0) {
@@ -138,6 +139,23 @@ public class NetworkTicker {
         return FACES;
     }
 
+    private static boolean isPotentialContainer(Material mat) {
+        if (mat == null || mat.isAir()) {
+            return false;
+        }
+        return switch (mat) {
+            case CHEST, TRAPPED_CHEST, BARREL, HOPPER, DISPENSER, DROPPER,
+                 FURNACE, BLAST_FURNACE, SMOKER, BREWING_STAND, CHISELED_BOOKSHELF,
+                 SHULKER_BOX, WHITE_SHULKER_BOX, ORANGE_SHULKER_BOX, MAGENTA_SHULKER_BOX,
+                 LIGHT_BLUE_SHULKER_BOX, YELLOW_SHULKER_BOX, LIME_SHULKER_BOX,
+                 PINK_SHULKER_BOX, GRAY_SHULKER_BOX, LIGHT_GRAY_SHULKER_BOX,
+                 CYAN_SHULKER_BOX, PURPLE_SHULKER_BOX, BLUE_SHULKER_BOX,
+                 BROWN_SHULKER_BOX, GREEN_SHULKER_BOX, RED_SHULKER_BOX,
+                 BLACK_SHULKER_BOX -> true;
+            default -> false;
+        };
+    }
+
     /**
      * Saca hasta {@code rate} unidades del contenedor adyacente y las mete en la red. Si la red
      * no las admite todas, el sobrante vuelve al origen; si el origen tampoco lo admite (alguien
@@ -152,8 +170,9 @@ public class NetworkTicker {
         Block self = net.block(pos);
         for (BlockFace face : facesFor(blob)) {
             Block target = self.getRelative(face);
+            Material mat = target.getType();
 
-            if (target.getState() instanceof InventoryHolder holder) {
+            if (isPotentialContainer(mat) && target.getState() instanceof InventoryHolder holder) {
                 Inventory inv = holder.getInventory();
                 ItemStack extracted = NetworkManager.extractFirst(inv, pred, rate);
                 if (extracted == null) {
@@ -174,27 +193,29 @@ public class NetworkTicker {
             }
 
             // Slimefun machine compatibility branch
-            ItemStack extracted = SlimefunBridge.extract(target, pred, rate);
-            if (extracted == null) {
-                continue;
-            }
-            int leftover = net.storage().deposit(extracted);
-            if (leftover > 0) {
-                extracted.setAmount(leftover);
-                int unhoused = SlimefunBridge.insert(target, extracted);
-                if (unhoused > 0) {
-                    extracted.setAmount(unhoused);
-                    dropAt(target, extracted);
+            if (Settings.compatSlimefun() && SlimefunBridge.isAvailable()) {
+                ItemStack extracted = SlimefunBridge.extract(target, pred, rate);
+                if (extracted == null) {
+                    continue;
                 }
+                int leftover = net.storage().deposit(extracted);
+                if (leftover > 0) {
+                    extracted.setAmount(leftover);
+                    int unhoused = SlimefunBridge.insert(target, extracted);
+                    if (unhoused > 0) {
+                        extracted.setAmount(unhoused);
+                        dropAt(target, extracted);
+                    }
+                }
+                spark(net, pos);
+                return;
             }
-            spark(net, pos);
-            return;
         }
     }
 
     /**
      * EN: Exports items from the network into adjacent inventories.
- *
+     *
      * ES: Exporta ítems desde la red hacia los contenedores adyacentes.
      */
     private void pushOnce(Network net, long pos, int rate) {
@@ -210,8 +231,9 @@ public class NetworkTicker {
         Block self = net.block(pos);
         for (BlockFace face : facesFor(blob)) {
             Block target = self.getRelative(face);
+            Material mat = target.getType();
 
-            if (target.getState() instanceof InventoryHolder holder) {
+            if (isPotentialContainer(mat) && target.getState() instanceof InventoryHolder holder) {
                 int leftover = NetworkManager.insertInto(holder.getInventory(), stack);
                 if (leftover < stack.getAmount()) {
                     spark(net, pos);
@@ -223,17 +245,16 @@ public class NetworkTicker {
                 continue;
             }
 
-            if (!SlimefunBridge.isMachine(target)) {
-                continue;
-            }
-            int before = stack.getAmount();
-            int unhoused = SlimefunBridge.insert(target, stack);
-            stack.setAmount(Math.max(0, Math.min(unhoused, before)));
-            if (stack.getAmount() < before) {
-                spark(net, pos);
-            }
-            if (stack.getAmount() <= 0) {
-                break;
+            if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
+                int before = stack.getAmount();
+                int unhoused = SlimefunBridge.insert(target, stack);
+                stack.setAmount(Math.max(0, Math.min(unhoused, before)));
+                if (stack.getAmount() < before) {
+                    spark(net, pos);
+                }
+                if (stack.getAmount() <= 0) {
+                    break;
+                }
             }
         }
         if (stack.getAmount() > 0) {
@@ -313,7 +334,7 @@ public class NetworkTicker {
             int take = (int) Math.min(blob.cellAmount, Settings.itemsPerOp() * 2L);
             for (BlockFace face : FACES) {
                 Block target = block.getRelative(face);
-                if (!(target.getState() instanceof InventoryHolder holder)) {
+                if (!isPotentialContainer(target.getType()) || !(target.getState() instanceof InventoryHolder holder)) {
                     continue;
                 }
                 ItemStack out = blob.cellSample.clone();

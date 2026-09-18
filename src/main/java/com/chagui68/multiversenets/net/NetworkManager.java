@@ -159,6 +159,7 @@ public class NetworkManager {
             }
         }
         for (Network net : touched) {
+            net.markDirty();
             net.scan();
         }
     }

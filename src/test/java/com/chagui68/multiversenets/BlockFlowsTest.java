@@ -485,4 +485,60 @@ class BlockFlowsTest {
         assertEquals(10, net.storage().count(i -> i.getType() == Material.DIAMOND),
                 "diamonds must remain untouched in network");
     }
+
+    /**
+     * [EN] Fast type and presence lookups in NodeStore operate accurately and self-heal missing type tags.
+     * [ES] Las consultas rápidas de tipo y presencia en NodeStore funcionan con precisión y autoreparan tags ausentes.
+     */
+    @Test
+    void nodeStoreFastTypeAndPresenceOperations() {
+        Block cable = place(10, 64, 10, DeviceType.CABLE);
+        Block empty = world.getBlockAt(10, 64, 11);
+
+        assertTrue(NodeStore.hasNode(cable));
+        assertFalse(NodeStore.hasNode(empty));
+        assertEquals(DeviceType.CABLE, NodeStore.getType(cable));
+
+        // Test self-healing fallback when nodeTypeKey is removed
+        org.bukkit.NamespacedKey typeKey = new org.bukkit.NamespacedKey(plugin, "t10_64_10");
+        cable.getChunk().getPersistentDataContainer().remove(typeKey);
+        assertFalse(cable.getChunk().getPersistentDataContainer().has(typeKey, PersistentDataType.STRING));
+
+        // getType should fall back to blob decode and restore typeKey
+        assertEquals(DeviceType.CABLE, NodeStore.getType(cable));
+        assertTrue(cable.getChunk().getPersistentDataContainer().has(typeKey, PersistentDataType.STRING));
+    }
+
+    /**
+     * [EN] NetworkStorage view aggregation correctly groups and sums items by material in O(N).
+     * [ES] La agregación de vistas de NetworkStorage agrupa y suma correctamente ítems por material en O(N).
+     */
+    @Test
+    void networkStorageViewAggregatesBucketsCorrectly() {
+        Block ctrl = place(0, 64, 0, DeviceType.CONTROLLER);
+        plugin.networks().registerController(ctrl);
+        place(1, 64, 0, DeviceType.CELL_T1);
+        place(2, 64, 0, DeviceType.CELL_T1);
+        Network net = plugin.networks().networkByController(ctrl.getLocation());
+        net.scan();
+
+        net.storage().deposit(new ItemStack(Material.IRON_INGOT, 50));
+        net.storage().deposit(new ItemStack(Material.IRON_INGOT, 30));
+        net.storage().deposit(new ItemStack(Material.GOLD_INGOT, 15));
+
+        var views = net.storage().view();
+        assertEquals(2, views.size(), "should have 2 distinct item entries (IRON and GOLD)");
+
+        long ironCount = views.stream()
+                .filter(v -> v.sample().getType() == Material.IRON_INGOT)
+                .mapToLong(com.chagui68.multiversenets.net.NetworkStorage.View::amount)
+                .sum();
+        long goldCount = views.stream()
+                .filter(v -> v.sample().getType() == Material.GOLD_INGOT)
+                .mapToLong(com.chagui68.multiversenets.net.NetworkStorage.View::amount)
+                .sum();
+
+        assertEquals(80, ironCount);
+        assertEquals(15, goldCount);
+    }
 }

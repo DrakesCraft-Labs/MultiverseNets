@@ -41,6 +41,7 @@ public class Network {
     private volatile long version = 0;
     private long lastScanMs = 0;
     private volatile boolean crayon;
+    private volatile boolean dirty = true;
     public String error;
 
     public Network(com.chagui68.multiversenets.MultiverseNets plugin, org.bukkit.World world, long controllerPos) {
@@ -75,6 +76,14 @@ public class Network {
 
     public boolean crayon() {
         return crayon;
+    }
+
+    public boolean isDirty() {
+        return dirty;
+    }
+
+    public void markDirty() {
+        this.dirty = true;
     }
 
     public boolean contains(long pos) {
@@ -158,11 +167,7 @@ public class Network {
                 if (!NodeStore.chunkHasNodes(block.getChunk())) {
                     continue;
                 }
-                NodeBlob blob = NodeStore.get(block);
-                if (blob == null) {
-                    continue;
-                }
-                DeviceType type = DeviceType.parse(blob.typeName);
+                DeviceType type = NodeStore.getType(block);
                 if (type == null) {
                     continue;
                 }
@@ -186,6 +191,7 @@ public class Network {
         this.error = String.join("; ", errors);
         this.version++;
         this.lastScanMs = System.currentTimeMillis();
+        this.dirty = false;
         storage.invalidate();
     }
 

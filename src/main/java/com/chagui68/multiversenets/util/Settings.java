@@ -36,97 +36,107 @@ public final class Settings {
 
     /**
      * EN: Returns the interval (in ticks) between topology rescans.
- *
+     *
      * ES: Devuelve el intervalo (en ticks) entre reescaneos de topología de red.
      */
     public static int scanIntervalTicks() {
-        return Math.max(5, cfg.getInt("network.scan-interval-ticks", 20));
+        return cfg != null ? Math.max(5, cfg.getInt("network.scan-interval-ticks", 20)) : 20;
     }
 
     /**
      * EN: Returns the maximum number of connected nodes allowed per network.
- *
+     *
      * ES: Devuelve el número máximo de nodos conectados permitidos por red.
      */
     public static int maxNodes() {
-        return Math.max(16, cfg.getInt("network.max-nodes", 4096));
+        return cfg != null ? Math.max(16, cfg.getInt("network.max-nodes", 4096)) : 4096;
     }
 
     /**
      * EN: Returns the interval (in ticks) between transfer operations (grabbers/pushers).
- *
+     *
      * ES: Devuelve el intervalo (en ticks) entre operaciones de transferencia (grabbers/pushers).
      */
     public static int transferIntervalTicks() {
-        return Math.max(1, cfg.getInt("network.op-interval-ticks.transfer", 5));
+        return cfg != null ? Math.max(1, cfg.getInt("network.op-interval-ticks.transfer", 5)) : 5;
     }
 
     /**
      * EN: Returns the interval (in ticks) between vacuum pickup cycles.
- *
+     *
      * ES: Devuelve el intervalo (en ticks) entre ciclos de recolección de los vacuums.
      */
     public static int vacuumIntervalTicks() {
-        return Math.max(1, cfg.getInt("network.op-interval-ticks.vacuum", 10));
+        return cfg != null ? Math.max(1, cfg.getInt("network.op-interval-ticks.vacuum", 10)) : 10;
     }
 
     /**
      * EN: Returns the interval (in ticks) between auto-crafting attempts.
- *
+     *
      * ES: Devuelve el intervalo (en ticks) entre intentos de autocrafteo.
      */
     public static int craftIntervalTicks() {
-        return Math.max(1, cfg.getInt("network.op-interval-ticks.craft", 20));
+        return cfg != null ? Math.max(1, cfg.getInt("network.op-interval-ticks.craft", 20)) : 20;
     }
 
     /**
      * EN: Base amount of items transferred per tick operation.
- *
+     *
      * ES: Cantidad base de ítems transferidos por operación de tick.
      */
     public static int itemsPerOp() {
-        return Math.max(1, cfg.getInt("transfer.items-per-op", 64));
+        return cfg != null ? Math.max(1, cfg.getInt("transfer.items-per-op", 64)) : 64;
     }
 
     /**
      * EN: Multiplier for high-throughput (HT) importers and exporters.
- *
+     *
      * ES: Multiplicador para importadores y exportadores de alto rendimiento (HT).
      */
     public static int htMultiplier() {
-        return Math.max(1, cfg.getInt("transfer.ht-multiplier", 8));
+        return cfg != null ? Math.max(1, cfg.getInt("transfer.ht-multiplier", 8)) : 8;
     }
 
     /**
      * EN: Buffer capacity of a Greedy Cell.
- *
+     *
      * ES: Capacidad de almacenamiento de una Greedy Cell.
      */
     public static long greedyCapacity() {
-        return Math.max(1, cfg.getLong("greedy.capacity", 262144L));
+        return cfg != null ? Math.max(1L, cfg.getLong("greedy.capacity", 262144L)) : 262144L;
+    }
+
+    /**
+     * EN: Storage capacity of an Infinity Barrel.
+     *
+     * ES: Capacidad de almacenamiento de un Infinity Barrel.
+     */
+    public static long barrelCapacity() {
+        return Math.max(1L, cfg != null ? cfg.getLong("barrel.capacity", 2_000_000_000L) : 2_000_000_000L);
     }
 
     /**
      * EN: Maximum number of blueprints/recipes installed in an Auto-Crafter.
- *
+     *
      * ES: Número máximo de blueprints/recetas instalables en un Auto-Crafter.
      */
     public static int maxBlueprints() {
-        return Math.max(1, cfg.getInt("crafter.max-recipes", 26));
+        int raw = cfg != null ? cfg.getInt("crafter.max-recipes", 18) : 18;
+        return Math.min(18, Math.max(1, raw));
     }
 
     /**
      * EN: Pickup radius in blocks for Network Vacuums.
- *
+     *
      * ES: Radio de recolección en bloques para los Network Vacuums.
      */
     public static double vacuumRadius() {
-        return Math.max(1.0, cfg.getDouble("vacuum.radius", 4.0));
+        return cfg != null ? Math.max(1.0, cfg.getDouble("vacuum.radius", 4.0)) : 4.0;
     }
 
     /**
      * EN: Storage capacity for a cell of a given tier (1..6), with automatic fallback.
- *
+     *
      * ES: Capacidad de una celda por nivel (1..6), con respaldo automático si no está declarada.
      *
      * @param tier1to6 Cell tier / ES: Nivel de la celda.
@@ -136,7 +146,11 @@ public final class Settings {
         int tier = Math.max(1, tier1to6);
         long fallback = 65536L * (1L << (tier - 1));
 
-        List<Integer> caps = cfg.getIntegerList("cells.capacities");
+        if (cfg == null) {
+            return fallback;
+        }
+
+        List<Long> caps = cfg.getLongList("cells.capacities");
         if (caps.isEmpty()) {
             return fallback;
         }
@@ -185,6 +199,6 @@ public final class Settings {
      * ES: Usos máximos de durabilidad para un Network Rake recién crafteado.
      */
     public static int rakeUses() {
-        return Math.max(1, cfg.getInt("rake.uses", 250));
+        return cfg != null ? Math.max(1, cfg.getInt("rake.uses", 250)) : 250;
     }
 }

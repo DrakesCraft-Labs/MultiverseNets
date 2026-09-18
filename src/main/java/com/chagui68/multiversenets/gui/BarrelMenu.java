@@ -5,6 +5,7 @@ import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.item.Items;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
+import com.chagui68.multiversenets.util.Settings;
 import com.chagui68.multiversenets.util.StackUtils;
 import com.chagui68.multiversenets.util.Text;
 import net.kyori.adventure.text.Component;
@@ -34,7 +35,9 @@ public class BarrelMenu extends MenuHolder {
     public static final int SET_SLOT = 13;
     public static final int EXTRACT_ALL_SLOT = 15;
 
-    private static final long INFINITY_CAPACITY = 2_000_000_000L;
+    private static long capacity() {
+        return Settings.barrelCapacity();
+    }
     private static final int[] BACKGROUND_SLOTS = {
             0, 1, 2, 3, 5, 6, 7, 8,
             9, 10, 12, 14, 16, 17
@@ -104,14 +107,15 @@ public class BarrelMenu extends MenuHolder {
     private void updateDisplay() {
         NodeBlob blob = NodeStore.get(block);
         ItemStack icon;
+        long cap = capacity();
         if (blob == null || blob.cellSample == null || blob.cellAmount <= 0) {
             icon = new ItemStack(Material.RED_STAINED_GLASS_PANE);
             var meta = icon.getItemMeta();
             meta.displayName(Component.text("No Registered Item", NamedTextColor.RED)
                     .decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
-                    Component.text("Capacity: " + Items.formatAmount(INFINITY_CAPACITY), NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                    Component.text("Stores up to 2 Billion of a single item", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("Capacity: " + Items.formatAmount(cap), NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("Stores up to " + Items.formatAmount(cap) + " of a single item", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
                     Component.empty(),
                     Component.text("Click with item on cursor to set", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false)));
             icon.setItemMeta(meta);
@@ -121,9 +125,9 @@ public class BarrelMenu extends MenuHolder {
             var meta = icon.getItemMeta();
             meta.lore(List.of(
                     Component.empty(),
-                    Component.text("Amount: " + blob.cellAmount + " / " + Items.formatAmount(INFINITY_CAPACITY),
+                    Component.text("Amount: " + blob.cellAmount + " / " + Items.formatAmount(cap),
                             NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                    Component.text("Usage: " + (INFINITY_CAPACITY > 0 ? (blob.cellAmount * 100 / INFINITY_CAPACITY) : 0) + "%", NamedTextColor.GRAY)
+                    Component.text("Usage: " + (cap > 0 ? (blob.cellAmount * 100 / cap) : 0) + "%", NamedTextColor.GRAY)
                             .decoration(TextDecoration.ITALIC, false),
                     Component.empty(),
                     Component.text("Left Click: Take 1 item", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false),
@@ -141,7 +145,7 @@ public class BarrelMenu extends MenuHolder {
         if (blob.cellSample != null && !StackUtils.itemsMatch(blob.cellSample, stack)) {
             return false;
         }
-        long space = INFINITY_CAPACITY - blob.cellAmount;
+        long space = capacity() - blob.cellAmount;
         if (space <= 0) {
             return false;
         }
@@ -258,7 +262,7 @@ public class BarrelMenu extends MenuHolder {
                 continue;
             }
             if (StackUtils.itemsMatch(blob.cellSample, stack)) {
-                long space = INFINITY_CAPACITY - blob.cellAmount;
+                long space = capacity() - blob.cellAmount;
                 if (space <= 0) {
                     break;
                 }

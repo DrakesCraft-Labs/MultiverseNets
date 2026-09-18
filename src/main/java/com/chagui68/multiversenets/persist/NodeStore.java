@@ -60,13 +60,27 @@ public final class NodeStore {
 
     public static void save() {
         YamlConfiguration yaml = new YamlConfiguration();
-        for (Map.Entry<UUID, List<String>> entry : CONTROLLERS.entrySet()) {
-            yaml.set("controllers." + entry.getKey(), entry.getValue());
+        synchronized (CONTROLLERS) {
+            for (Map.Entry<UUID, List<String>> entry : CONTROLLERS.entrySet()) {
+                yaml.set("controllers." + entry.getKey(), new ArrayList<>(entry.getValue()));
+            }
         }
-        try {
-            yaml.save(registryFile);
-        } catch (IOException e) {
-            plugin.getLogger().severe("Could not save networks.yml: " + e.getMessage());
+        if (plugin != null && plugin.isEnabled() && plugin.getServer() != null && plugin.getServer().isPrimaryThread()) {
+            plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                try {
+                    yaml.save(registryFile);
+                } catch (IOException e) {
+                    plugin.getLogger().severe("Could not save networks.yml: " + e.getMessage());
+                }
+            });
+        } else {
+            try {
+                yaml.save(registryFile);
+            } catch (IOException e) {
+                if (plugin != null) {
+                    plugin.getLogger().severe("Could not save networks.yml: " + e.getMessage());
+                }
+            }
         }
     }
 
@@ -128,14 +142,64 @@ public final class NodeStore {
         return data == null ? null : decode(data);
     }
 
+    /**
+     * EN: Retrieves the DeviceType directly without deserializing the entire NodeBlob.
+     *
+     * ES: Obtiene el DeviceType directamente sin deserializar el NodeBlob completo.
+     */
+    public static com.chagui68.multiversenets.item.DeviceType getType(Block block) {
+        Chunk chunk = block.getChunk();
+        if (!chunk.isLoaded()) {
+            return null;
+        }
+        var pdc = chunk.getPersistentDataContainer();
+        String typeName = pdc.get(nodeTypeKey(block), PersistentDataType.STRING);
+        if (typeName != null) {
+            return com.chagui68.multiversenets.item.DeviceType.parse(typeName);
+        }
+        // Fallback para nodos guardados antes del tipado rápido: deserializa y auto-repara el tag
+        String data = pdc.get(nodeKey(block), PersistentDataType.STRING);
+        if (data == null) {
+            return null;
+        }
+        NodeBlob blob = decode(data);
+        if (blob == null || blob.typeName == null) {
+            return null;
+        }
+        pdc.set(nodeTypeKey(block), PersistentDataType.STRING, blob.typeName);
+        return com.chagui68.multiversenets.item.DeviceType.parse(blob.typeName);
+    }
+
+    /**
+     * EN: Checks if a block is registered as a network node without deserializing.
+     *
+     * ES: Comprueba si un bloque está registrado como nodo de red sin deserializar.
+     */
+    public static boolean hasNode(Block block) {
+        Chunk chunk = block.getChunk();
+        if (!chunk.isLoaded()) {
+            return false;
+        }
+        var pdc = chunk.getPersistentDataContainer();
+        return pdc.has(nodeTypeKey(block), PersistentDataType.STRING)
+                || pdc.has(nodeKey(block), PersistentDataType.STRING);
+    }
+
     public static void put(Block block, NodeBlob blob) {
         Chunk chunk = block.getChunk();
-        chunk.getPersistentDataContainer().set(nodeKey(block), PersistentDataType.STRING, encode(blob));
-        chunk.getPersistentDataContainer().set(Keys.CHUNK_HAS_NODES, PersistentDataType.BYTE, (byte) 1);
+        var pdc = chunk.getPersistentDataContainer();
+        pdc.set(nodeKey(block), PersistentDataType.STRING, encode(blob));
+        if (blob != null && blob.typeName != null) {
+            pdc.set(nodeTypeKey(block), PersistentDataType.STRING, blob.typeName);
+        }
+        pdc.set(Keys.CHUNK_HAS_NODES, PersistentDataType.BYTE, (byte) 1);
     }
 
     public static void remove(Block block) {
-        block.getChunk().getPersistentDataContainer().remove(nodeKey(block));
+        Chunk chunk = block.getChunk();
+        var pdc = chunk.getPersistentDataContainer();
+        pdc.remove(nodeKey(block));
+        pdc.remove(nodeTypeKey(block));
     }
 
     public static boolean chunkHasNodes(Chunk chunk) {
@@ -146,6 +210,11 @@ public final class NodeStore {
     private static org.bukkit.NamespacedKey nodeKey(Block block) {
         return new org.bukkit.NamespacedKey(plugin,
                 "n" + block.getX() + "_" + block.getY() + "_" + block.getZ());
+    }
+
+    private static org.bukkit.NamespacedKey nodeTypeKey(Block block) {
+        return new org.bukkit.NamespacedKey(plugin,
+                "t" + block.getX() + "_" + block.getY() + "_" + block.getZ());
     }
 
     public static List<long[]> controllers(UUID worldId) {
