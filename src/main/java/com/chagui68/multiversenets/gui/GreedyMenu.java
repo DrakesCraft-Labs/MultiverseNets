@@ -109,21 +109,21 @@ public class GreedyMenu extends MenuHolder {
                     ? new ArrayList<>(meta.lore())
                     : new ArrayList<>();
             lore.add(Component.empty());
-            lore.add(Component.text("Almacenado: ", NamedTextColor.GRAY)
+            lore.add(Component.text("Stored: ", NamedTextColor.GRAY)
                     .append(Component.text(Items.formatAmount(amount) + " (" + amount + ")", NamedTextColor.AQUA))
                     .decoration(TextDecoration.ITALIC, false));
 
             double pctOfUsed = totalUsed > 0 ? (amount * 100.0 / totalUsed) : 0.0;
-            lore.add(Component.text("Ocupación del buffer: ", NamedTextColor.GRAY)
+            lore.add(Component.text("Buffer Usage: ", NamedTextColor.GRAY)
                     .append(Component.text(String.format(Locale.US, "%.1f%%", pctOfUsed), NamedTextColor.YELLOW))
                     .decoration(TextDecoration.ITALIC, false));
 
             lore.add(Component.empty());
-            lore.add(Component.text("▶ Clic Izquierdo: Extraer 1", NamedTextColor.DARK_GRAY)
+            lore.add(Component.text("▶ Left Click: Take 1 item", NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("▶ Clic Derecho: Extraer 64 (1 stack)", NamedTextColor.DARK_GRAY)
+            lore.add(Component.text("▶ Right Click: Take 64 items (1 stack)", NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("▶ Shift+Clic: Extraer a inventario", NamedTextColor.DARK_GRAY)
+            lore.add(Component.text("▶ Shift+Click: Take to inventory", NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false));
             meta.lore(lore);
             icon.setItemMeta(meta);
@@ -135,11 +135,11 @@ public class GreedyMenu extends MenuHolder {
         ItemStack item = new ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE);
         var meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text("Ranura Disponible", NamedTextColor.DARK_GRAY)
+            meta.displayName(Component.text("Available Slot", NamedTextColor.DARK_GRAY)
                     .decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
-                    Component.text("Coloca un ítem aquí con el cursor", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                    Component.text("para almacenarlo manualmente.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)
+                    Component.text("Place an item here with cursor", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("to store it manually.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)
             ));
             item.setItemMeta(meta);
         }
@@ -150,15 +150,15 @@ public class GreedyMenu extends MenuHolder {
         ItemStack item = new ItemStack(Material.HOPPER);
         var meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text("Configurar Filtros", NamedTextColor.GOLD)
+            meta.displayName(Component.text("Configure Filters", NamedTextColor.GOLD)
                     .decoration(TextDecoration.ITALIC, false));
             int mats = blob.filterMaterials != null ? blob.filterMaterials.size() : 0;
             int items = blob.filterItems != null ? blob.filterItems.size() : 0;
             meta.lore(List.of(
-                    Component.text("Filtros activos: " + (mats + items), NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                    Component.text("Modo: " + (blob.filterBlacklist ? "Lista Negra" : "Lista Blanca"), NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("Active filters: " + (mats + items), NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("Mode: " + (blob.filterBlacklist ? "Blacklist" : "Whitelist"), NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
                     Component.empty(),
-                    Component.text("Clic para abrir menú de filtros.", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false)
+                    Component.text("Click to open filter menu.", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false)
             ));
             item.setItemMeta(meta);
         }
@@ -169,13 +169,13 @@ public class GreedyMenu extends MenuHolder {
         ItemStack item = new ItemStack(Material.CHEST);
         var meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text("Depósito Rápido", NamedTextColor.AQUA)
+            meta.displayName(Component.text("Quick Deposit", NamedTextColor.AQUA)
                     .decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
-                    Component.text("Deposita todos los ítems válidos", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                    Component.text("de tu inventario en esta Greedy Cell.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("Click to deposit all matching items", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("from your inventory into this cell.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
                     Component.empty(),
-                    Component.text("Clic para depositar.", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false)
+                    Component.text("Click to deposit.", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false)
             ));
             item.setItemMeta(meta);
         }
@@ -186,20 +186,20 @@ public class GreedyMenu extends MenuHolder {
         ItemStack item = new ItemStack(Material.RESPAWN_ANCHOR);
         var meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text("Monitor de Capacidad", NamedTextColor.GREEN)
+            meta.displayName(Component.text("Capacity Monitor", NamedTextColor.GREEN)
                     .decoration(TextDecoration.ITALIC, false));
 
             double usedPct = cap > 0 ? (used * 100.0 / cap) : 0.0;
             double freePct = cap > 0 ? (free * 100.0 / cap) : 100.0;
 
             List<Component> lore = new ArrayList<>();
-            lore.add(Component.text("Capacidad Máxima: ", NamedTextColor.GRAY)
+            lore.add(Component.text("Max Capacity: ", NamedTextColor.GRAY)
                     .append(Component.text(Items.formatAmount(cap), NamedTextColor.WHITE))
                     .decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("Espacio Usado: ", NamedTextColor.GRAY)
+            lore.add(Component.text("Used Space: ", NamedTextColor.GRAY)
                     .append(Component.text(Items.formatAmount(used) + " (" + String.format(Locale.US, "%.1f%%", usedPct) + ")", NamedTextColor.YELLOW))
                     .decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("Espacio Libre: ", NamedTextColor.GRAY)
+            lore.add(Component.text("Free Space: ", NamedTextColor.GRAY)
                     .append(Component.text(Items.formatAmount(free) + " (" + String.format(Locale.US, "%.1f%%", freePct) + ")", NamedTextColor.GREEN))
                     .decoration(TextDecoration.ITALIC, false));
 
@@ -208,11 +208,11 @@ public class GreedyMenu extends MenuHolder {
             lore.add(Component.empty());
 
             int count = blob.greedySamples != null ? blob.greedySamples.size() : 0;
-            lore.add(Component.text("Desglose por ítems (" + count + " tipos):", NamedTextColor.AQUA)
+            lore.add(Component.text("Item Breakdown (" + count + " types):", NamedTextColor.AQUA)
                     .decoration(TextDecoration.ITALIC, false));
 
             if (count == 0) {
-                lore.add(Component.text(" (Sin ítems almacenados)", NamedTextColor.DARK_GRAY)
+                lore.add(Component.text(" (No items stored)", NamedTextColor.DARK_GRAY)
                         .decoration(TextDecoration.ITALIC, false));
             } else {
                 int limit = Math.min(count, 5);
@@ -227,7 +227,7 @@ public class GreedyMenu extends MenuHolder {
                             .decoration(TextDecoration.ITALIC, false));
                 }
                 if (count > limit) {
-                    lore.add(Component.text(" ... y " + (count - limit) + " tipos más.", NamedTextColor.DARK_GRAY)
+                    lore.add(Component.text(" ... and " + (count - limit) + " more types.", NamedTextColor.DARK_GRAY)
                             .decoration(TextDecoration.ITALIC, false));
                 }
             }
@@ -267,13 +267,13 @@ public class GreedyMenu extends MenuHolder {
         var meta = item.getItemMeta();
         if (meta != null) {
             String face = blob.targetFace != null ? blob.targetFace.toUpperCase(Locale.ROOT) : "ALL";
-            meta.displayName(Component.text("Dirección de Salida: " + face, NamedTextColor.LIGHT_PURPLE)
+            meta.displayName(Component.text("Export Face: " + face, NamedTextColor.LIGHT_PURPLE)
                     .decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
-                    Component.text("Determina a qué cara adyacente reparte", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                    Component.text("ítems automáticamente.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("Specifies which adjacent face receives", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("exported items automatically.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
                     Component.empty(),
-                    Component.text("Clic para alternar dirección.", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false)
+                    Component.text("Click to cycle target face.", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false)
             ));
             item.setItemMeta(meta);
         }
@@ -284,13 +284,13 @@ public class GreedyMenu extends MenuHolder {
         ItemStack item = new ItemStack(Material.DISPENSER);
         var meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(Component.text("Información de Distribución", NamedTextColor.GOLD)
+            meta.displayName(Component.text("Distribution Info", NamedTextColor.GOLD)
                     .decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
-                    Component.text("La Greedy Cell funciona como búfer:", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                    Component.text("1. Succiona ítems de la red según sus filtros.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                    Component.text("2. Distribuye ítems a contenedores vecinos.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                    Component.text("3. La capacidad es compartida entre todos los ítems.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)
+                    Component.text("The Greedy Cell acts as a buffer:", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("1. Sucks filtered items from network.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("2. Distributes items to adjacent containers.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("3. Shared capacity across all items.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)
             ));
             item.setItemMeta(meta);
         }
@@ -378,11 +378,11 @@ public class GreedyMenu extends MenuHolder {
             long cap = Settings.greedyCapacity();
             long space = Math.max(0, cap - blob.totalGreedyAmount());
             if (space <= 0) {
-                player.sendMessage(Text.msg("La celda Greedy está llena (capacidad máxima alcanzada).", NamedTextColor.RED));
+                player.sendMessage(Text.msg("The Greedy Cell is full (maximum capacity reached).", NamedTextColor.RED));
                 return;
             }
             if (!allowsItem(blob, cursor)) {
-                player.sendMessage(Text.msg("Este ítem no está permitido por el filtro de la Greedy Cell.", NamedTextColor.RED));
+                player.sendMessage(Text.msg("This item is not allowed by the Greedy Cell filter.", NamedTextColor.RED));
                 return;
             }
             long take = Math.min(space, (long) cursor.getAmount());
@@ -441,7 +441,7 @@ public class GreedyMenu extends MenuHolder {
         long cap = Settings.greedyCapacity();
         long space = Math.max(0, cap - blob.totalGreedyAmount());
         if (space <= 0) {
-            player.sendMessage(Text.msg("La Greedy Cell está llena.", NamedTextColor.RED));
+            player.sendMessage(Text.msg("The Greedy Cell is full.", NamedTextColor.RED));
             return;
         }
         long depositedTotal = 0;
@@ -470,9 +470,9 @@ public class GreedyMenu extends MenuHolder {
         }
         if (depositedTotal > 0) {
             NodeStore.put(block, blob);
-            player.sendMessage(Text.msg("Depositados " + Items.formatAmount(depositedTotal) + " ítems en la Greedy Cell.", NamedTextColor.GREEN));
+            player.sendMessage(Text.msg("Deposited " + Items.formatAmount(depositedTotal) + " items into the Greedy Cell.", NamedTextColor.GREEN));
         } else {
-            player.sendMessage(Text.msg("No se encontraron ítems compatibles en tu inventario.", NamedTextColor.YELLOW));
+            player.sendMessage(Text.msg("No matching items found in your inventory.", NamedTextColor.YELLOW));
         }
     }
 

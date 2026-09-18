@@ -181,11 +181,11 @@ public class TerminalMenu extends MenuHolder {
         if (!showOnlyPurged) {
             long greedyAmt = network.storage().getGreedyStoredAmount(view.sample());
             if (greedyAmt > 0) {
-                lore.add(Component.text("⚡ En Greedy Buffer: " + Items.formatAmount(greedyAmt), NamedTextColor.GREEN)
+                lore.add(Component.text("⚡ In Greedy Buffer: " + Items.formatAmount(greedyAmt), NamedTextColor.GREEN)
                         .decoration(TextDecoration.ITALIC, false));
             }
         } else {
-            lore.add(Component.text("⚠ Destinado a Purger", NamedTextColor.RED)
+            lore.add(Component.text("⚠ Targeted by Purger", NamedTextColor.RED)
                     .decoration(TextDecoration.ITALIC, false));
         }
 
@@ -202,15 +202,15 @@ public class TerminalMenu extends MenuHolder {
             ItemStack item = new ItemStack(Material.MAGMA_BLOCK);
             var meta = item.getItemMeta();
             if (meta != null) {
-                meta.displayName(Component.text("Panel de Red: Almacén Normal", NamedTextColor.AQUA)
+                meta.displayName(Component.text("Network Status: Normal Storage", NamedTextColor.AQUA)
                         .decoration(TextDecoration.ITALIC, false));
                 meta.lore(List.of(
-                        Component.text("Purgers activos en red: " + network.storage().countActivePurgers(), NamedTextColor.GRAY)
+                        Component.text("Active purgers in network: " + network.storage().countActivePurgers(), NamedTextColor.GRAY)
                                 .decoration(TextDecoration.ITALIC, false),
-                        Component.text("Greedy Cells en red: " + network.storage().countActiveGreedyCells(), NamedTextColor.GRAY)
+                        Component.text("Active greedy cells: " + network.storage().countActiveGreedyCells(), NamedTextColor.GRAY)
                                 .decoration(TextDecoration.ITALIC, false),
                         Component.empty(),
-                        Component.text("▶ Clic: Ver Ítems en Purga", NamedTextColor.GOLD)
+                        Component.text("▶ Click: View Purged Items", NamedTextColor.GOLD)
                                 .decoration(TextDecoration.ITALIC, false)
                 ));
                 item.setItemMeta(meta);
@@ -220,15 +220,15 @@ public class TerminalMenu extends MenuHolder {
             ItemStack item = new ItemStack(Material.LAVA_BUCKET);
             var meta = item.getItemMeta();
             if (meta != null) {
-                meta.displayName(Component.text("Panel de Red: Modo Purga", NamedTextColor.RED)
+                meta.displayName(Component.text("Network Status: Purge Mode", NamedTextColor.RED)
                         .decoration(TextDecoration.ITALIC, false));
                 meta.lore(List.of(
-                        Component.text("Viendo ítems configurados para", NamedTextColor.GRAY)
+                        Component.text("Showing items targeted for", NamedTextColor.GRAY)
                                 .decoration(TextDecoration.ITALIC, false),
-                        Component.text("eliminación por los Purgers activos.", NamedTextColor.GRAY)
+                        Component.text("destruction by active purgers.", NamedTextColor.GRAY)
                                 .decoration(TextDecoration.ITALIC, false),
                         Component.empty(),
-                        Component.text("◀ Clic: Volver a Almacén Normal", NamedTextColor.GREEN)
+                        Component.text("◀ Click: Return to Normal Storage", NamedTextColor.GREEN)
                                 .decoration(TextDecoration.ITALIC, false)
                 ));
                 item.setItemMeta(meta);

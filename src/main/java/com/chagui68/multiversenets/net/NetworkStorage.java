@@ -165,8 +165,8 @@ public class NetworkStorage {
         List<CellState> states = load();
         long remaining = item.getAmount();
 
-        // 1) Greedy cells: sumidero preferido de la red si ya guardan este ítem o si su filtro lo acepta.
-        // Capacidad compartida (Option B): blob.totalGreedyAmount() <= state.capacity.
+        // 1) Greedy cells: preferred network sink if they already store this item or if their filter accepts it.
+        // Shared capacity (Option B): blob.totalGreedyAmount() <= state.capacity.
         for (CellState state : states) {
             if (!state.greedy) {
                 continue;
@@ -408,7 +408,9 @@ public class NetworkStorage {
     }
 
     /**
-     * Devuelve la cantidad total de este ítem almacenada en celdas Greedy de la red.
+     * EN: Returns the total quantity of this item stored across all Greedy Cells in the network.
+     *
+     * ES: Devuelve la cantidad total de este ítem almacenada en celdas Greedy de la red.
      */
     public long getGreedyStoredAmount(ItemStack item) {
         if (item == null) {
@@ -430,7 +432,9 @@ public class NetworkStorage {
     }
 
     /**
-     * Comprueba si un ítem cumple los filtros de algún Purger activo en la red.
+     * EN: Checks if an item matches the filter of any active Purger on the network.
+     *
+     * ES: Comprueba si un ítem cumple los filtros de algún Purger activo en la red.
      */
     public boolean isItemPurged(ItemStack item) {
         if (item == null || item.getType().isAir()) {
@@ -466,9 +470,10 @@ public class NetworkStorage {
     }
 
     /**
-     * Devuelve la lista de ítems que están siendo dirigidos a purga.
-     * Incluye tanto ítems actualmente en almacén que coinciden con algún purger,
-     * como ítems configurados en los filtros de los purgers activos (incluso si tienen 0 en stock).
+     * EN: Returns a view of items targeted for voiding by active Purgers.
+     * Includes currently stored matching items and items configured in Purger filters.
+     *
+     * ES: Devuelve la lista de ítems dirigidos a purga por los Purgers activos.
      */
     public List<View> getPurgedItemsView() {
         Map<Material, List<View>> buckets = new EnumMap<>(Material.class);
