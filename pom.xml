@@ -6,7 +6,7 @@
 
     <groupId>com.chagui68</groupId>
     <artifactId>MultiverseNets</artifactId>
-    <version>2.9</version>
+    <version>3.0</version>
     <packaging>jar</packaging>
 
     <name>MultiverseNets</name>
