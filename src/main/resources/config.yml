@@ -35,7 +35,7 @@ network:
   #      Protects the server from infinite loops and massive builds.
   # [ES] Cantidad máxima de nodos conectados (máquinas + cables) permitidos por red.
   #      Protege al servidor contra bucles infinitos o sobrecargas de rendimiento.
-  max-nodes: 4096
+  max-nodes: 16384
 
   # [EN] Operation intervals (in ticks) for active network machines.
   # [ES] Intervalos de operación (en ticks) para las máquinas activas de la red.

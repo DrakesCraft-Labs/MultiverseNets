@@ -49,7 +49,7 @@ public final class Settings {
      * ES: Devuelve el número máximo de nodos conectados permitidos por red.
      */
     public static int maxNodes() {
-        return cfg != null ? Math.max(16, cfg.getInt("network.max-nodes", 4096)) : 4096;
+        return cfg != null ? Math.max(16, cfg.getInt("network.max-nodes", 16384)) : 16384;
     }
 
     /**

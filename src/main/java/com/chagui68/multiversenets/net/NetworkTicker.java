@@ -302,60 +302,73 @@ public class NetworkTicker {
             return;
         }
         long cap = Settings.greedyCapacity();
+        long currentTotal = blob.totalGreedyAmount();
 
-        boolean tryAdopt = blob.cellSample == null && !blob.filterMaterials.isEmpty();
-        boolean tryRefill = blob.cellSample != null && blob.cellAmount < cap;
-        if (tryAdopt || tryRefill) {
-            final ItemStack sample = blob.cellSample;
-            Predicate<ItemStack> pred = tryAdopt
-                    ? NetworkManager.filterPredicate(blob)
-                    : item -> StackUtils.itemsMatch(item, sample);
-            int want = (int) Math.min(cap, Integer.MAX_VALUE);
-            if (!tryAdopt) {
-                want = (int) Math.min(cap - blob.cellAmount, Integer.MAX_VALUE);
-            }
-            ItemStack got = net.storage().withdraw(pred, want, pos);
-            if (got != null) {
-                blob = NodeStore.get(block);
-                if (blob == null) {
-                    net.storage().deposit(got);
-                    return;
-                }
-                if (blob.cellSample == null) {
-                    blob.cellSample = StackUtils.getAsQuantity(got, 1);
-                }
-                blob.cellAmount += got.getAmount();
-                NodeStore.put(block, blob);
-                spark(net, pos);
-            }
-        }
-
-        if (blob.cellAmount > 0 && blob.cellSample != null) {
-            int take = (int) Math.min(blob.cellAmount, Settings.itemsPerOp() * 2L);
-            for (BlockFace face : FACES) {
-                Block target = block.getRelative(face);
-                if (!isPotentialContainer(target.getType()) || !(target.getState() instanceof InventoryHolder holder)) {
-                    continue;
-                }
-                ItemStack out = blob.cellSample.clone();
-                out.setAmount(take);
-                int leftover = NetworkManager.insertInto(holder.getInventory(), out);
-                int moved = take - leftover;
-                blob.cellAmount -= moved;
-                take = leftover;
-                if (moved > 0) {
+        // 1. Suction: pull matching items from network into greedy storage up to shared cap
+        if (currentTotal < cap) {
+            boolean hasFilter = (blob.filterMaterials != null && !blob.filterMaterials.isEmpty())
+                    || (blob.filterItems != null && !blob.filterItems.isEmpty());
+            if (hasFilter) {
+                Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
+                long space = cap - currentTotal;
+                int want = (int) Math.min(space, (long) Settings.itemsPerOp() * 4);
+                ItemStack got = net.storage().withdraw(pred, want, pos);
+                if (got != null && got.getAmount() > 0) {
+                    blob.addGreedyItem(got, got.getAmount());
                     spark(net, pos);
                 }
-                if (take <= 0) {
-                    break;
+            }
+        }
+
+        // 2. Distribution: push stored items into adjacent containers
+        if (blob.totalGreedyAmount() > 0 && blob.greedySamples != null && !blob.greedySamples.isEmpty()) {
+            int maxTake = (int) Math.min(blob.totalGreedyAmount(), Settings.itemsPerOp() * 2L);
+            int movedTotal = 0;
+            for (int i = 0; i < blob.greedySamples.size() && movedTotal < maxTake; i++) {
+                ItemStack sample = blob.greedySamples.get(i);
+                long amount = blob.greedyAmounts.get(i);
+                if (sample == null || amount <= 0) {
+                    continue;
+                }
+                int want = (int) Math.min(amount, (long) (maxTake - movedTotal));
+                int roundMoved = 0;
+                for (BlockFace face : facesFor(blob)) {
+                    Block target = block.getRelative(face);
+                    Material targetMat = target.getType();
+                    if (isPotentialContainer(targetMat) && target.getState() instanceof InventoryHolder holder) {
+                        ItemStack out = sample.clone();
+                        out.setAmount(want);
+                        int leftover = NetworkManager.insertInto(holder.getInventory(), out);
+                        int moved = want - leftover;
+                        if (moved > 0) {
+                            roundMoved += moved;
+                            want = leftover;
+                        }
+                    } else if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
+                        ItemStack out = sample.clone();
+                        out.setAmount(want);
+                        int unhoused = SlimefunBridge.insert(target, out);
+                        int moved = want - unhoused;
+                        if (moved > 0) {
+                            roundMoved += moved;
+                            want = unhoused;
+                        }
+                    }
+                    if (want <= 0) {
+                        break;
+                    }
+                }
+                if (roundMoved > 0) {
+                    blob.removeGreedyItem(i, roundMoved);
+                    movedTotal += roundMoved;
+                    spark(net, pos);
+                    if (roundMoved >= amount) {
+                        i--;
+                    }
                 }
             }
         }
 
-        if (blob.cellAmount <= 0) {
-            blob.cellAmount = 0;
-            blob.cellSample = null;
-        }
         NodeStore.put(block, blob);
     }
 

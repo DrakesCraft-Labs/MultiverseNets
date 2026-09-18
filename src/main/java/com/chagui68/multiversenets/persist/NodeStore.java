@@ -130,6 +130,20 @@ public final class NodeStore {
         if (blob.craftingMatrix == null) {
             blob.craftingMatrix = new org.bukkit.inventory.ItemStack[9];
         }
+        if (blob.greedySamples == null) {
+            blob.greedySamples = new ArrayList<>();
+        }
+        if (blob.greedyAmounts == null) {
+            blob.greedyAmounts = new ArrayList<>();
+        }
+        if ("GREEDY_CELL".equals(blob.typeName) && blob.cellSample != null && blob.cellAmount > 0) {
+            if (blob.greedySamples.isEmpty()) {
+                blob.greedySamples.add(blob.cellSample);
+                blob.greedyAmounts.add(blob.cellAmount);
+                blob.cellSample = null;
+                blob.cellAmount = 0;
+            }
+        }
     }
 
     public static NodeBlob get(Block block) {

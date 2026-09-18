@@ -34,7 +34,7 @@ public class TerminalMenu extends MenuHolder {
 
     private static final int PAGE_SIZE = 48;
     private static final int INPUT_SLOT = 8;
-    private static final int BACKGROUND_SLOT = 17;
+    private static final int PURGER_TOGGLE_SLOT = 17;
     private static final int SORT_SLOT = 26;
     private static final int FILTER_SLOT = 35;
     private static final int PREV_SLOT = 44;
@@ -58,6 +58,7 @@ public class TerminalMenu extends MenuHolder {
     private int page = 0;
     private String query = "";
     private SortOrder sortOrder = SortOrder.ALPHABETIC;
+    private boolean showOnlyPurged = false;
     private BukkitTask tickTask;
 
     public TerminalMenu(MultiverseNets plugin, Player player, Network network) {
@@ -80,7 +81,7 @@ public class TerminalMenu extends MenuHolder {
     @Override
     protected void draw() {
         ItemStack background = panel(Material.LIGHT_GRAY_STAINED_GLASS_PANE, " ");
-        inv.setItem(BACKGROUND_SLOT, background);
+        inv.setItem(PURGER_TOGGLE_SLOT, purgerToggleIcon());
         inv.setItem(SORT_SLOT, panel(Material.BLUE_STAINED_GLASS_PANE,
                 sortOrder == SortOrder.ALPHABETIC ? "Change Sort Order: A-Z" : "Change Sort Order: Amount"));
         inv.setItem(FILTER_SLOT, filterIcon());
@@ -108,7 +109,9 @@ public class TerminalMenu extends MenuHolder {
     }
 
     private List<NetworkStorage.View> filteredItems() {
-        List<NetworkStorage.View> all = network.storage().view();
+        List<NetworkStorage.View> all = showOnlyPurged
+                ? network.storage().getPurgedItemsView()
+                : network.storage().view();
         Comparator<NetworkStorage.View> comparator = sortOrder == SortOrder.AMOUNT
                 ? Comparator.comparingLong(NetworkStorage.View::amount).reversed()
                 : Comparator.comparing(v -> readableName(v.sample()));
@@ -174,12 +177,64 @@ public class TerminalMenu extends MenuHolder {
         lore.add(Component.empty());
         lore.add(Component.text(AMOUNT_PREFIX + Items.formatAmount(view.amount()), NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, false));
+
+        if (!showOnlyPurged) {
+            long greedyAmt = network.storage().getGreedyStoredAmount(view.sample());
+            if (greedyAmt > 0) {
+                lore.add(Component.text("⚡ En Greedy Buffer: " + Items.formatAmount(greedyAmt), NamedTextColor.GREEN)
+                        .decoration(TextDecoration.ITALIC, false));
+            }
+        } else {
+            lore.add(Component.text("⚠ Destinado a Purger", NamedTextColor.RED)
+                    .decoration(TextDecoration.ITALIC, false));
+        }
+
         if (meta != null) {
             meta.lore(lore);
             meta.getPersistentDataContainer().set(Keys.TERMINAL_DISPLAY, PersistentDataType.BYTE, (byte) 1);
             icon.setItemMeta(meta);
         }
         return icon;
+    }
+
+    private ItemStack purgerToggleIcon() {
+        if (!showOnlyPurged) {
+            ItemStack item = new ItemStack(Material.MAGMA_BLOCK);
+            var meta = item.getItemMeta();
+            if (meta != null) {
+                meta.displayName(Component.text("Panel de Red: Almacén Normal", NamedTextColor.AQUA)
+                        .decoration(TextDecoration.ITALIC, false));
+                meta.lore(List.of(
+                        Component.text("Purgers activos en red: " + network.storage().countActivePurgers(), NamedTextColor.GRAY)
+                                .decoration(TextDecoration.ITALIC, false),
+                        Component.text("Greedy Cells en red: " + network.storage().countActiveGreedyCells(), NamedTextColor.GRAY)
+                                .decoration(TextDecoration.ITALIC, false),
+                        Component.empty(),
+                        Component.text("▶ Clic: Ver Ítems en Purga", NamedTextColor.GOLD)
+                                .decoration(TextDecoration.ITALIC, false)
+                ));
+                item.setItemMeta(meta);
+            }
+            return item;
+        } else {
+            ItemStack item = new ItemStack(Material.LAVA_BUCKET);
+            var meta = item.getItemMeta();
+            if (meta != null) {
+                meta.displayName(Component.text("Panel de Red: Modo Purga", NamedTextColor.RED)
+                        .decoration(TextDecoration.ITALIC, false));
+                meta.lore(List.of(
+                        Component.text("Viendo ítems configurados para", NamedTextColor.GRAY)
+                                .decoration(TextDecoration.ITALIC, false),
+                        Component.text("eliminación por los Purgers activos.", NamedTextColor.GRAY)
+                                .decoration(TextDecoration.ITALIC, false),
+                        Component.empty(),
+                        Component.text("◀ Clic: Volver a Almacén Normal", NamedTextColor.GREEN)
+                                .decoration(TextDecoration.ITALIC, false)
+                ));
+                item.setItemMeta(meta);
+            }
+            return item;
+        }
     }
 
     private ItemStack panel(Material material, String name) {
@@ -205,6 +260,12 @@ public class TerminalMenu extends MenuHolder {
     protected void click(InventoryClickEvent event) {
         int raw = event.getRawSlot();
         switch (raw) {
+            case PURGER_TOGGLE_SLOT -> {
+                showOnlyPurged = !showOnlyPurged;
+                page = 0;
+                refresh();
+                return;
+            }
             case PREV_SLOT -> {
                 if (page > 0) {
                     page--;
@@ -384,9 +445,14 @@ public class TerminalMenu extends MenuHolder {
         if (meta != null) {
             if (meta.hasLore() && meta.lore() != null) {
                 List<Component> lore = new ArrayList<>(meta.lore());
-                if (lore.size() >= 2) {
-                    lore.remove(lore.size() - 1);
-                    lore.remove(lore.size() - 1);
+                while (!lore.isEmpty()) {
+                    Component last = lore.get(lore.size() - 1);
+                    String str = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(last);
+                    if (str.startsWith(AMOUNT_PREFIX) || str.contains("Greedy Buffer") || str.contains("Purger") || str.isBlank()) {
+                        lore.remove(lore.size() - 1);
+                    } else {
+                        break;
+                    }
                 }
                 meta.lore(lore.isEmpty() ? null : lore);
             }

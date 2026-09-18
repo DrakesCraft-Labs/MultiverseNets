@@ -150,7 +150,7 @@ class SettingsCellCapacityTest {
         field.set(null, null);
 
         assertEquals(20, Settings.scanIntervalTicks());
-        assertEquals(4096, Settings.maxNodes());
+        assertEquals(16384, Settings.maxNodes());
         assertEquals(5, Settings.transferIntervalTicks());
         assertEquals(10, Settings.vacuumIntervalTicks());
         assertEquals(20, Settings.craftIntervalTicks());

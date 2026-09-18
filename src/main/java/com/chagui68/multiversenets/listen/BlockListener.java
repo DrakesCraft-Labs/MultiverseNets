@@ -7,6 +7,7 @@ import com.chagui68.multiversenets.gui.CrafterMenu;
 import com.chagui68.multiversenets.gui.CraftingGridMenu;
 import com.chagui68.multiversenets.gui.EncoderMenu;
 import com.chagui68.multiversenets.gui.FilterMenu;
+import com.chagui68.multiversenets.gui.GreedyMenu;
 import com.chagui68.multiversenets.gui.MonitorMenu;
 import com.chagui68.multiversenets.gui.QuantumWorkbenchMenu;
 import com.chagui68.multiversenets.gui.TerminalMenu;
@@ -143,6 +144,9 @@ public class BlockListener implements Listener {
         if (blob.cellSample != null && blob.cellAmount > 0) {
             lore.add(Component.text("Cargo: " + Items.formatAmount(blob.cellAmount) + " x "
                     + blob.cellSample.getType().name(), NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
+        } else if (blob.totalGreedyAmount() > 0) {
+            lore.add(Component.text("Cargo: " + Items.formatAmount(blob.totalGreedyAmount()) + " items ("
+                    + (blob.greedySamples != null ? blob.greedySamples.size() : 0) + " types)", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
         }
         meta.lore(lore);
         item.setItemMeta(meta);
@@ -158,6 +162,7 @@ public class BlockListener implements Listener {
             }
         }
         return blob.cellAmount <= 0
+                && blob.totalGreedyAmount() <= 0
                 && blob.filterMaterials.isEmpty()
                 && blob.recipes.isEmpty()
                 && blob.blueprintData.isEmpty()
@@ -189,6 +194,8 @@ public class BlockListener implements Listener {
         }
         actual.cellSample = loaded.cellSample;
         actual.cellAmount = loaded.cellAmount;
+        actual.greedySamples = loaded.greedySamples;
+        actual.greedyAmounts = loaded.greedyAmounts;
         actual.filterMaterials = loaded.filterMaterials;
         actual.filterBlacklist = loaded.filterBlacklist;
         actual.recipes = loaded.recipes;
@@ -315,6 +322,10 @@ public class BlockListener implements Listener {
                 event.setCancelled(true);
                 new CellMenu(plugin, player, block, type).openMenu();
             }
+            case GREEDY_CELL -> {
+                event.setCancelled(true);
+                new GreedyMenu(plugin, player, block).openMenu();
+            }
             case INFINITY_BARREL -> {
                 event.setCancelled(true);
                 new BarrelMenu(plugin, player, block).openMenu();
@@ -370,7 +381,8 @@ public class BlockListener implements Listener {
             player.sendMessage(Text.msg("The rake cannot remove a controller.", NamedTextColor.RED));
             return;
         }
-        if ((type.isCell() || type == DeviceType.GREEDY_CELL || type == DeviceType.INFINITY_BARREL) && blob.cellAmount > 0) {
+        if ((type.isCell() || type == DeviceType.GREEDY_CELL || type == DeviceType.INFINITY_BARREL)
+                && (blob.cellAmount > 0 || blob.totalGreedyAmount() > 0)) {
             player.sendMessage(Text.msg("The storage has cargo; empty it before raking.", NamedTextColor.RED));
             return;
         }

@@ -52,10 +52,93 @@ public class NodeBlob implements Serializable {
     public int txZ;
     /** EN: Selected target face direction / ES: Dirección seleccionada (NORTH, SOUTH, etc. o ALL). */
     public String targetFace;
+    /** EN: Multi-item storage templates for Greedy Cell / ES: Plantillas de almacenamiento multi-ítem para Greedy Cell. */
+    public List<ItemStack> greedySamples = new ArrayList<>();
+    /** EN: Multi-item storage quantities for Greedy Cell / ES: Cantidades de almacenamiento multi-ítem para Greedy Cell. */
+    public List<Long> greedyAmounts = new ArrayList<>();
+
+    /**
+     * EN: Returns the combined sum of all items stored in the Greedy Cell.
+     *
+     * ES: Devuelve la suma combinada de todos los ítems almacenados en la Greedy Cell.
+     */
+    public long totalGreedyAmount() {
+        long total = 0;
+        if (greedyAmounts != null) {
+            for (Long amt : greedyAmounts) {
+                if (amt != null) {
+                    total += amt;
+                }
+            }
+        }
+        return total;
+    }
+
+    /**
+     * EN: Finds the index of a matching item sample in greedy storage.
+     *
+     * ES: Encuentra el índice de una muestra coincidente en el almacenamiento greedy.
+     */
+    public int indexOfGreedySample(ItemStack item) {
+        if (item == null || greedySamples == null) {
+            return -1;
+        }
+        for (int i = 0; i < greedySamples.size(); i++) {
+            if (com.chagui68.multiversenets.util.StackUtils.itemsMatch(greedySamples.get(i), item)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * EN: Adds an item amount to the multi-item greedy storage.
+     *
+     * ES: Añade una cantidad de ítem al almacenamiento greedy multi-ítem.
+     */
+    public void addGreedyItem(ItemStack item, long amount) {
+        if (item == null || amount <= 0) {
+            return;
+        }
+        if (greedySamples == null) {
+            greedySamples = new ArrayList<>();
+        }
+        if (greedyAmounts == null) {
+            greedyAmounts = new ArrayList<>();
+        }
+        int idx = indexOfGreedySample(item);
+        if (idx >= 0) {
+            greedyAmounts.set(idx, greedyAmounts.get(idx) + amount);
+        } else {
+            greedySamples.add(com.chagui68.multiversenets.util.StackUtils.getAsQuantity(item, 1));
+            greedyAmounts.add(amount);
+        }
+    }
+
+    /**
+     * EN: Removes up to {@code amount} of an item at the given index.
+     *
+     * ES: Retira hasta {@code amount} del ítem en el índice especificado.
+     */
+    public long removeGreedyItem(int index, long amount) {
+        if (greedyAmounts == null || index < 0 || index >= greedyAmounts.size() || amount <= 0) {
+            return 0;
+        }
+        long current = greedyAmounts.get(index);
+        long take = Math.min(current, amount);
+        long remaining = current - take;
+        if (remaining <= 0) {
+            greedySamples.remove(index);
+            greedyAmounts.remove(index);
+        } else {
+            greedyAmounts.set(index, remaining);
+        }
+        return take;
+    }
 
     /**
      * EN: Factory method to create a new NodeBlob for a given device type.
- *
+     *
      * ES: Método factoría para crear un nuevo NodeBlob con el tipo especificado.
      */
     public static NodeBlob create(String typeName) {

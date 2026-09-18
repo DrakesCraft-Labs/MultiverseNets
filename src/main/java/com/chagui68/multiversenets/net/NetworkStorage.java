@@ -165,15 +165,27 @@ public class NetworkStorage {
         List<CellState> states = load();
         long remaining = item.getAmount();
 
-        // 1) greedy cells que ya guarden este tipo: son el sumidero preferido de la red.
+        // 1) Greedy cells: sumidero preferido de la red si ya guardan este ítem o si su filtro lo acepta.
+        // Capacidad compartida (Option B): blob.totalGreedyAmount() <= state.capacity.
         for (CellState state : states) {
-            if (!state.greedy || state.blob.cellSample == null
-                    || !StackUtils.itemsMatch(state.blob.cellSample, item)) {
+            if (!state.greedy) {
                 continue;
             }
-            remaining = pour(state, item, remaining);
-            if (remaining <= 0) {
-                break;
+            long space = state.capacity - state.blob.totalGreedyAmount();
+            if (space <= 0) {
+                continue;
+            }
+            boolean matchesExisting = state.blob.indexOfGreedySample(item) >= 0;
+            boolean matchesFilter = (state.blob.filterMaterials != null && !state.blob.filterMaterials.isEmpty())
+                    || (state.blob.filterItems != null && !state.blob.filterItems.isEmpty());
+            if (matchesExisting || (matchesFilter && NetworkManager.filterPredicate(state.blob).test(item))) {
+                long take = Math.min(space, remaining);
+                state.blob.addGreedyItem(item, take);
+                state.dirty = true;
+                remaining -= take;
+                if (remaining <= 0) {
+                    break;
+                }
             }
         }
         // 2) celdas normales con el mismo tipo.
@@ -253,20 +265,50 @@ public class NetworkStorage {
                 if (state.greedy != greedyPass || state.pos == excludePos) {
                     continue;
                 }
-                if (blobEmpty(state.blob) || !matcher.test(state.blob.cellSample)) {
-                    continue;
+                if (state.greedy) {
+                    if (state.blob.greedySamples == null || state.blob.greedyAmounts == null) {
+                        continue;
+                    }
+                    for (int i = 0; i < state.blob.greedySamples.size(); i++) {
+                        ItemStack sample = state.blob.greedySamples.get(i);
+                        Long amount = state.blob.greedyAmounts.get(i);
+                        if (sample == null || amount == null || amount <= 0 || !matcher.test(sample)) {
+                            continue;
+                        }
+                        if (result == null) {
+                            result = StackUtils.getAsQuantity(sample, 0);
+                        } else if (!StackUtils.itemsMatch(result, sample)) {
+                            continue;
+                        }
+                        long take = Math.min(want - got, amount);
+                        long removed = state.blob.removeGreedyItem(i, take);
+                        got += removed;
+                        state.dirty = true;
+                        if (removed >= amount) {
+                            i--;
+                        }
+                        if (got >= want) {
+                            break;
+                        }
+                    }
+                } else {
+                    if (blobEmpty(state.blob) || !matcher.test(state.blob.cellSample)) {
+                        continue;
+                    }
+                    if (result == null) {
+                        result = StackUtils.getAsQuantity(state.blob.cellSample, 0);
+                    } else if (!StackUtils.itemsMatch(result, state.blob.cellSample)) {
+                        continue;
+                    }
+                    long take = Math.min(want - got, state.blob.cellAmount);
+                    state.blob.cellAmount -= take;
+                    got += take;
+                    if (state.blob.cellAmount <= 0) {
+                        state.blob.cellAmount = 0;
+                        state.blob.cellSample = null;
+                    }
+                    state.dirty = true;
                 }
-                if (result == null) {
-                    result = StackUtils.getAsQuantity(state.blob.cellSample, 0);
-                }
-                long take = Math.min(want - got, state.blob.cellAmount);
-                state.blob.cellAmount -= take;
-                got += take;
-                if (state.blob.cellAmount <= 0) {
-                    state.blob.cellAmount = 0;
-                    state.blob.cellSample = null;
-                }
-                state.dirty = true;
                 if (got >= want) {
                     break;
                 }
@@ -287,8 +329,20 @@ public class NetworkStorage {
     public long count(Predicate<ItemStack> matcher) {
         long total = 0;
         for (CellState state : load()) {
-            if (!blobEmpty(state.blob) && matcher.test(state.blob.cellSample)) {
-                total += state.blob.cellAmount;
+            if (state.greedy) {
+                if (state.blob.greedySamples != null && state.blob.greedyAmounts != null) {
+                    for (int i = 0; i < state.blob.greedySamples.size(); i++) {
+                        ItemStack sample = state.blob.greedySamples.get(i);
+                        Long amount = state.blob.greedyAmounts.get(i);
+                        if (sample != null && amount != null && amount > 0 && matcher.test(sample)) {
+                            total += amount;
+                        }
+                    }
+                }
+            } else {
+                if (!blobEmpty(state.blob) && matcher.test(state.blob.cellSample)) {
+                    total += state.blob.cellAmount;
+                }
             }
         }
         return total;
@@ -305,27 +359,22 @@ public class NetworkStorage {
         }
         Map<Material, List<View>> buckets = new EnumMap<>(Material.class);
         for (CellState state : load()) {
-            if (blobEmpty(state.blob)) {
-                continue;
-            }
-            ItemStack sample = state.blob.cellSample;
-            Material mat = sample.getType();
-            List<View> bucket = buckets.computeIfAbsent(mat, k -> new ArrayList<>());
-            boolean found = false;
-            for (int i = 0; i < bucket.size(); i++) {
-                View v = bucket.get(i);
-                if (StackUtils.itemsMatch(v.sample(), sample)) {
-                    long sum = v.amount() + state.blob.cellAmount;
-                    if (sum < 0) {
-                        sum = Long.MAX_VALUE;
+            if (state.greedy) {
+                if (state.blob.greedySamples != null && state.blob.greedyAmounts != null) {
+                    for (int i = 0; i < state.blob.greedySamples.size(); i++) {
+                        ItemStack sample = state.blob.greedySamples.get(i);
+                        Long amount = state.blob.greedyAmounts.get(i);
+                        if (sample == null || amount == null || amount <= 0) {
+                            continue;
+                        }
+                        addToBuckets(buckets, sample, amount);
                     }
-                    bucket.set(i, new View(v.sample(), sum));
-                    found = true;
-                    break;
                 }
-            }
-            if (!found) {
-                bucket.add(new View(StackUtils.getAsQuantity(sample, 1), state.blob.cellAmount));
+            } else {
+                if (blobEmpty(state.blob)) {
+                    continue;
+                }
+                addToBuckets(buckets, state.blob.cellSample, state.blob.cellAmount);
             }
         }
         List<View> merged = new ArrayList<>();
@@ -335,6 +384,165 @@ public class NetworkStorage {
         viewCache = new ArrayList<>(merged);
         viewCacheAt = now;
         return merged;
+    }
+
+    private static void addToBuckets(Map<Material, List<View>> buckets, ItemStack sample, long amount) {
+        Material mat = sample.getType();
+        List<View> bucket = buckets.computeIfAbsent(mat, k -> new ArrayList<>());
+        boolean found = false;
+        for (int i = 0; i < bucket.size(); i++) {
+            View v = bucket.get(i);
+            if (StackUtils.itemsMatch(v.sample(), sample)) {
+                long sum = v.amount() + amount;
+                if (sum < 0) {
+                    sum = Long.MAX_VALUE;
+                }
+                bucket.set(i, new View(v.sample(), sum));
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            bucket.add(new View(StackUtils.getAsQuantity(sample, 1), amount));
+        }
+    }
+
+    /**
+     * Devuelve la cantidad total de este ítem almacenada en celdas Greedy de la red.
+     */
+    public long getGreedyStoredAmount(ItemStack item) {
+        if (item == null) {
+            return 0;
+        }
+        long total = 0;
+        for (CellState state : load()) {
+            if (state.greedy && state.blob.greedySamples != null && state.blob.greedyAmounts != null) {
+                for (int i = 0; i < state.blob.greedySamples.size(); i++) {
+                    ItemStack sample = state.blob.greedySamples.get(i);
+                    Long amt = state.blob.greedyAmounts.get(i);
+                    if (sample != null && amt != null && amt > 0 && StackUtils.itemsMatch(sample, item)) {
+                        total += amt;
+                    }
+                }
+            }
+        }
+        return total;
+    }
+
+    /**
+     * Comprueba si un ítem cumple los filtros de algún Purger activo en la red.
+     */
+    public boolean isItemPurged(ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return false;
+        }
+        synchronized (network.nodes()) {
+            for (var entry : network.nodes().entrySet()) {
+                if (entry.getValue() == DeviceType.PURGER) {
+                    long pos = entry.getKey();
+                    int cx = com.chagui68.multiversenets.util.PosUtil.unpackX(pos) >> 4;
+                    int cz = com.chagui68.multiversenets.util.PosUtil.unpackZ(pos) >> 4;
+                    if (!network.world().isChunkLoaded(cx, cz)) {
+                        continue;
+                    }
+                    Block block = network.block(pos);
+                    NodeBlob blob = NodeStore.get(block);
+                    if (blob == null) {
+                        continue;
+                    }
+                    boolean hasItems = blob.filterItems != null && !blob.filterItems.isEmpty();
+                    boolean hasMats = blob.filterMaterials != null && !blob.filterMaterials.isEmpty();
+                    if (!hasItems && !hasMats) {
+                        continue;
+                    }
+                    Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
+                    if (pred.test(item)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Devuelve la lista de ítems que están siendo dirigidos a purga.
+     * Incluye tanto ítems actualmente en almacén que coinciden con algún purger,
+     * como ítems configurados en los filtros de los purgers activos (incluso si tienen 0 en stock).
+     */
+    public List<View> getPurgedItemsView() {
+        Map<Material, List<View>> buckets = new EnumMap<>(Material.class);
+        List<View> allStored = view();
+
+        for (View v : allStored) {
+            if (isItemPurged(v.sample())) {
+                addToBuckets(buckets, v.sample(), v.amount());
+            }
+        }
+
+        synchronized (network.nodes()) {
+            for (var entry : network.nodes().entrySet()) {
+                if (entry.getValue() == DeviceType.PURGER) {
+                    long pos = entry.getKey();
+                    int cx = com.chagui68.multiversenets.util.PosUtil.unpackX(pos) >> 4;
+                    int cz = com.chagui68.multiversenets.util.PosUtil.unpackZ(pos) >> 4;
+                    if (!network.world().isChunkLoaded(cx, cz)) {
+                        continue;
+                    }
+                    Block b = network.block(pos);
+                    NodeBlob blob = NodeStore.get(b);
+                    if (blob == null) {
+                        continue;
+                    }
+                    if (!blob.filterBlacklist) {
+                        if (blob.filterItems != null) {
+                            for (ItemStack sample : blob.filterItems) {
+                                if (sample != null && !sample.getType().isAir()) {
+                                    addToBuckets(buckets, sample, 0);
+                                }
+                            }
+                        }
+                        if (blob.filterMaterials != null) {
+                            for (String matName : blob.filterMaterials) {
+                                Material mat = Material.matchMaterial(matName);
+                                if (mat != null && !mat.isAir() && mat.isItem()) {
+                                    addToBuckets(buckets, new ItemStack(mat), 0);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        List<View> merged = new ArrayList<>();
+        for (List<View> bucket : buckets.values()) {
+            merged.addAll(bucket);
+        }
+        return merged;
+    }
+
+    public int countActivePurgers() {
+        int count = 0;
+        synchronized (network.nodes()) {
+            for (var entry : network.nodes().entrySet()) {
+                if (entry.getValue() == DeviceType.PURGER) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    public int countActiveGreedyCells() {
+        int count = 0;
+        synchronized (network.nodes()) {
+            for (var entry : network.nodes().entrySet()) {
+                if (entry.getValue() == DeviceType.GREEDY_CELL) {
+                    count++;
+                }
+            }
+        }
+        return count;
     }
 
     public boolean isEmpty() {
