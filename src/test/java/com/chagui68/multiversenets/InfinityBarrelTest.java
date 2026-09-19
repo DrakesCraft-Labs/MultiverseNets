@@ -61,7 +61,7 @@ class InfinityBarrelTest {
      */
     @Test
     void barrelHasTwoBillionCapacity() {
-        assertEquals(2_000_000_000L, Items.capacityOf(DeviceType.INFINITY_BARREL),
+        assertEquals(2_000_000_000L, Items.capacityOf(DeviceType.MVN_INFINITY_BARREL),
                 "infinity barrel must have capacity of 2 billion");
     }
 
@@ -73,7 +73,7 @@ class InfinityBarrelTest {
     void openBarrelAndDepositItems() {
         Block barrelBlock = world.getBlockAt(0, 64, 0);
         barrelBlock.setType(Material.BARREL);
-        NodeStore.put(barrelBlock, NodeBlob.create(DeviceType.INFINITY_BARREL.name()));
+        NodeStore.put(barrelBlock, NodeBlob.create(DeviceType.MVN_INFINITY_BARREL.name()));
 
         BarrelMenu menu = new BarrelMenu(plugin, player, barrelBlock);
         menu.openMenu();
@@ -107,16 +107,16 @@ class InfinityBarrelTest {
     void barrelIntegratesIntoNetworkStorage() {
         Block ctrl = world.getBlockAt(0, 64, 0);
         ctrl.setType(Material.LODESTONE);
-        NodeStore.put(ctrl, NodeBlob.create(DeviceType.CONTROLLER.name()));
+        NodeStore.put(ctrl, NodeBlob.create(DeviceType.MVN_CONTROLLER.name()));
         plugin.networks().registerController(ctrl);
 
         Block cable = world.getBlockAt(1, 64, 0);
         cable.setType(Material.GLASS);
-        NodeStore.put(cable, NodeBlob.create(DeviceType.CABLE.name()));
+        NodeStore.put(cable, NodeBlob.create(DeviceType.MVN_CABLE.name()));
 
         Block barrel = world.getBlockAt(2, 64, 0);
         barrel.setType(Material.BARREL);
-        NodeStore.put(barrel, NodeBlob.create(DeviceType.INFINITY_BARREL.name()));
+        NodeStore.put(barrel, NodeBlob.create(DeviceType.MVN_INFINITY_BARREL.name()));
 
         Network net = plugin.networks().networkAt(ctrl);
         assertNotNull(net);
@@ -147,7 +147,7 @@ class InfinityBarrelTest {
     void breakAndPlaceBarrelPreservesStoredItems() {
         Block barrelBlock = world.getBlockAt(0, 64, 0);
         barrelBlock.setType(Material.BARREL);
-        NodeBlob blob = NodeBlob.create(DeviceType.INFINITY_BARREL.name());
+        NodeBlob blob = NodeBlob.create(DeviceType.MVN_INFINITY_BARREL.name());
         blob.cellSample = new ItemStack(Material.NETHERITE_INGOT);
         blob.cellAmount = 15000;
         NodeStore.put(barrelBlock, blob);
@@ -157,7 +157,7 @@ class InfinityBarrelTest {
         server.getPluginManager().callEvent(breakEvent);
 
         // Simulate placing item with embedded cargo
-        ItemStack itemDropped = Items.create(DeviceType.INFINITY_BARREL);
+        ItemStack itemDropped = Items.create(DeviceType.MVN_INFINITY_BARREL);
         var meta = itemDropped.getItemMeta();
         meta.getPersistentDataContainer().set(Keys.CELL_CARGO, PersistentDataType.STRING, NodeStore.encode(blob));
         itemDropped.setItemMeta(meta);

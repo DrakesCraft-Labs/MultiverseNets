@@ -56,8 +56,8 @@ class CrafterGuiTest {
 
     private Block placeCrafter() {
         Block block = world.getBlockAt(0, 64, 0);
-        block.setType(DeviceType.CRAFTER.material());
-        NodeStore.put(block, NodeBlob.create(DeviceType.CRAFTER.name()));
+        block.setType(DeviceType.MVN_CRAFTER.material());
+        NodeStore.put(block, NodeBlob.create(DeviceType.MVN_CRAFTER.name()));
         return block;
     }
 

@@ -106,13 +106,13 @@ public class NetworkTicker {
     private void doTransfers(Network net) {
         int base = Settings.itemsPerOp();
         int ht = base * Settings.htMultiplier();
-        net.forEach(DeviceType.GRABBER, (pos, type) -> grabOnce(net, pos, base));
-        net.forEach(DeviceType.GRABBER_HT, (pos, type) -> grabOnce(net, pos, ht));
-        net.forEach(DeviceType.PUSHER, (pos, type) -> pushOnce(net, pos, base));
-        net.forEach(DeviceType.PUSHER_HT, (pos, type) -> pushOnce(net, pos, ht));
-        net.forEach(DeviceType.GREEDY_CELL, (pos, type) -> greedyTick(net, pos));
-        net.forEach(DeviceType.PURGER, (pos, type) -> purgeOnce(net, pos, base));
-        net.forEach(DeviceType.RECEIVER, (pos, type) -> bridgeOnce(net, pos, base));
+        net.forEach(DeviceType.MVN_GRABBER, (pos, type) -> grabOnce(net, pos, base));
+        net.forEach(DeviceType.MVN_GRABBER_HT, (pos, type) -> grabOnce(net, pos, ht));
+        net.forEach(DeviceType.MVN_PUSHER, (pos, type) -> pushOnce(net, pos, base));
+        net.forEach(DeviceType.MVN_PUSHER_HT, (pos, type) -> pushOnce(net, pos, ht));
+        net.forEach(DeviceType.MVN_GREEDY_CELL, (pos, type) -> greedyTick(net, pos));
+        net.forEach(DeviceType.MVN_PURGER, (pos, type) -> purgeOnce(net, pos, base));
+        net.forEach(DeviceType.MVN_RECEIVER, (pos, type) -> bridgeOnce(net, pos, base));
     }
 
     private NodeBlob blobOf(Network net, long pos) {
@@ -402,7 +402,7 @@ public class NetworkTicker {
         }
         Block txBlock = world.getBlockAt(blob.txX, blob.txY, blob.txZ);
         NodeBlob txBlob = NodeStore.get(txBlock);
-        if (txBlob == null || DeviceType.parse(txBlob.typeName) != DeviceType.TRANSMITTER) {
+        if (txBlob == null || DeviceType.parse(txBlob.typeName) != DeviceType.MVN_TRANSMITTER) {
             return;
         }
         Network remote = manager.networkAt(txBlock);
@@ -430,7 +430,7 @@ public class NetworkTicker {
      */
     private void doVacuum(Network net) {
         double radius = Settings.vacuumRadius();
-        net.forEach(DeviceType.VACUUM, (pos, type) -> {
+        net.forEach(DeviceType.MVN_VACUUM, (pos, type) -> {
             NodeBlob blob = blobOf(net, pos);
             if (blob == null) {
                 return;
@@ -468,7 +468,7 @@ public class NetworkTicker {
      * ES: Ejecuta intentos de autocrafteo para los blueprints y recetas instaladas.
      */
     private void doCrafting(Network net) {
-        net.forEach(DeviceType.CRAFTER, (pos, type) -> {
+        net.forEach(DeviceType.MVN_CRAFTER, (pos, type) -> {
             NodeBlob blob = blobOf(net, pos);
             if (blob == null) {
                 return;

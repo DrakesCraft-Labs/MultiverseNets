@@ -89,9 +89,9 @@ public class NetworkStorage {
                 DeviceType type = entry.getValue();
                 if (type.isCell()) {
                     cells.add(new CellRef(entry.getKey(), type.cellTier(), false, false));
-                } else if (type == DeviceType.GREEDY_CELL) {
+                } else if (type == DeviceType.MVN_GREEDY_CELL) {
                     cells.add(new CellRef(entry.getKey(), 0, true, false));
-                } else if (type == DeviceType.INFINITY_BARREL) {
+                } else if (type == DeviceType.MVN_INFINITY_BARREL) {
                     cells.add(new CellRef(entry.getKey(), 0, false, true));
                 }
             }
@@ -122,10 +122,10 @@ public class NetworkStorage {
             boolean stillValid;
             long cap;
             if (ref.greedy()) {
-                stillValid = real == DeviceType.GREEDY_CELL;
+                stillValid = real == DeviceType.MVN_GREEDY_CELL;
                 cap = Settings.greedyCapacity();
             } else if (ref.barrel()) {
-                stillValid = real == DeviceType.INFINITY_BARREL;
+                stillValid = real == DeviceType.MVN_INFINITY_BARREL;
                 cap = Settings.barrelCapacity();
             } else {
                 stillValid = real != null && real.isCell();
@@ -442,7 +442,7 @@ public class NetworkStorage {
         }
         synchronized (network.nodes()) {
             for (var entry : network.nodes().entrySet()) {
-                if (entry.getValue() == DeviceType.PURGER) {
+                if (entry.getValue() == DeviceType.MVN_PURGER) {
                     long pos = entry.getKey();
                     int cx = com.chagui68.multiversenets.util.PosUtil.unpackX(pos) >> 4;
                     int cz = com.chagui68.multiversenets.util.PosUtil.unpackZ(pos) >> 4;
@@ -487,7 +487,7 @@ public class NetworkStorage {
 
         synchronized (network.nodes()) {
             for (var entry : network.nodes().entrySet()) {
-                if (entry.getValue() == DeviceType.PURGER) {
+                if (entry.getValue() == DeviceType.MVN_PURGER) {
                     long pos = entry.getKey();
                     int cx = com.chagui68.multiversenets.util.PosUtil.unpackX(pos) >> 4;
                     int cz = com.chagui68.multiversenets.util.PosUtil.unpackZ(pos) >> 4;
@@ -530,7 +530,7 @@ public class NetworkStorage {
         int count = 0;
         synchronized (network.nodes()) {
             for (var entry : network.nodes().entrySet()) {
-                if (entry.getValue() == DeviceType.PURGER) {
+                if (entry.getValue() == DeviceType.MVN_PURGER) {
                     count++;
                 }
             }
@@ -542,7 +542,7 @@ public class NetworkStorage {
         int count = 0;
         synchronized (network.nodes()) {
             for (var entry : network.nodes().entrySet()) {
-                if (entry.getValue() == DeviceType.GREEDY_CELL) {
+                if (entry.getValue() == DeviceType.MVN_GREEDY_CELL) {
                     count++;
                 }
             }

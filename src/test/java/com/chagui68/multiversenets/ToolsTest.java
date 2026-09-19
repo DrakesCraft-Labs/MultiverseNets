@@ -18,7 +18,7 @@ class ToolsTest {
      */
     @Test
     void toolsAreHandHeldAndNotPlaceable() {
-        for (DeviceType tool : new DeviceType[]{DeviceType.CONFIGURATOR, DeviceType.RAKE, DeviceType.CRAYON}) {
+        for (DeviceType tool : new DeviceType[]{DeviceType.MVN_CONFIGURATOR, DeviceType.MVN_RAKE, DeviceType.MVN_CRAYON}) {
             assertFalse(tool.placeable(), tool + " is a hand tool, not a block");
             assertFalse(tool.isCell(), tool + " does not store");
             assertFalse(tool.filterable(), tool + " does not filter");
@@ -31,7 +31,7 @@ class ToolsTest {
      */
     @Test
     void receiverIsFilterableForWirelessBridge() {
-        assertTrue(DeviceType.RECEIVER.filterable());
+        assertTrue(DeviceType.MVN_RECEIVER.filterable());
     }
 
     /**

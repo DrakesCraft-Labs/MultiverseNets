@@ -72,7 +72,7 @@ class FilterGuiTest {
      */
     @Test
     void pusherOpensFilterMenu() {
-        Block pusher = place(DeviceType.PUSHER);
+        Block pusher = place(DeviceType.MVN_PUSHER);
         PlayerInteractEvent interact = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK,
                 null, pusher, BlockFace.NORTH, EquipmentSlot.HAND, null);
         server.getPluginManager().callEvent(interact);
@@ -87,8 +87,8 @@ class FilterGuiTest {
      */
     @Test
     void clickWithItemAddsMaterialToFilter() {
-        Block pusher = place(DeviceType.PUSHER);
-        new FilterMenu(plugin, player, pusher, DeviceType.PUSHER).openMenu();
+        Block pusher = place(DeviceType.MVN_PUSHER);
+        new FilterMenu(plugin, player, pusher, DeviceType.MVN_PUSHER).openMenu();
         player.getOpenInventory().setCursor(new ItemStack(Material.DIAMOND, 7));
 
         clickTop(0, ClickType.LEFT, InventoryAction.PICKUP_ALL);
@@ -105,12 +105,12 @@ class FilterGuiTest {
      */
     @Test
     void clickWithEmptyCursorRemovesMaterial() {
-        Block pusher = place(DeviceType.PUSHER);
+        Block pusher = place(DeviceType.MVN_PUSHER);
         NodeBlob blob = NodeStore.get(pusher);
         blob.filterMaterials.add("DIAMOND");
         NodeStore.put(pusher, blob);
 
-        new FilterMenu(plugin, player, pusher, DeviceType.PUSHER).openMenu();
+        new FilterMenu(plugin, player, pusher, DeviceType.MVN_PUSHER).openMenu();
         player.getOpenInventory().setCursor(null);
         clickTop(0, ClickType.LEFT, InventoryAction.PICKUP_ALL);
 
@@ -124,8 +124,8 @@ class FilterGuiTest {
      */
     @Test
     void modeButtonTogglesBlacklist() {
-        Block pusher = place(DeviceType.PUSHER);
-        new FilterMenu(plugin, player, pusher, DeviceType.PUSHER).openMenu();
+        Block pusher = place(DeviceType.MVN_PUSHER);
+        new FilterMenu(plugin, player, pusher, DeviceType.MVN_PUSHER).openMenu();
         clickTop(17, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         assertTrue(NodeStore.get(pusher).filterBlacklist, "first click activates blacklist mode");
         clickTop(17, ClickType.LEFT, InventoryAction.PICKUP_ALL);
@@ -138,9 +138,9 @@ class FilterGuiTest {
      */
     @Test
     void shiftClickOnOwnStackAddsToFilterWithoutMoving() {
-        Block pusher = place(DeviceType.PUSHER);
+        Block pusher = place(DeviceType.MVN_PUSHER);
         player.getInventory().setItem(0, new ItemStack(Material.REDSTONE, 16));
-        new FilterMenu(plugin, player, pusher, DeviceType.PUSHER).openMenu();
+        new FilterMenu(plugin, player, pusher, DeviceType.MVN_PUSHER).openMenu();
 
         InventoryClickEvent shift = new InventoryClickEvent(player.getOpenInventory(),
                 InventoryType.SlotType.CONTAINER, 27, ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
@@ -159,9 +159,9 @@ class FilterGuiTest {
      */
     @Test
     void playerInventoryRemainsInteractiveWithMenuOpen() {
-        Block pusher = place(DeviceType.PUSHER);
+        Block pusher = place(DeviceType.MVN_PUSHER);
         player.getInventory().setItem(0, new ItemStack(Material.STONE, 3));
-        new FilterMenu(plugin, player, pusher, DeviceType.PUSHER).openMenu();
+        new FilterMenu(plugin, player, pusher, DeviceType.MVN_PUSHER).openMenu();
         InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
                 InventoryType.SlotType.CONTAINER, 27, ClickType.LEFT, InventoryAction.PICKUP_ALL);
         server.getPluginManager().callEvent(click);
@@ -175,7 +175,7 @@ class FilterGuiTest {
      */
     @Test
     void filterDistinguishesQuantumCellFromVanillaTerracotta() {
-        ItemStack cellT1 = com.chagui68.multiversenets.item.Items.create(DeviceType.CELL_T1);
+        ItemStack cellT1 = com.chagui68.multiversenets.item.Items.create(DeviceType.MVN_CELL_T1);
         ItemStack vanillaTerracotta = new ItemStack(Material.CYAN_TERRACOTTA);
 
         assertTrue(com.chagui68.multiversenets.net.NetworkManager.matchesFilter(cellT1, cellT1.clone()),
@@ -195,11 +195,11 @@ class FilterGuiTest {
      */
     @Test
     void filterRegistersCustomItemsWithShiftClick() {
-        Block grabber = place(DeviceType.GRABBER);
-        ItemStack cellT1 = com.chagui68.multiversenets.item.Items.create(DeviceType.CELL_T1);
+        Block grabber = place(DeviceType.MVN_GRABBER);
+        ItemStack cellT1 = com.chagui68.multiversenets.item.Items.create(DeviceType.MVN_CELL_T1);
         player.getInventory().setItem(0, cellT1);
 
-        new FilterMenu(plugin, player, grabber, DeviceType.GRABBER).openMenu();
+        new FilterMenu(plugin, player, grabber, DeviceType.MVN_GRABBER).openMenu();
 
         InventoryClickEvent shift = new InventoryClickEvent(player.getOpenInventory(),
                 InventoryType.SlotType.CONTAINER, 27, ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
@@ -207,7 +207,7 @@ class FilterGuiTest {
 
         NodeBlob blob = NodeStore.get(grabber);
         assertFalse(blob.filterItems.isEmpty(), "filterItems must register custom item");
-        assertEquals(DeviceType.CELL_T1, com.chagui68.multiversenets.item.Items.typeOf(blob.filterItems.get(0)),
+        assertEquals(DeviceType.MVN_CELL_T1, com.chagui68.multiversenets.item.Items.typeOf(blob.filterItems.get(0)),
                 "registered item in filterItems must match CELL_T1");
     }
 
@@ -217,13 +217,13 @@ class FilterGuiTest {
      */
     @Test
     void clearButtonClearsAllFilters() {
-        Block pusher = place(DeviceType.PUSHER);
+        Block pusher = place(DeviceType.MVN_PUSHER);
         NodeBlob blob = NodeStore.get(pusher);
         blob.filterItems.add(new ItemStack(Material.IRON_INGOT));
         blob.filterMaterials.add("IRON_INGOT");
         NodeStore.put(pusher, blob);
 
-        new FilterMenu(plugin, player, pusher, DeviceType.PUSHER).openMenu();
+        new FilterMenu(plugin, player, pusher, DeviceType.MVN_PUSHER).openMenu();
         clickTop(FilterMenu.CLEAR_SLOT, ClickType.LEFT, InventoryAction.PICKUP_ALL);
 
         NodeBlob after = NodeStore.get(pusher);
@@ -237,11 +237,11 @@ class FilterGuiTest {
      */
     @Test
     void directionalSelectionSetsTargetFace() {
-        Block grabber = place(DeviceType.GRABBER_HT);
+        Block grabber = place(DeviceType.MVN_GRABBER_HT);
         Block northBlock = world.getBlockAt(0, 64, -1);
         northBlock.setType(Material.CHEST);
 
-        new FilterMenu(plugin, player, grabber, DeviceType.GRABBER_HT).openMenu();
+        new FilterMenu(plugin, player, grabber, DeviceType.MVN_GRABBER_HT).openMenu();
 
         clickTop(20, ClickType.LEFT, InventoryAction.PICKUP_ALL);
 
@@ -259,8 +259,8 @@ class FilterGuiTest {
      */
     @Test
     void simpleGrabberDoesNotShowDirectionalButtons() {
-        Block grabber = place(DeviceType.GRABBER);
-        new FilterMenu(plugin, player, grabber, DeviceType.GRABBER).openMenu();
+        Block grabber = place(DeviceType.MVN_GRABBER);
+        new FilterMenu(plugin, player, grabber, DeviceType.MVN_GRABBER).openMenu();
 
         ItemStack slot20 = player.getOpenInventory().getTopInventory().getItem(20);
         assertNotNull(slot20);

@@ -77,7 +77,7 @@ public class BlockListener implements Listener {
 
         restoreCargo(event);
 
-        if (type == DeviceType.RECEIVER) {
+        if (type == DeviceType.MVN_RECEIVER) {
             NodeBlob blob = NodeStore.get(event.getBlockPlaced());
             Location bind = Items.readReceiverBind(event.getItemInHand());
             if (bind != null) {
@@ -89,7 +89,7 @@ public class BlockListener implements Listener {
             }
         }
 
-        if (type == DeviceType.CONTROLLER) {
+        if (type == DeviceType.MVN_CONTROLLER) {
             manager.registerController(event.getBlockPlaced());
             event.getPlayer().sendMessage(Text.msg("Controller registered. Connect nodes with cables.", NamedTextColor.GREEN));
         } else {
@@ -112,7 +112,7 @@ public class BlockListener implements Listener {
         block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), createDropItem(type, blob));
 
         NodeStore.remove(block);
-        if (type == DeviceType.CONTROLLER) {
+        if (type == DeviceType.MVN_CONTROLLER) {
             manager.removeController(block);
         } else {
             manager.invalidateNear(block);
@@ -126,7 +126,7 @@ public class BlockListener implements Listener {
      */
     private ItemStack createDropItem(DeviceType type, NodeBlob blob) {
         ItemStack item = Items.create(type);
-        if (type == DeviceType.CONTROLLER || type == DeviceType.CABLE || isEmptyState(blob)) {
+        if (type == DeviceType.MVN_CONTROLLER || type == DeviceType.MVN_CABLE || isEmptyState(blob)) {
             return item;
         }
         var meta = item.getItemMeta();
@@ -221,7 +221,7 @@ public class BlockListener implements Listener {
         // La terminal inalambrica se usa AL AIRE: antes solo se procesaban clics a bloque y el
         // aparato nunca abria nada.
         if (event.getAction() == Action.RIGHT_CLICK_AIR) {
-            if (heldType == DeviceType.WIRELESS_TERMINAL) {
+            if (heldType == DeviceType.MVN_WIRELESS_TERMINAL) {
                 useWirelessInAir(event);
             }
             return;
@@ -236,26 +236,26 @@ public class BlockListener implements Listener {
         NodeBlob blob = NodeStore.get(block);
 
         // Handheld tools: handled before general menus
-        if (heldType == DeviceType.PROBE) {
+        if (heldType == DeviceType.MVN_PROBE) {
             event.setCancelled(true);
             probeNode(event.getPlayer(), block);
             return;
         }
-        if (heldType == DeviceType.RAKE) {
+        if (heldType == DeviceType.MVN_RAKE) {
             useRake(event, block, blob);
             return;
         }
-        if (heldType == DeviceType.CONFIGURATOR) {
+        if (heldType == DeviceType.MVN_CONFIGURATOR) {
             useWrench(event, block, blob);
             return;
         }
-        if (heldType == DeviceType.CRAYON) {
+        if (heldType == DeviceType.MVN_CRAYON) {
             useCrayon(event, block, blob);
             return;
         }
 
         if (blob == null) {
-            if (heldType == DeviceType.WIRELESS_TERMINAL && !event.getPlayer().isSneaking()) {
+            if (heldType == DeviceType.MVN_WIRELESS_TERMINAL && !event.getPlayer().isSneaking()) {
                 useWirelessInAir(event);
             }
             return;
@@ -267,10 +267,10 @@ public class BlockListener implements Listener {
         Player player = event.getPlayer();
 
         // Shift-click binding actions
-        if ((type == DeviceType.CONTROLLER || type == DeviceType.TERMINAL) && heldType == DeviceType.WIRELESS_TERMINAL && player.isSneaking()) {
+        if ((type == DeviceType.MVN_CONTROLLER || type == DeviceType.MVN_TERMINAL) && heldType == DeviceType.MVN_WIRELESS_TERMINAL && player.isSneaking()) {
             event.setCancelled(true);
             Location targetLoc = block.getLocation();
-            if (type == DeviceType.TERMINAL) {
+            if (type == DeviceType.MVN_TERMINAL) {
                 Network net = manager.networkAt(block);
                 if (net == null) {
                     player.sendMessage(Text.msg("This terminal is not connected to a network.", NamedTextColor.RED));
@@ -282,7 +282,7 @@ public class BlockListener implements Listener {
             player.sendMessage(Text.msg("Wireless terminal bound to this network.", NamedTextColor.GREEN));
             return;
         }
-        if (type == DeviceType.TRANSMITTER && heldType == DeviceType.RECEIVER && player.isSneaking()) {
+        if (type == DeviceType.MVN_TRANSMITTER && heldType == DeviceType.MVN_RECEIVER && player.isSneaking()) {
             event.setCancelled(true);
             Items.linkReceiver(held, block.getLocation());
             player.sendMessage(Text.msg("Receiver linked to this transmitter.", NamedTextColor.GREEN));
@@ -293,19 +293,19 @@ public class BlockListener implements Listener {
             return;
         }
 
-        if (held != null && held.getType().isBlock() && (type == DeviceType.CABLE || type == DeviceType.CONTROLLER)) {
+        if (held != null && held.getType().isBlock() && (type == DeviceType.MVN_CABLE || type == DeviceType.MVN_CONTROLLER)) {
             return;
         }
 
         switch (type) {
-            case CONTROLLER -> {
+            case MVN_CONTROLLER -> {
                 // The controller is the brain/heart of the network; no inventory GUI.
             }
-            case TERMINAL, TRANSMITTER -> {
+            case MVN_TERMINAL, MVN_TRANSMITTER -> {
                 event.setCancelled(true);
                 openTerminal(player, block);
             }
-            case MONITOR -> {
+            case MVN_MONITOR -> {
                 event.setCancelled(true);
                 Network net = manager.networkAt(block);
                 if (net == null) {
@@ -314,35 +314,35 @@ public class BlockListener implements Listener {
                 }
                 new MonitorMenu(plugin, player, net, block).openMenu();
             }
-            case RECEIVER -> {
+            case MVN_RECEIVER -> {
                 event.setCancelled(true);
                 openReceiver(player, block);
             }
-            case CELL_T1, CELL_T2, CELL_T3, CELL_T4, CELL_T5, CELL_T6 -> {
+            case MVN_CELL_T1, MVN_CELL_T2, MVN_CELL_T3, MVN_CELL_T4, MVN_CELL_T5, MVN_CELL_T6 -> {
                 event.setCancelled(true);
                 new CellMenu(plugin, player, block, type).openMenu();
             }
-            case GREEDY_CELL -> {
+            case MVN_GREEDY_CELL -> {
                 event.setCancelled(true);
                 new GreedyMenu(plugin, player, block).openMenu();
             }
-            case INFINITY_BARREL -> {
+            case MVN_INFINITY_BARREL -> {
                 event.setCancelled(true);
                 new BarrelMenu(plugin, player, block).openMenu();
             }
-            case QUANTUM_WORKBENCH -> {
+            case MVN_QUANTUM_WORKBENCH -> {
                 event.setCancelled(true);
                 new QuantumWorkbenchMenu(plugin, player, block).openMenu();
             }
-            case ENCODER -> {
+            case MVN_ENCODER -> {
                 event.setCancelled(true);
                 new EncoderMenu(plugin, player, block).openMenu();
             }
-            case CRAFTER -> {
+            case MVN_CRAFTER -> {
                 event.setCancelled(true);
                 new CrafterMenu(plugin, player, block).openMenu();
             }
-            case CRAFTING_GRID -> {
+            case MVN_CRAFTING_GRID -> {
                 event.setCancelled(true);
                 Network net = manager.networkAt(block);
                 if (net == null) {
@@ -377,11 +377,11 @@ public class BlockListener implements Listener {
         if (type == null) {
             return;
         }
-        if (type == DeviceType.CONTROLLER) {
+        if (type == DeviceType.MVN_CONTROLLER) {
             player.sendMessage(Text.msg("The rake cannot remove a controller.", NamedTextColor.RED));
             return;
         }
-        if ((type.isCell() || type == DeviceType.GREEDY_CELL || type == DeviceType.INFINITY_BARREL)
+        if ((type.isCell() || type == DeviceType.MVN_GREEDY_CELL || type == DeviceType.MVN_INFINITY_BARREL)
                 && (blob.cellAmount > 0 || blob.totalGreedyAmount() > 0)) {
             player.sendMessage(Text.msg("The storage has cargo; empty it before raking.", NamedTextColor.RED));
             return;
@@ -451,7 +451,7 @@ public class BlockListener implements Listener {
             return;
         }
         DeviceType type = DeviceType.parse(blob.typeName);
-        if (type != DeviceType.CONTROLLER) {
+        if (type != DeviceType.MVN_CONTROLLER) {
             player.sendMessage(Text.msg("The crayon only works on a Network Controller.", NamedTextColor.RED));
             return;
         }

@@ -56,14 +56,14 @@ class QuantumWorkbenchTest {
     void upgradeQuantumStoragePreservesCargoAndTransfersItems() {
         Block benchBlock = world.getBlockAt(0, 64, 0);
         benchBlock.setType(Material.BRAIN_CORAL_BLOCK);
-        NodeStore.put(benchBlock, NodeBlob.create(DeviceType.QUANTUM_WORKBENCH.name()));
+        NodeStore.put(benchBlock, NodeBlob.create(DeviceType.MVN_QUANTUM_WORKBENCH.name()));
 
         QuantumWorkbenchMenu menu = new QuantumWorkbenchMenu(plugin, player, benchBlock);
         menu.openMenu();
 
         // 1) Create T1 cell with pre-existing cargo (500 iron ingots)
-        ItemStack cellT1 = Items.create(DeviceType.CELL_T1);
-        NodeBlob blobT1 = NodeBlob.create(DeviceType.CELL_T1.name());
+        ItemStack cellT1 = Items.create(DeviceType.MVN_CELL_T1);
+        NodeBlob blobT1 = NodeBlob.create(DeviceType.MVN_CELL_T1.name());
         blobT1.cellSample = new ItemStack(Material.IRON_INGOT);
         blobT1.cellAmount = 500;
         var metaT1 = cellT1.getItemMeta();
@@ -87,7 +87,7 @@ class QuantumWorkbenchTest {
         // 4) Verify output slot contains T2 cell with preserved cargo
         ItemStack result = player.getOpenInventory().getTopInventory().getItem(QuantumWorkbenchMenu.OUTPUT_SLOT);
         assertNotNull(result, "output slot must contain craft result");
-        assertEquals(DeviceType.CELL_T2, Items.typeOf(result), "result must be Quantum Cell T2");
+        assertEquals(DeviceType.MVN_CELL_T2, Items.typeOf(result), "result must be Quantum Cell T2");
 
         String cargoDecoded = result.getItemMeta().getPersistentDataContainer()
                 .get(Keys.CELL_CARGO, PersistentDataType.STRING);
@@ -112,7 +112,7 @@ class QuantumWorkbenchTest {
     void closingMenuReturnsIngredientsToPlayer() {
         Block benchBlock = world.getBlockAt(0, 64, 0);
         benchBlock.setType(Material.BRAIN_CORAL_BLOCK);
-        NodeStore.put(benchBlock, NodeBlob.create(DeviceType.QUANTUM_WORKBENCH.name()));
+        NodeStore.put(benchBlock, NodeBlob.create(DeviceType.MVN_QUANTUM_WORKBENCH.name()));
 
         QuantumWorkbenchMenu menu = new QuantumWorkbenchMenu(plugin, player, benchBlock);
         menu.openMenu();

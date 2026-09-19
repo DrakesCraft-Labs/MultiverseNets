@@ -56,7 +56,7 @@ public class CrafterMenu extends MenuHolder {
     private NodeBlob blob() {
         NodeBlob blob = NodeStore.get(block);
         if (blob == null) {
-            blob = NodeBlob.create(DeviceType.CRAFTER.name());
+            blob = NodeBlob.create(DeviceType.MVN_CRAFTER.name());
         }
         if (blob.blueprintData == null) {
             blob.blueprintData = new ArrayList<>();

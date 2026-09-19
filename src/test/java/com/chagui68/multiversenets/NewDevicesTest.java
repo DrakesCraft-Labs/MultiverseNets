@@ -3,6 +3,7 @@ package com.chagui68.multiversenets;
 import com.chagui68.multiversenets.item.DeviceType;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -58,9 +59,24 @@ class NewDevicesTest {
     @Test
     void allDeviceTypesHaveMaterialAndDisplayName() {
         for (DeviceType type : DeviceType.values()) {
+            assertTrue(type.name().startsWith("MVN_"), type.name() + " must start with MVN_ prefix");
             assertNotNull(type.material(), type + " missing material");
             assertNotNull(type.display(), type + " missing display name");
             assertFalse(type.display().isBlank(), type + " has blank display name");
         }
+    }
+
+    /**
+     * [EN] Tests that DeviceType.parse resolves both modern MVN_ prefixed and legacy names.
+     * [ES] Verifica que DeviceType.parse resuelva tanto los nombres modernos con prefijo MVN_ como los heredados.
+     */
+    @Test
+    void parseSupportsModernAndLegacyNames() {
+        assertEquals(DeviceType.MVN_CONTROLLER, DeviceType.parse("CONTROLLER"));
+        assertEquals(DeviceType.MVN_CONTROLLER, DeviceType.parse("MVN_CONTROLLER"));
+        assertEquals(DeviceType.MVN_CONTROLLER, DeviceType.parse("mvn_controller"));
+        assertEquals(DeviceType.MVN_GREEDY_CELL, DeviceType.parse("GREEDY_CELL"));
+        assertEquals(DeviceType.MVN_GREEDY_CELL, DeviceType.parse("MVN_GREEDY_CELL"));
+        assertEquals(DeviceType.MVN_WIRELESS_TERMINAL, DeviceType.parse("wireless"));
     }
 }

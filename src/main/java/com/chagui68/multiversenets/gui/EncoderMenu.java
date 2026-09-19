@@ -54,7 +54,7 @@ public class EncoderMenu extends MenuHolder {
 
     private NodeBlob blob() {
         NodeBlob blob = NodeStore.get(block);
-        return blob == null ? NodeBlob.create(DeviceType.ENCODER.name()) : blob;
+        return blob == null ? NodeBlob.create(DeviceType.MVN_ENCODER.name()) : blob;
     }
 
     @Override
@@ -135,7 +135,7 @@ public class EncoderMenu extends MenuHolder {
         }
         if (raw >= inv.getSize()) {
             ItemStack moving = event.getCurrentItem();
-            if (moving == null || Items.typeOf(moving) != DeviceType.BLUEPRINT || Blueprints.read(moving) != null) {
+            if (moving == null || Items.typeOf(moving) != DeviceType.MVN_BLUEPRINT || Blueprints.read(moving) != null) {
                 return;
             }
             int playerSlot = playerInventorySlot(event);
@@ -144,7 +144,7 @@ public class EncoderMenu extends MenuHolder {
                 inv.setItem(BLANK_SLOT, moving);
                 player.getInventory().setItem(playerSlot, null);
                 player.updateInventory();
-            } else if (Items.typeOf(current) == DeviceType.BLUEPRINT && Blueprints.read(current) == null) {
+            } else if (Items.typeOf(current) == DeviceType.MVN_BLUEPRINT && Blueprints.read(current) == null) {
                 int transferred = Math.min(current.getMaxStackSize() - current.getAmount(), moving.getAmount());
                 if (transferred <= 0) {
                     return;
@@ -183,7 +183,7 @@ public class EncoderMenu extends MenuHolder {
             return;
         }
         ItemStack blank = inv.getItem(BLANK_SLOT);
-        if (blank == null || Items.typeOf(blank) != DeviceType.BLUEPRINT
+        if (blank == null || Items.typeOf(blank) != DeviceType.MVN_BLUEPRINT
                 || Blueprints.read(blank) != null) {
             player.sendMessage(Text.msg("Put a Blank Blueprint in the blue slot first.",
                     NamedTextColor.RED));

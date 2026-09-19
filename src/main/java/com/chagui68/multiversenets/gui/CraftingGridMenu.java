@@ -59,7 +59,7 @@ public class CraftingGridMenu extends MenuHolder {
 
     private NodeBlob blob() {
         NodeBlob blob = NodeStore.get(block);
-        return blob == null ? NodeBlob.create(com.chagui68.multiversenets.item.DeviceType.CRAFTING_GRID.name()) : blob;
+        return blob == null ? NodeBlob.create(com.chagui68.multiversenets.item.DeviceType.MVN_CRAFTING_GRID.name()) : blob;
     }
 
     private ItemStack[] matrix() {

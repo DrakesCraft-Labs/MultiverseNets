@@ -317,7 +317,7 @@ public class GreedyMenu extends MenuHolder {
 
         // Handle control slots
         if (raw == FILTER_SLOT) {
-            new FilterMenu(plugin, player, block, DeviceType.GREEDY_CELL).openMenu();
+            new FilterMenu(plugin, player, block, DeviceType.MVN_GREEDY_CELL).openMenu();
             return;
         }
 

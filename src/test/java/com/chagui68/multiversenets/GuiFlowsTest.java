@@ -96,10 +96,10 @@ class GuiFlowsTest {
     }
 
     private Network networkWithCell() {
-        Block controller = place(0, 64, 0, DeviceType.CONTROLLER);
+        Block controller = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
         plugin.networks().registerController(controller);
-        place(1, 64, 0, DeviceType.CELL_T2);
-        place(0, 64, 1, DeviceType.TERMINAL);
+        place(1, 64, 0, DeviceType.MVN_CELL_T2);
+        place(0, 64, 1, DeviceType.MVN_TERMINAL);
         Network net = plugin.networks().networkByController(controller.getLocation());
         net.scan();
         return net;
@@ -236,7 +236,7 @@ class GuiFlowsTest {
     @Test
     void encoderEncodesMatrixIntoBlueprint() {
         registerRecipe();
-        Block encoder = place(5, 64, 0, DeviceType.ENCODER);
+        Block encoder = place(5, 64, 0, DeviceType.MVN_ENCODER);
         rightClick(encoder);
         assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof EncoderMenu);
 
@@ -246,7 +246,7 @@ class GuiFlowsTest {
             clickTop(slot, ClickType.LEFT);
         }
         player.getOpenInventory().setCursor(null);
-        player.getOpenInventory().getTopInventory().setItem(19, Items.create(DeviceType.BLUEPRINT));
+        player.getOpenInventory().getTopInventory().setItem(19, Items.create(DeviceType.MVN_BLUEPRINT));
 
         clickTop(16, ClickType.LEFT); // encode
 
@@ -270,8 +270,8 @@ class GuiFlowsTest {
     void crafterWithBlueprintCraftsFromNetworkAtomically() {
         registerRecipe();
         Network net = networkWithCell();
-        place(1, 63, 0, DeviceType.CELL_T2);
-        place(2, 64, 0, DeviceType.CRAFTER);
+        place(1, 63, 0, DeviceType.MVN_CELL_T2);
+        place(2, 64, 0, DeviceType.MVN_CRAFTER);
         Block crafter = world.getBlockAt(2, 64, 0);
 
         ItemStack[] matrix = new ItemStack[]{new ItemStack(Material.DIAMOND), new ItemStack(Material.DIAMOND),
@@ -307,7 +307,7 @@ class GuiFlowsTest {
     void craftingGridUsesNetworkAndReturnsResult() {
         registerRecipe();
         Network net = networkWithCell();
-        Block grid = place(0, 63, 0, DeviceType.CRAFTING_GRID);
+        Block grid = place(0, 63, 0, DeviceType.MVN_CRAFTING_GRID);
         rightClick(grid);
         assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof CraftingGridMenu);
 
@@ -342,7 +342,7 @@ class GuiFlowsTest {
     @Test
     void monitorOpensWithNetwork() {
         networkWithCell();
-        place(2, 64, 0, DeviceType.MONITOR);
+        place(2, 64, 0, DeviceType.MVN_MONITOR);
         rightClick(world.getBlockAt(2, 64, 0));
         assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof MonitorMenu);
     }
@@ -353,17 +353,17 @@ class GuiFlowsTest {
      */
     @Test
     void grabberAndVacuumOpenFilter() {
-        Block grabber = place(6, 64, 0, DeviceType.GRABBER);
+        Block grabber = place(6, 64, 0, DeviceType.MVN_GRABBER);
         rightClick(grabber);
         assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof FilterMenu);
         player.closeInventory();
 
-        Block vacuum = place(7, 64, 0, DeviceType.VACUUM);
+        Block vacuum = place(7, 64, 0, DeviceType.MVN_VACUUM);
         rightClick(vacuum);
         assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof FilterMenu);
         player.closeInventory();
 
-        Block crafter = place(8, 64, 0, DeviceType.CRAFTER);
+        Block crafter = place(8, 64, 0, DeviceType.MVN_CRAFTER);
         rightClick(crafter);
         assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof CrafterMenu);
     }

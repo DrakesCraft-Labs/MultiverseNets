@@ -121,7 +121,7 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
         }
         DeviceType type = DeviceType.parse(args[1]);
         if (type == null && args[1].equalsIgnoreCase("wireless")) {
-            type = DeviceType.WIRELESS_TERMINAL;
+            type = DeviceType.MVN_WIRELESS_TERMINAL;
         }
         if (type == null) {
             sender.sendMessage(Text.msg("Unknown device. Use /mvnets devices.", NamedTextColor.RED));
@@ -134,8 +134,8 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
             } catch (NumberFormatException ignored) {
             }
         }
-        ItemStack stack = type == DeviceType.RAKE ? Items.rake() : Items.create(type);
-        stack.setAmount(type == DeviceType.WIRELESS_TERMINAL ? 1 : amount);
+        ItemStack stack = type == DeviceType.MVN_RAKE ? Items.rake() : Items.create(type);
+        stack.setAmount(type == DeviceType.MVN_WIRELESS_TERMINAL ? 1 : amount);
         player.getInventory().addItem(stack);
         player.sendMessage(Text.msg("Received: " + type.display(), NamedTextColor.GREEN));
     }

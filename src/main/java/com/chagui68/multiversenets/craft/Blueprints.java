@@ -69,7 +69,7 @@ public final class Blueprints {
     // ---------------------------------------------------------------- item <-> receta
 
     public static ItemStack toItem(RecipeData data) {
-        ItemStack item = new ItemStack(DeviceType.BLUEPRINT.material());
+        ItemStack item = new ItemStack(DeviceType.MVN_BLUEPRINT.material());
         var meta = item.getItemMeta();
         meta.displayName(Component.text("Blueprint: " + readableName(data.output), NamedTextColor.LIGHT_PURPLE)
                 .decoration(TextDecoration.ITALIC, false));
@@ -87,7 +87,7 @@ public final class Blueprints {
         lore.add(Component.text("Click an Auto-Crafter to install", NamedTextColor.DARK_GRAY)
                 .decoration(TextDecoration.ITALIC, false));
         meta.lore(lore);
-        meta.getPersistentDataContainer().set(Keys.DEVICE_TYPE, PersistentDataType.STRING, DeviceType.BLUEPRINT.name());
+        meta.getPersistentDataContainer().set(Keys.DEVICE_TYPE, PersistentDataType.STRING, DeviceType.MVN_BLUEPRINT.name());
         meta.getPersistentDataContainer().set(Keys.BLUEPRINT_DATA, PersistentDataType.STRING, encode(data));
         item.setItemMeta(meta);
         return item;

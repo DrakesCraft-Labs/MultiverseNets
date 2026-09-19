@@ -66,7 +66,7 @@ class CellGuiTest {
      */
     @Test
     void cellOpensOnRightClick() {
-        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
+        Block cell = placeCell(0, 64, 0, DeviceType.MVN_CELL_T1);
         PlayerInteractEvent interact = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK,
                 null, cell, BlockFace.NORTH, EquipmentSlot.HAND, null);
         server.getPluginManager().callEvent(interact);
@@ -80,9 +80,9 @@ class CellGuiTest {
      */
     @Test
     void setItemButtonSetsFilterSample() {
-        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
+        Block cell = placeCell(0, 64, 0, DeviceType.MVN_CELL_T1);
 
-        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.CELL_T1);
+        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.MVN_CELL_T1);
         menu.openMenu();
         player.getOpenInventory().setCursor(new ItemStack(Material.DIAMOND, 5));
 
@@ -102,14 +102,14 @@ class CellGuiTest {
      */
     @Test
     void quickDepositDepositsInventoryItemsIntoCell() {
-        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
+        Block cell = placeCell(0, 64, 0, DeviceType.MVN_CELL_T1);
         NodeBlob blob = NodeStore.get(cell);
         blob.cellSample = new ItemStack(Material.COBBLESTONE);
         blob.cellAmount = 0;
         NodeStore.put(cell, blob);
 
         player.getInventory().addItem(new ItemStack(Material.COBBLESTONE, 64));
-        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.CELL_T1);
+        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.MVN_CELL_T1);
         menu.openMenu();
 
         InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
@@ -127,13 +127,13 @@ class CellGuiTest {
      */
     @Test
     void storedItemSlotAllowsWithdrawingItems() {
-        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
+        Block cell = placeCell(0, 64, 0, DeviceType.MVN_CELL_T1);
         NodeBlob blob = NodeStore.get(cell);
         blob.cellSample = new ItemStack(Material.DIAMOND);
         blob.cellAmount = 100;
         NodeStore.put(cell, blob);
 
-        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.CELL_T1);
+        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.MVN_CELL_T1);
         menu.openMenu();
 
         InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
@@ -152,13 +152,13 @@ class CellGuiTest {
      */
     @Test
     void storedItemSlotShiftClickExtractsToInventory() {
-        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
+        Block cell = placeCell(0, 64, 0, DeviceType.MVN_CELL_T1);
         NodeBlob blob = NodeStore.get(cell);
         blob.cellSample = new ItemStack(Material.EMERALD);
         blob.cellAmount = 100;
         NodeStore.put(cell, blob);
 
-        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.CELL_T1);
+        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.MVN_CELL_T1);
         menu.openMenu();
 
         InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
@@ -180,8 +180,8 @@ class CellGuiTest {
     }
 
     private int cellMenuSize() {
-        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
-        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.CELL_T1);
+        Block cell = placeCell(0, 64, 0, DeviceType.MVN_CELL_T1);
+        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.MVN_CELL_T1);
         menu.openMenu();
         return player.getOpenInventory().getTopInventory().getSize();
     }
@@ -192,14 +192,14 @@ class CellGuiTest {
      */
     @Test
     void setItemDoesNotOverwriteNonEmptyCell() {
-        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
+        Block cell = placeCell(0, 64, 0, DeviceType.MVN_CELL_T1);
         NodeBlob blob = NodeStore.get(cell);
         blob.cellSample = new ItemStack(Material.COBBLESTONE);
         blob.cellAmount = 100;
         NodeStore.put(cell, blob);
 
         player.setItemOnCursor(new ItemStack(Material.DIAMOND, 1));
-        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.CELL_T1);
+        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.MVN_CELL_T1);
         menu.openMenu();
         InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
                 InventoryType.SlotType.CONTAINER, 13, ClickType.LEFT, InventoryAction.PICKUP_ALL);
@@ -216,7 +216,7 @@ class CellGuiTest {
      */
     @Test
     void shiftClickFromPlayerInventoryDepositsIntoCell() {
-        Block cell = placeCell(0, 64, 0, DeviceType.CELL_T1);
+        Block cell = placeCell(0, 64, 0, DeviceType.MVN_CELL_T1);
         NodeBlob blob = NodeStore.get(cell);
         blob.cellSample = new ItemStack(Material.COBBLESTONE);
         blob.cellAmount = 0;
@@ -224,7 +224,7 @@ class CellGuiTest {
 
         player.getInventory().setItem(0, new ItemStack(Material.COBBLESTONE, 32));
 
-        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.CELL_T1);
+        CellMenu menu = new CellMenu(plugin, player, cell, DeviceType.MVN_CELL_T1);
         menu.openMenu();
 
         InventoryClickEvent shift = new InventoryClickEvent(player.getOpenInventory(),

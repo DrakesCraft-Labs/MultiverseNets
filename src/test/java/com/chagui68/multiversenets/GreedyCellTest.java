@@ -56,7 +56,7 @@ class GreedyCellTest {
 
     @Test
     void multiItemGreedyStorageAndSharedCapacity() {
-        NodeBlob blob = NodeBlob.create(DeviceType.GREEDY_CELL.name());
+        NodeBlob blob = NodeBlob.create(DeviceType.MVN_GREEDY_CELL.name());
         assertEquals(0, blob.totalGreedyAmount());
 
         ItemStack stone = new ItemStack(Material.STONE);
@@ -93,7 +93,7 @@ class GreedyCellTest {
 
     @Test
     void legacyGreedyCellMigration() {
-        NodeBlob legacy = NodeBlob.create(DeviceType.GREEDY_CELL.name());
+        NodeBlob legacy = NodeBlob.create(DeviceType.MVN_GREEDY_CELL.name());
         legacy.cellSample = new ItemStack(Material.GOLD_INGOT);
         legacy.cellAmount = 64_000;
         legacy.greedySamples = null;
@@ -117,7 +117,7 @@ class GreedyCellTest {
     void greedyMenuOpensAndDrawsMonitor() {
         Block block = world.getBlockAt(0, 64, 0);
         block.setType(Material.SLIME_BLOCK);
-        NodeBlob blob = NodeBlob.create(DeviceType.GREEDY_CELL.name());
+        NodeBlob blob = NodeBlob.create(DeviceType.MVN_GREEDY_CELL.name());
         blob.addGreedyItem(new ItemStack(Material.IRON_INGOT), 1_000);
         NodeStore.put(block, blob);
 
@@ -145,26 +145,26 @@ class GreedyCellTest {
         // Build a network with Controller, Terminal, Greedy Cell, and Purger
         Block controller = world.getBlockAt(0, 64, 0);
         controller.setType(Material.LODESTONE);
-        NodeStore.put(controller, NodeBlob.create(DeviceType.CONTROLLER.name()));
+        NodeStore.put(controller, NodeBlob.create(DeviceType.MVN_CONTROLLER.name()));
         plugin.networks().registerController(controller);
 
         Block cable = world.getBlockAt(1, 64, 0);
         cable.setType(Material.IRON_BARS);
-        NodeStore.put(cable, NodeBlob.create(DeviceType.CABLE.name()));
+        NodeStore.put(cable, NodeBlob.create(DeviceType.MVN_CABLE.name()));
 
         Block terminal = world.getBlockAt(2, 64, 0);
         terminal.setType(Material.GLOWSTONE);
-        NodeStore.put(terminal, NodeBlob.create(DeviceType.TERMINAL.name()));
+        NodeStore.put(terminal, NodeBlob.create(DeviceType.MVN_TERMINAL.name()));
 
         Block greedy = world.getBlockAt(3, 64, 0);
         greedy.setType(Material.SLIME_BLOCK);
-        NodeBlob greedyBlob = NodeBlob.create(DeviceType.GREEDY_CELL.name());
+        NodeBlob greedyBlob = NodeBlob.create(DeviceType.MVN_GREEDY_CELL.name());
         greedyBlob.addGreedyItem(new ItemStack(Material.EMERALD), 500);
         NodeStore.put(greedy, greedyBlob);
 
         Block purger = world.getBlockAt(4, 64, 0);
         purger.setType(Material.MAGMA_BLOCK);
-        NodeBlob purgerBlob = NodeBlob.create(DeviceType.PURGER.name());
+        NodeBlob purgerBlob = NodeBlob.create(DeviceType.MVN_PURGER.name());
         purgerBlob.filterMaterials.add(Material.ROTTEN_FLESH.name());
         NodeStore.put(purger, purgerBlob);
 
@@ -221,7 +221,7 @@ class GreedyCellTest {
     void breakingGreedyCellPreservesMultiItemCargo() {
         Block block = world.getBlockAt(0, 64, 0);
         block.setType(Material.SLIME_BLOCK);
-        NodeBlob blob = NodeBlob.create(DeviceType.GREEDY_CELL.name());
+        NodeBlob blob = NodeBlob.create(DeviceType.MVN_GREEDY_CELL.name());
         blob.addGreedyItem(new ItemStack(Material.COPPER_INGOT), 128);
         blob.addGreedyItem(new ItemStack(Material.GOLD_INGOT), 256);
         NodeStore.put(block, blob);

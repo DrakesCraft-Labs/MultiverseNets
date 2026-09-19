@@ -58,7 +58,7 @@ class GuiDupeGuardTest {
     void dangerousActionsAreCancelledInMenus() {
         Block ctrl = world.getBlockAt(0, 64, 0);
         ctrl.setType(Material.LODESTONE);
-        NodeStore.put(ctrl, NodeBlob.create(DeviceType.CONTROLLER.name()));
+        NodeStore.put(ctrl, NodeBlob.create(DeviceType.MVN_CONTROLLER.name()));
         plugin.networks().registerController(ctrl);
         Network net = plugin.networks().networkAt(ctrl);
 
@@ -109,9 +109,9 @@ class GuiDupeGuardTest {
     void dangerousActionsCancelledInCellMenuAndBarrelMenu() {
         Block cellBlock = world.getBlockAt(1, 64, 0);
         cellBlock.setType(Material.TERRACOTTA);
-        NodeStore.put(cellBlock, NodeBlob.create(DeviceType.CELL_T1.name()));
+        NodeStore.put(cellBlock, NodeBlob.create(DeviceType.MVN_CELL_T1.name()));
 
-        CellMenu cellMenu = new CellMenu(plugin, player, cellBlock, DeviceType.CELL_T1);
+        CellMenu cellMenu = new CellMenu(plugin, player, cellBlock, DeviceType.MVN_CELL_T1);
         cellMenu.openMenu();
 
         InventoryClickEvent numKey = new InventoryClickEvent(player.getOpenInventory(),
@@ -121,7 +121,7 @@ class GuiDupeGuardTest {
 
         Block barrelBlock = world.getBlockAt(2, 64, 0);
         barrelBlock.setType(Material.BARREL);
-        NodeStore.put(barrelBlock, NodeBlob.create(DeviceType.INFINITY_BARREL.name()));
+        NodeStore.put(barrelBlock, NodeBlob.create(DeviceType.MVN_INFINITY_BARREL.name()));
 
         BarrelMenu barrelMenu = new BarrelMenu(plugin, player, barrelBlock);
         barrelMenu.openMenu();
@@ -140,12 +140,12 @@ class GuiDupeGuardTest {
     void shiftClickDepositsAndRemovesFromPlayerInventoryWithoutDupe() {
         Block ctrl = world.getBlockAt(0, 64, 0);
         ctrl.setType(Material.LODESTONE);
-        NodeStore.put(ctrl, NodeBlob.create(DeviceType.CONTROLLER.name()));
+        NodeStore.put(ctrl, NodeBlob.create(DeviceType.MVN_CONTROLLER.name()));
         plugin.networks().registerController(ctrl);
 
         Block cellBlock = world.getBlockAt(1, 64, 0);
         cellBlock.setType(Material.TERRACOTTA);
-        NodeStore.put(cellBlock, NodeBlob.create(DeviceType.CELL_T2.name()));
+        NodeStore.put(cellBlock, NodeBlob.create(DeviceType.MVN_CELL_T2.name()));
 
         Network net = plugin.networks().networkAt(ctrl);
         net.scan();
@@ -184,9 +184,9 @@ class GuiDupeGuardTest {
         player.closeInventory();
         Block emptyCellBlock = world.getBlockAt(5, 64, 0);
         emptyCellBlock.setType(Material.TERRACOTTA);
-        NodeStore.put(emptyCellBlock, NodeBlob.create(DeviceType.CELL_T2.name()));
+        NodeStore.put(emptyCellBlock, NodeBlob.create(DeviceType.MVN_CELL_T2.name()));
 
-        CellMenu cellMenu = new CellMenu(plugin, player, emptyCellBlock, DeviceType.CELL_T2);
+        CellMenu cellMenu = new CellMenu(plugin, player, emptyCellBlock, DeviceType.MVN_CELL_T2);
         cellMenu.openMenu();
 
         player.getInventory().setItem(0, new ItemStack(Material.EMERALD, 12));
@@ -202,7 +202,7 @@ class GuiDupeGuardTest {
         player.closeInventory();
         Block barrelBlock = world.getBlockAt(2, 64, 0);
         barrelBlock.setType(Material.BARREL);
-        NodeBlob bBlob = NodeBlob.create(DeviceType.INFINITY_BARREL.name());
+        NodeBlob bBlob = NodeBlob.create(DeviceType.MVN_INFINITY_BARREL.name());
         bBlob.cellSample = new ItemStack(Material.IRON_INGOT, 1);
         NodeStore.put(barrelBlock, bBlob);
 

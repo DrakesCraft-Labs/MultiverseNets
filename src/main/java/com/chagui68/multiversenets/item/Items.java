@@ -44,11 +44,11 @@ public final class Items {
         List<Component> lore = new ArrayList<>();
         lore.add(Component.text("MultiverseNets", NamedTextColor.DARK_GRAY)
                 .decoration(TextDecoration.ITALIC, false));
-        if (type.isCell() || type == DeviceType.INFINITY_BARREL || type == DeviceType.GREEDY_CELL) {
+        if (type.isCell() || type == DeviceType.MVN_INFINITY_BARREL || type == DeviceType.MVN_GREEDY_CELL) {
             lore.add(Component.text("Capacity: " + formatAmount(capacityOf(type)), NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false));
         }
-        if (type == DeviceType.WIRELESS_TERMINAL) {
+        if (type == DeviceType.MVN_WIRELESS_TERMINAL) {
             lore.add(Component.text("Status: ", NamedTextColor.GRAY)
                     .append(Component.text("Unbound", NamedTextColor.RED))
                     .decoration(TextDecoration.ITALIC, false));
@@ -90,7 +90,7 @@ public final class Items {
      * @return Rake ItemStack / ItemStack del rastrillo
      */
     public static ItemStack rake() {
-        ItemStack item = create(DeviceType.RAKE);
+        ItemStack item = create(DeviceType.MVN_RAKE);
         var meta = item.getItemMeta();
         meta.getPersistentDataContainer().set(Keys.RAKE_USES, PersistentDataType.INTEGER, Settings.rakeUses());
         meta.lore(java.util.List.of(
@@ -201,14 +201,15 @@ public final class Items {
      * @return Encoded blueprint ItemStack / ItemStack del plano codificado
      */
     public static ItemStack blueprint(String recipeKey, String resultName) {
-        ItemStack item = new ItemStack(DeviceType.BLUEPRINT.material());
+        ItemStack item = new ItemStack(DeviceType.MVN_BLUEPRINT.material());
         ItemMeta meta = item.getItemMeta();
         meta.displayName(Component.text("Blueprint: " + resultName, NamedTextColor.LIGHT_PURPLE)
                 .decoration(TextDecoration.ITALIC, false));
-        meta.lore(List.of(
-                Component.text("Recipe: " + recipeKey, NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                Component.text("Click an Auto-Crafter to install", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false)));
-        meta.getPersistentDataContainer().set(Keys.DEVICE_TYPE, PersistentDataType.STRING, DeviceType.BLUEPRINT.name());
+        List<Component> lore = new ArrayList<>();
+        lore.add(Component.text("Recipe: " + recipeKey, NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("Click an Auto-Crafter to install", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+        meta.lore(lore);
+        meta.getPersistentDataContainer().set(Keys.DEVICE_TYPE, PersistentDataType.STRING, DeviceType.MVN_BLUEPRINT.name());
         meta.getPersistentDataContainer().set(Keys.BLUEPRINT_RECIPE, PersistentDataType.STRING, recipeKey);
         item.setItemMeta(meta);
         return item;
@@ -356,10 +357,10 @@ public final class Items {
      * @return Total capacity in items / Capacidad total en ítems
      */
     public static long capacityOf(DeviceType type) {
-        if (type == DeviceType.INFINITY_BARREL) {
+        if (type == DeviceType.MVN_INFINITY_BARREL) {
             return com.chagui68.multiversenets.util.Settings.barrelCapacity();
         }
-        if (type == DeviceType.GREEDY_CELL) {
+        if (type == DeviceType.MVN_GREEDY_CELL) {
             return com.chagui68.multiversenets.util.Settings.greedyCapacity();
         }
         return com.chagui68.multiversenets.util.Settings.cellCapacity(type.cellTier());
@@ -398,30 +399,30 @@ public final class Items {
      * @param plugin Main plugin instance / Instancia principal del plugin
      */
     public static void registerRecipes(MultiverseNets plugin) {
-        shaped(plugin, "controller", create(DeviceType.CONTROLLER), r -> {
+        shaped(plugin, "controller", create(DeviceType.MVN_CONTROLLER), r -> {
             r.shape("III", "INI", "III");
             r.setIngredient('I', Material.IRON_BLOCK);
             r.setIngredient('N', Material.NETHER_STAR);
         });
-        shaped(plugin, "cable", stackOf(create(DeviceType.CABLE), 16), r -> {
+        shaped(plugin, "cable", stackOf(create(DeviceType.MVN_CABLE), 16), r -> {
             r.shape("GGG", "GRG", "GGG");
             r.setIngredient('G', Material.GLASS);
             r.setIngredient('R', Material.REDSTONE);
         });
-        shaped(plugin, "terminal", create(DeviceType.TERMINAL), r -> {
+        shaped(plugin, "terminal", create(DeviceType.MVN_TERMINAL), r -> {
             r.shape("GEG", "EBE", "GEG");
             r.setIngredient('G', Material.GLASS);
             r.setIngredient('E', Material.ENDER_PEARL);
             r.setIngredient('B', Material.BEACON);
         });
-        shaped(plugin, "cell_t1", create(DeviceType.CELL_T1), r -> {
+        shaped(plugin, "cell_t1", create(DeviceType.MVN_CELL_T1), r -> {
             r.shape("GGG", "GDG", "GGG");
             r.setIngredient('G', Material.GLASS);
             r.setIngredient('D', Material.DIAMOND);
         });
         for (int tier = 2; tier <= 6; tier++) {
-            DeviceType prev = DeviceType.valueOf("CELL_T" + (tier - 1));
-            DeviceType cur = DeviceType.valueOf("CELL_T" + tier);
+            DeviceType prev = DeviceType.parse("MVN_CELL_T" + (tier - 1));
+            DeviceType cur = DeviceType.parse("MVN_CELL_T" + tier);
             final DeviceType prevFinal = prev;
             shaped(plugin, "cell_t" + tier, create(cur), r -> {
                 r.shape("DDD", "DPD", "DDD");
@@ -429,100 +430,100 @@ public final class Items {
                 r.setIngredient('P', new org.bukkit.inventory.RecipeChoice.ExactChoice(create(prevFinal)));
             });
         }
-        shaped(plugin, "grabber", create(DeviceType.GRABBER), r -> {
+        shaped(plugin, "grabber", create(DeviceType.MVN_GRABBER), r -> {
             r.shape("IOI", "ORO", "IOI");
             r.setIngredient('I', Material.IRON_INGOT);
             r.setIngredient('O', Material.OBSERVER);
             r.setIngredient('R', Material.REDSTONE_BLOCK);
         });
-        shaped(plugin, "pusher", create(DeviceType.PUSHER), r -> {
+        shaped(plugin, "pusher", create(DeviceType.MVN_PUSHER), r -> {
             r.shape("IDI", "DRD", "IDI");
             r.setIngredient('I', Material.IRON_INGOT);
             r.setIngredient('D', Material.DROPPER);
             r.setIngredient('R', Material.REDSTONE_BLOCK);
         });
-        shaped(plugin, "vacuum", create(DeviceType.VACUUM), r -> {
+        shaped(plugin, "vacuum", create(DeviceType.MVN_VACUUM), r -> {
             r.shape("SRS", "RHR", "SRS");
             r.setIngredient('S', Material.STRING);
             r.setIngredient('R', Material.REDSTONE);
             r.setIngredient('H', Material.HOPPER);
         });
-        shaped(plugin, "purger", create(DeviceType.PURGER), r -> {
+        shaped(plugin, "purger", create(DeviceType.MVN_PURGER), r -> {
             r.shape("ILI", "LHL", "ILI");
             r.setIngredient('I', Material.IRON_INGOT);
             r.setIngredient('L', Material.MAGMA_BLOCK);
             r.setIngredient('H', Material.HOPPER);
         });
-        shaped(plugin, "probe", create(DeviceType.PROBE), r -> {
+        shaped(plugin, "probe", create(DeviceType.MVN_PROBE), r -> {
             r.shape(" A ", "ASA", " A ");
             r.setIngredient('A', Material.AMETHYST_SHARD);
             r.setIngredient('S', Material.SPYGLASS);
         });
-        shaped(plugin, "crafter", create(DeviceType.CRAFTER), r -> {
+        shaped(plugin, "crafter", create(DeviceType.MVN_CRAFTER), r -> {
             r.shape("RCR", "ITI", "RCR");
             r.setIngredient('R', Material.REDSTONE);
             r.setIngredient('C', Material.CRAFTING_TABLE);
             r.setIngredient('I', Material.IRON_INGOT);
             r.setIngredient('T', Material.TARGET);
         });
-        shaped(plugin, "wireless_terminal", create(DeviceType.WIRELESS_TERMINAL), r -> {
+        shaped(plugin, "wireless_terminal", create(DeviceType.MVN_WIRELESS_TERMINAL), r -> {
             r.shape(" P ", "PNP", " C ");
             r.setIngredient('P', Material.ENDER_PEARL);
             r.setIngredient('N', Material.NETHER_STAR);
             r.setIngredient('C', Material.COMPASS);
         });
-        shaped(plugin, "monitor", create(DeviceType.MONITOR), r -> {
+        shaped(plugin, "monitor", create(DeviceType.MVN_MONITOR), r -> {
             r.shape("GGG", "GCG", "GGG");
             r.setIngredient('G', Material.GLASS_PANE);
             r.setIngredient('C', Material.COMPARATOR);
         });
-        shaped(plugin, "transmitter", create(DeviceType.TRANSMITTER), r -> {
+        shaped(plugin, "transmitter", create(DeviceType.MVN_TRANSMITTER), r -> {
             r.shape("IRI", "RCR", "IRI");
             r.setIngredient('I', Material.IRON_INGOT);
             r.setIngredient('R', Material.REDSTONE_BLOCK);
             r.setIngredient('C', Material.CONDUIT);
         });
-        shaped(plugin, "receiver", create(DeviceType.RECEIVER), r -> {
+        shaped(plugin, "receiver", create(DeviceType.MVN_RECEIVER), r -> {
             r.shape("IPI", "PLP", "IPI");
             r.setIngredient('I', Material.IRON_INGOT);
             r.setIngredient('P', Material.ENDER_PEARL);
             r.setIngredient('L', Material.REDSTONE_LAMP);
         });
-        shaped(plugin, "greedy_cell", create(DeviceType.GREEDY_CELL), r -> {
+        shaped(plugin, "greedy_cell", create(DeviceType.MVN_GREEDY_CELL), r -> {
             r.shape("GHG", "HSH", "GHG");
             r.setIngredient('G', Material.GOLD_INGOT);
             r.setIngredient('H', Material.HOPPER);
             r.setIngredient('S', Material.SLIME_BLOCK);
         });
-        shaped(plugin, "grabber_ht", create(DeviceType.GRABBER_HT), r -> {
+        shaped(plugin, "grabber_ht", create(DeviceType.MVN_GRABBER_HT), r -> {
             r.shape("OPO");
             r.setIngredient('O', Material.OBSERVER);
             r.setIngredient('P', Material.STICKY_PISTON);
         });
-        shaped(plugin, "pusher_ht", create(DeviceType.PUSHER_HT), r -> {
+        shaped(plugin, "pusher_ht", create(DeviceType.MVN_PUSHER_HT), r -> {
             r.shape("DPD");
             r.setIngredient('D', Material.DROPPER);
             r.setIngredient('P', Material.PISTON);
         });
-        shaped(plugin, "encoder", create(DeviceType.ENCODER), r -> {
+        shaped(plugin, "encoder", create(DeviceType.MVN_ENCODER), r -> {
             r.shape("KPK", "PSP", "KPK");
             r.setIngredient('K', Material.INK_SAC);
             r.setIngredient('P', Material.PAPER);
             r.setIngredient('S', Material.SMITHING_TABLE);
         });
-        shaped(plugin, "crafting_grid", create(DeviceType.CRAFTING_GRID), r -> {
+        shaped(plugin, "crafting_grid", create(DeviceType.MVN_CRAFTING_GRID), r -> {
             r.shape("CRC", "RGR", "CRC");
             r.setIngredient('C', Material.CRAFTING_TABLE);
             r.setIngredient('R', Material.REDSTONE);
             r.setIngredient('G', Material.CARTOGRAPHY_TABLE);
         });
         // Blueprint en blanco: el Encoder lo rellena con la receta de la matriz.
-        shaped(plugin, "blueprint", stackOf(create(DeviceType.BLUEPRINT), 4), r -> {
+        shaped(plugin, "blueprint", stackOf(create(DeviceType.MVN_BLUEPRINT), 4), r -> {
             r.shape("PPP", "PBP", "PPP");
             r.setIngredient('P', Material.PAPER);
             r.setIngredient('B', Material.BLUE_DYE);
         });
-        shaped(plugin, "configurator", create(DeviceType.CONFIGURATOR), r -> {
+        shaped(plugin, "configurator", create(DeviceType.MVN_CONFIGURATOR), r -> {
             r.shape("I I", " C ", " I ");
             r.setIngredient('I', Material.IRON_INGOT);
             r.setIngredient('C', Material.COMPARATOR);
@@ -532,17 +533,17 @@ public final class Items {
             r.setIngredient('D', Material.DEAD_BUSH);
             r.setIngredient('S', Material.STICK);
         });
-        shaped(plugin, "crayon", create(DeviceType.CRAYON), r -> {
+        shaped(plugin, "crayon", create(DeviceType.MVN_CRAYON), r -> {
             r.shape("C", "S");
             r.setIngredient('C', Material.CYAN_DYE);
             r.setIngredient('S', Material.STICK);
         });
-        shaped(plugin, "quantum_workbench", create(DeviceType.QUANTUM_WORKBENCH), r -> {
+        shaped(plugin, "quantum_workbench", create(DeviceType.MVN_QUANTUM_WORKBENCH), r -> {
             r.shape("DDD", "DCD", "DDD");
             r.setIngredient('D', Material.DIAMOND);
             r.setIngredient('C', Material.CRAFTING_TABLE);
         });
-        shaped(plugin, "infinity_barrel", create(DeviceType.INFINITY_BARREL), r -> {
+        shaped(plugin, "infinity_barrel", create(DeviceType.MVN_INFINITY_BARREL), r -> {
             r.shape("NDN", "DBD", "NDN");
             r.setIngredient('N', Material.NETHERITE_INGOT);
             r.setIngredient('D', Material.DIAMOND_BLOCK);

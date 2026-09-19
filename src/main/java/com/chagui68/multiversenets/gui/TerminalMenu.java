@@ -51,13 +51,13 @@ public class TerminalMenu extends MenuHolder {
 
     private static final String AMOUNT_PREFIX = "Amount: ";
 
-    private enum SortOrder {ALPHABETIC, AMOUNT}
+    private enum SortOrder {MVN_ALPHABETIC, MVN_AMOUNT}
 
     private final Network network;
     private final ItemStack[] displayedSamples = new ItemStack[54];
     private int page = 0;
     private String query = "";
-    private SortOrder sortOrder = SortOrder.ALPHABETIC;
+    private SortOrder sortOrder = SortOrder.MVN_ALPHABETIC;
     private boolean showOnlyPurged = false;
     private BukkitTask tickTask;
 
@@ -83,7 +83,7 @@ public class TerminalMenu extends MenuHolder {
         ItemStack background = panel(Material.LIGHT_GRAY_STAINED_GLASS_PANE, " ");
         inv.setItem(PURGER_TOGGLE_SLOT, purgerToggleIcon());
         inv.setItem(SORT_SLOT, panel(Material.BLUE_STAINED_GLASS_PANE,
-                sortOrder == SortOrder.ALPHABETIC ? "Change Sort Order: A-Z" : "Change Sort Order: Amount"));
+                sortOrder == SortOrder.MVN_ALPHABETIC ? "Change Sort Order: A-Z" : "Change Sort Order: Amount"));
         inv.setItem(FILTER_SLOT, filterIcon());
         inv.setItem(PREV_SLOT, panel(Material.RED_STAINED_GLASS_PANE, "Previous Page"));
         inv.setItem(NEXT_SLOT, panel(Material.RED_STAINED_GLASS_PANE, "Next Page"));
@@ -112,7 +112,7 @@ public class TerminalMenu extends MenuHolder {
         List<NetworkStorage.View> all = showOnlyPurged
                 ? network.storage().getPurgedItemsView()
                 : network.storage().view();
-        Comparator<NetworkStorage.View> comparator = sortOrder == SortOrder.AMOUNT
+        Comparator<NetworkStorage.View> comparator = sortOrder == SortOrder.MVN_AMOUNT
                 ? Comparator.comparingLong(NetworkStorage.View::amount).reversed()
                 : Comparator.comparing(v -> readableName(v.sample()));
         List<NetworkStorage.View> out = new ArrayList<>(all);
@@ -279,7 +279,7 @@ public class TerminalMenu extends MenuHolder {
                 return;
             }
             case SORT_SLOT -> {
-                sortOrder = sortOrder == SortOrder.ALPHABETIC ? SortOrder.AMOUNT : SortOrder.ALPHABETIC;
+                sortOrder = sortOrder == SortOrder.MVN_ALPHABETIC ? SortOrder.MVN_AMOUNT : SortOrder.MVN_ALPHABETIC;
                 page = 0;
                 refresh();
                 return;

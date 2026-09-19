@@ -136,7 +136,8 @@ public final class NodeStore {
         if (blob.greedyAmounts == null) {
             blob.greedyAmounts = new ArrayList<>();
         }
-        if ("GREEDY_CELL".equals(blob.typeName) && blob.cellSample != null && blob.cellAmount > 0) {
+        if (("GREEDY_CELL".equals(blob.typeName) || "MVN_GREEDY_CELL".equals(blob.typeName))
+                && blob.cellSample != null && blob.cellAmount > 0) {
             if (blob.greedySamples.isEmpty()) {
                 blob.greedySamples.add(blob.cellSample);
                 blob.greedyAmounts.add(blob.cellAmount);

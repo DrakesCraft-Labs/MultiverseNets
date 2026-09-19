@@ -19,12 +19,12 @@ class DeviceTypeTest {
      */
     @Test
     void filterableDevicesIncludeNewTypes() {
-        assertTrue(DeviceType.GRABBER.filterable());
-        assertTrue(DeviceType.GRABBER_HT.filterable());
-        assertTrue(DeviceType.PUSHER_HT.filterable());
-        assertTrue(DeviceType.VACUUM.filterable());
-        assertTrue(DeviceType.GREEDY_CELL.filterable());
-        assertFalse(DeviceType.CONTROLLER.filterable());
+        assertTrue(DeviceType.MVN_GRABBER.filterable());
+        assertTrue(DeviceType.MVN_GRABBER_HT.filterable());
+        assertTrue(DeviceType.MVN_PUSHER_HT.filterable());
+        assertTrue(DeviceType.MVN_VACUUM.filterable());
+        assertTrue(DeviceType.MVN_GREEDY_CELL.filterable());
+        assertFalse(DeviceType.MVN_CONTROLLER.filterable());
     }
 
     /**
@@ -33,8 +33,8 @@ class DeviceTypeTest {
      */
     @Test
     void greedyCellIsNotStorageCell() {
-        assertTrue(DeviceType.CELL_T1.isCell());
-        assertFalse(DeviceType.GREEDY_CELL.isCell());
+        assertTrue(DeviceType.MVN_CELL_T1.isCell());
+        assertFalse(DeviceType.MVN_GREEDY_CELL.isCell());
     }
 
     /**
@@ -43,8 +43,8 @@ class DeviceTypeTest {
      */
     @Test
     void blueprintAndWirelessTerminalAreNotPlaceable() {
-        assertFalse(DeviceType.BLUEPRINT.placeable());
-        assertFalse(DeviceType.WIRELESS_TERMINAL.placeable());
+        assertFalse(DeviceType.MVN_BLUEPRINT.placeable());
+        assertFalse(DeviceType.MVN_WIRELESS_TERMINAL.placeable());
     }
 
     /**
@@ -53,11 +53,11 @@ class DeviceTypeTest {
      */
     @Test
     void directionalAppliesOnlyToAdvancedDevices() {
-        assertTrue(DeviceType.GRABBER_HT.isDirectional());
-        assertTrue(DeviceType.PUSHER_HT.isDirectional());
-        assertFalse(DeviceType.GRABBER.isDirectional());
-        assertFalse(DeviceType.PUSHER.isDirectional());
-        assertFalse(DeviceType.VACUUM.isDirectional());
+        assertTrue(DeviceType.MVN_GRABBER_HT.isDirectional());
+        assertTrue(DeviceType.MVN_PUSHER_HT.isDirectional());
+        assertFalse(DeviceType.MVN_GRABBER.isDirectional());
+        assertFalse(DeviceType.MVN_PUSHER.isDirectional());
+        assertFalse(DeviceType.MVN_VACUUM.isDirectional());
     }
 
     /**
@@ -66,9 +66,9 @@ class DeviceTypeTest {
      */
     @Test
     void simpleAndAdvancedDisplayNames() {
-        assertEquals("Simple Grabber", DeviceType.GRABBER.display());
-        assertEquals("Advanced Grabber", DeviceType.GRABBER_HT.display());
-        assertEquals("Simple Pusher", DeviceType.PUSHER.display());
-        assertEquals("Advanced Pusher", DeviceType.PUSHER_HT.display());
+        assertEquals("Simple Grabber", DeviceType.MVN_GRABBER.display());
+        assertEquals("Advanced Grabber", DeviceType.MVN_GRABBER_HT.display());
+        assertEquals("Simple Pusher", DeviceType.MVN_PUSHER.display());
+        assertEquals("Advanced Pusher", DeviceType.MVN_PUSHER_HT.display());
     }
 }

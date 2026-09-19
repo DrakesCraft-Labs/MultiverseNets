@@ -90,7 +90,7 @@ class BlockFlowsTest {
      */
     @Test
     void breakingCellWithCargoEmbedsCargoInItem() {
-        Block cell = place(0, 64, 0, DeviceType.CELL_T2);
+        Block cell = place(0, 64, 0, DeviceType.MVN_CELL_T2);
         NodeBlob blob = NodeStore.get(cell);
         blob.cellSample = new ItemStack(Material.REDSTONE);
         blob.cellAmount = 12345;
@@ -98,7 +98,7 @@ class BlockFlowsTest {
 
         ItemStack drop = breakBlock(cell);
         assertNotNull(drop, "breaking cell should drop cell item");
-        assertEquals(DeviceType.CELL_T2, Items.typeOf(drop));
+        assertEquals(DeviceType.MVN_CELL_T2, Items.typeOf(drop));
         String cargo = drop.getItemMeta().getPersistentDataContainer()
                 .get(Keys.CELL_CARGO, PersistentDataType.STRING);
         assertNotNull(cargo, "dropped item contains embedded cargo");
@@ -116,8 +116,8 @@ class BlockFlowsTest {
      */
     @Test
     void placingCellWithCargoRestoresState() {
-        ItemStack item = Items.create(DeviceType.CELL_T1);
-        NodeBlob saved = NodeBlob.create(DeviceType.CELL_T1.name());
+        ItemStack item = Items.create(DeviceType.MVN_CELL_T1);
+        NodeBlob saved = NodeBlob.create(DeviceType.MVN_CELL_T1.name());
         saved.cellSample = new ItemStack(Material.GOLD_INGOT);
         saved.cellAmount = 777;
         var meta = item.getItemMeta();
@@ -126,7 +126,7 @@ class BlockFlowsTest {
 
         Block target = world.getBlockAt(10, 64, 0);
         org.bukkit.block.BlockState previous = target.getState();
-        target.setType(DeviceType.CELL_T1.material());
+        target.setType(DeviceType.MVN_CELL_T1.material());
         BlockPlaceEvent placeEvent = new BlockPlaceEvent(target, previous, target.getRelative(BlockFace.DOWN),
                 item, player, true, EquipmentSlot.HAND);
         server.getPluginManager().callEvent(placeEvent);
@@ -143,9 +143,9 @@ class BlockFlowsTest {
      */
     @Test
     void breakingReceiverPreservesWirelessLink() {
-        Block tx = place(0, 64, 0, DeviceType.TRANSMITTER);
-        place(1, 64, 0, DeviceType.CABLE);
-        Block rx = place(2, 64, 0, DeviceType.RECEIVER);
+        Block tx = place(0, 64, 0, DeviceType.MVN_TRANSMITTER);
+        place(1, 64, 0, DeviceType.MVN_CABLE);
+        Block rx = place(2, 64, 0, DeviceType.MVN_RECEIVER);
         NodeBlob blob = NodeStore.get(rx);
         blob.txWorld = world.getUID().toString();
         blob.txX = 0;
@@ -169,7 +169,7 @@ class BlockFlowsTest {
      */
     @Test
     void explosionsDoNotBreakNodes() {
-        Block cable = place(5, 64, 5, DeviceType.CABLE);
+        Block cable = place(5, 64, 5, DeviceType.MVN_CABLE);
         Block other = world.getBlockAt(5, 65, 5);
         other.setType(Material.STONE);
         List<Block> affected = new ArrayList<>(List.of(cable, other));
@@ -188,7 +188,7 @@ class BlockFlowsTest {
      */
     @Test
     void pistonsDoNotMoveNodes() {
-        Block grabber = place(6, 64, 6, DeviceType.GRABBER);
+        Block grabber = place(6, 64, 6, DeviceType.MVN_GRABBER);
         Block piston = world.getBlockAt(6, 64, 7);
         piston.setType(Material.PISTON);
         BlockPistonExtendEvent extend = new BlockPistonExtendEvent(piston, List.of(grabber), BlockFace.NORTH);
@@ -204,11 +204,11 @@ class BlockFlowsTest {
      */
     @Test
     void bindAndOpenWirelessTerminal() {
-        Block controller = place(0, 64, 0, DeviceType.CONTROLLER);
+        Block controller = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
         plugin.networks().registerController(controller);
-        place(1, 64, 0, DeviceType.CELL_T1);
+        place(1, 64, 0, DeviceType.MVN_CELL_T1);
 
-        ItemStack terminal = Items.create(DeviceType.WIRELESS_TERMINAL);
+        ItemStack terminal = Items.create(DeviceType.MVN_WIRELESS_TERMINAL);
         assertNotNull(terminal.getItemMeta().lore(), "initial lore must be present");
         player.setSneaking(true);
         player.getInventory().setItemInMainHand(terminal);
@@ -232,12 +232,12 @@ class BlockFlowsTest {
      */
     @Test
     void wirelessTerminalBindsViaShiftClickOnTerminalBlock() {
-        Block controller = place(0, 64, 0, DeviceType.CONTROLLER);
+        Block controller = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
         plugin.networks().registerController(controller);
-        Block terminalBlock = place(1, 64, 0, DeviceType.TERMINAL);
+        Block terminalBlock = place(1, 64, 0, DeviceType.MVN_TERMINAL);
         plugin.networks().networkFor(world, PosUtil.pack(0, 64, 0)).scan();
 
-        ItemStack wireless = Items.create(DeviceType.WIRELESS_TERMINAL);
+        ItemStack wireless = Items.create(DeviceType.MVN_WIRELESS_TERMINAL);
         player.setSneaking(true);
         player.getInventory().setItemInMainHand(wireless);
         var bindEvent = new PlayerInteractEvent(player,
@@ -256,11 +256,11 @@ class BlockFlowsTest {
      */
     @Test
     void boundWirelessTerminalOpensTerminalInAir() {
-        Block controller = place(0, 64, 0, DeviceType.CONTROLLER);
+        Block controller = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
         plugin.networks().registerController(controller);
-        place(1, 64, 0, DeviceType.CELL_T1);
+        place(1, 64, 0, DeviceType.MVN_CELL_T1);
 
-        ItemStack terminal = Items.create(DeviceType.WIRELESS_TERMINAL);
+        ItemStack terminal = Items.create(DeviceType.MVN_WIRELESS_TERMINAL);
         Items.bindWireless(terminal, controller.getLocation());
         player.getInventory().setItemInMainHand(terminal);
 
@@ -279,7 +279,7 @@ class BlockFlowsTest {
      */
     @Test
     void rakeDismantlesNodeAndConsumesUse() {
-        Block grabber = place(0, 64, 0, DeviceType.GRABBER);
+        Block grabber = place(0, 64, 0, DeviceType.MVN_GRABBER);
         ItemStack rake = Items.rake();
         int usesBefore = Items.rakeUses(rake);
         player.getInventory().setItemInMainHand(rake);
@@ -300,8 +300,8 @@ class BlockFlowsTest {
      */
     @Test
     void rakeRejectsControllerAndLoadedCell() {
-        Block controller = place(0, 64, 0, DeviceType.CONTROLLER);
-        Block cell = place(1, 64, 0, DeviceType.CELL_T2);
+        Block controller = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
+        Block cell = place(1, 64, 0, DeviceType.MVN_CELL_T2);
         NodeBlob blob = NodeStore.get(cell);
         blob.cellSample = new ItemStack(Material.DIAMOND);
         blob.cellAmount = 5;
@@ -329,16 +329,16 @@ class BlockFlowsTest {
      */
     @Test
     void wrenchCopiesAndPastesFilters() {
-        Block source = place(0, 64, 0, DeviceType.GRABBER);
+        Block source = place(0, 64, 0, DeviceType.MVN_GRABBER);
         NodeBlob blobSource = NodeStore.get(source);
         blobSource.filterMaterials.add("diamond");
         blobSource.filterMaterials.add("gold_ingot");
         blobSource.filterBlacklist = true;
         NodeStore.put(source, blobSource);
 
-        Block target = place(1, 64, 0, DeviceType.GRABBER);
+        Block target = place(1, 64, 0, DeviceType.MVN_GRABBER);
 
-        ItemStack wrench = Items.create(DeviceType.CONFIGURATOR);
+        ItemStack wrench = Items.create(DeviceType.MVN_CONFIGURATOR);
         player.getInventory().setItemInMainHand(wrench);
 
         player.setSneaking(true);
@@ -361,8 +361,8 @@ class BlockFlowsTest {
      */
     @Test
     void crayonTogglesControllerParticles() {
-        Block controller = place(0, 64, 0, DeviceType.CONTROLLER);
-        ItemStack crayon = Items.create(DeviceType.CRAYON);
+        Block controller = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
+        ItemStack crayon = Items.create(DeviceType.MVN_CRAYON);
         player.getInventory().setItemInMainHand(crayon);
 
         assertFalse(NodeStore.get(controller).crayon);
@@ -380,11 +380,11 @@ class BlockFlowsTest {
      */
     @Test
     void grabberWithTargetFaceOnlyExtractsFromDesignatedFace() {
-        Block ctrl = place(0, 64, 0, DeviceType.CONTROLLER);
+        Block ctrl = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
         plugin.networks().registerController(ctrl);
-        Block cell = place(1, 64, 0, DeviceType.CELL_T1);
+        Block cell = place(1, 64, 0, DeviceType.MVN_CELL_T1);
         plugin.networks().invalidateNear(cell);
-        Block grabber = place(0, 64, 1, DeviceType.GRABBER_HT);
+        Block grabber = place(0, 64, 1, DeviceType.MVN_GRABBER_HT);
         plugin.networks().invalidateNear(grabber);
 
         Block westChest = world.getBlockAt(-1, 64, 1);
@@ -418,10 +418,10 @@ class BlockFlowsTest {
      */
     @Test
     void vacuumPicksUpGroundItemsAndRespectsFilters() {
-        Block ctrl = place(0, 64, 0, DeviceType.CONTROLLER);
+        Block ctrl = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
         plugin.networks().registerController(ctrl);
-        place(1, 64, 0, DeviceType.CELL_T1);
-        Block vacuum = place(0, 64, 1, DeviceType.VACUUM);
+        place(1, 64, 0, DeviceType.MVN_CELL_T1);
+        Block vacuum = place(0, 64, 1, DeviceType.MVN_VACUUM);
         Network net = plugin.networks().networkByController(ctrl.getLocation());
         net.scan();
 
@@ -454,11 +454,11 @@ class BlockFlowsTest {
      */
     @Test
     void purgerDiscardsNetworkItemsOnlyWhenFiltered() {
-        Block ctrl = place(0, 64, 0, DeviceType.CONTROLLER);
+        Block ctrl = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
         plugin.networks().registerController(ctrl);
-        place(1, 64, 0, DeviceType.CELL_T1);
-        place(2, 64, 0, DeviceType.CELL_T1);
-        Block purger = place(0, 64, 1, DeviceType.PURGER);
+        place(1, 64, 0, DeviceType.MVN_CELL_T1);
+        place(2, 64, 0, DeviceType.MVN_CELL_T1);
+        Block purger = place(0, 64, 1, DeviceType.MVN_PURGER);
         Network net = plugin.networks().networkByController(ctrl.getLocation());
         net.scan();
 
@@ -492,12 +492,12 @@ class BlockFlowsTest {
      */
     @Test
     void nodeStoreFastTypeAndPresenceOperations() {
-        Block cable = place(10, 64, 10, DeviceType.CABLE);
+        Block cable = place(10, 64, 10, DeviceType.MVN_CABLE);
         Block empty = world.getBlockAt(10, 64, 11);
 
         assertTrue(NodeStore.hasNode(cable));
         assertFalse(NodeStore.hasNode(empty));
-        assertEquals(DeviceType.CABLE, NodeStore.getType(cable));
+        assertEquals(DeviceType.MVN_CABLE, NodeStore.getType(cable));
 
         // Test self-healing fallback when nodeTypeKey is removed
         org.bukkit.NamespacedKey typeKey = new org.bukkit.NamespacedKey(plugin, "t10_64_10");
@@ -505,7 +505,7 @@ class BlockFlowsTest {
         assertFalse(cable.getChunk().getPersistentDataContainer().has(typeKey, PersistentDataType.STRING));
 
         // getType should fall back to blob decode and restore typeKey
-        assertEquals(DeviceType.CABLE, NodeStore.getType(cable));
+        assertEquals(DeviceType.MVN_CABLE, NodeStore.getType(cable));
         assertTrue(cable.getChunk().getPersistentDataContainer().has(typeKey, PersistentDataType.STRING));
     }
 
@@ -515,10 +515,10 @@ class BlockFlowsTest {
      */
     @Test
     void networkStorageViewAggregatesBucketsCorrectly() {
-        Block ctrl = place(0, 64, 0, DeviceType.CONTROLLER);
+        Block ctrl = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
         plugin.networks().registerController(ctrl);
-        place(1, 64, 0, DeviceType.CELL_T1);
-        place(2, 64, 0, DeviceType.CELL_T1);
+        place(1, 64, 0, DeviceType.MVN_CELL_T1);
+        place(2, 64, 0, DeviceType.MVN_CELL_T1);
         Network net = plugin.networks().networkByController(ctrl.getLocation());
         net.scan();
 

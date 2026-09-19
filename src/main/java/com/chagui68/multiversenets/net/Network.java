@@ -146,7 +146,7 @@ public class Network {
         }
         this.crayon = ctrlBlob.crayon;
 
-        found.put(controllerPos, DeviceType.CONTROLLER);
+        found.put(controllerPos, DeviceType.MVN_CONTROLLER);
         visited.add(controllerPos);
         queue.add(controllerPos);
 
@@ -171,7 +171,7 @@ public class Network {
                 if (type == null) {
                     continue;
                 }
-                if (type == DeviceType.CONTROLLER && next != controllerPos) {
+                if (type == DeviceType.MVN_CONTROLLER && next != controllerPos) {
                     errors.add("foreign controller at " + coordString(next));
                     continue;
                 }

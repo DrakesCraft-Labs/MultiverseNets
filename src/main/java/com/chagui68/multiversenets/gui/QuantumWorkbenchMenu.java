@@ -146,7 +146,7 @@ public class QuantumWorkbenchMenu extends MenuHolder {
         }
 
         int nextTier = centerType.cellTier() + 1;
-        DeviceType nextType = DeviceType.parse("CELL_T" + nextTier);
+        DeviceType nextType = DeviceType.parse("MVN_CELL_T" + nextTier);
         if (nextType == null) {
             return;
         }
