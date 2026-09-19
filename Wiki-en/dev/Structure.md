@@ -4,6 +4,9 @@ This document describes the folder and file organization of the **MultiverseNets
 aimed at developers who want to quickly understand where to find each piece of code and how the
 project is laid out.
 
+> This page is part of the wiki's **development area**. Recommended companions:
+> [How the code works](Code.md) · [Plugin tests](Tests.md)
+
 ## Project root
 ```
 MultiverseNets/
@@ -26,14 +29,20 @@ MultiverseNets/
 │       └─ java/        # Tests mirroring the packages in src/main/java
 ├─ pom.xml               # Maven project configuration (dependencies, Java version, etc.)
 ├─ README.md             # Main plugin documentation (English)
-├─ Wiki-es/              # Wiki in Spanish (overview, structure and recipes)
+├─ Wiki-es/              # Wiki in Spanish
 │   ├─ README.md         # Plugin overview in Spanish
-│   ├─ Structure.md      # Project structure description in Spanish
-│   └─ Recipes.md        # Recipes and functions of each item in Spanish
+│   ├─ Recipes.md        # Recipes and functions of each item in Spanish
+│   └─ dev/              # Technical / developer documentation (in Spanish)
+│       ├─ Structure.md  # Project structure description in Spanish
+│       ├─ Code.md       # How the code works internally in Spanish
+│       └─ Tests.md      # Tests: running them and what each covers in Spanish
 └─ Wiki-en/              # Wiki in English (mirror of the Spanish wiki)
     ├─ README.md         # Plugin overview in English
-    ├─ Structure.md      # This file – project structure description in English
-    └─ Recipes.md        # Recipes and functions of each item in English
+    ├─ Recipes.md        # Recipes and functions of each item in English
+    └─ dev/              # Technical / developer documentation
+        ├─ Structure.md  # This file – project structure description in English
+        ├─ Code.md       # How the code works internally in English
+        └─ Tests.md      # Tests: running them and what each covers in English
 ```
 
 ## Key folder details
@@ -50,6 +59,13 @@ MultiverseNets/
   resources.
 - **`src/test/java/`** – JUnit tests that validate the plugin's functionality. Run them with
   `mvn test`.
+
+## Documentation by area
+| Area | File | When to consult |
+| --- | --- | --- |
+| Structure and organization | `Structure.md` | You want to know where each thing lives in the repo. |
+| Internal workings | `Code.md` | You want to understand the network, persistence or the menus. |
+| Tests | `Tests.md` | You want to run the tests or know what each one covers. |
 
 This structure follows the standard Maven project layout, which makes building (`mvn clean package`)
 and dependency management straightforward.

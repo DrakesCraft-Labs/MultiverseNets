@@ -2,6 +2,9 @@
 
 Este documento describe la organización de carpetas y archivos del proyecto **MultiverseNets**. Está pensado para desarrolladores que quieran comprender rápidamente dónde encontrar cada elemento del código y cómo está estructurado el proyecto.
 
+> Esta página forma parte de la **zona de desarrollo** de la wiki. Complementos recomendados:
+> [Cómo funciona el código](Code.md) · [Los tests del plugin](Tests.md)
+
 ## Raíz del proyecto
 ```
 MultiverseNets/
@@ -24,14 +27,20 @@ MultiverseNets/
 │       └─ java/        # Tests correspondientes a los paquetes de src/main/java
 ├─ pom.xml               # Configuración del proyecto Maven (dependencias, versión Java, etc.)
 ├─ README.md             # Documentación principal del plugin (Inglés)
-├─ Wiki-es/              # Wiki en español (README, estructura y recetas)
+├─ Wiki-es/              # Wiki en español
 │   ├─ README.md         # Vista general del plugin en español
-│   ├─ Structure.md      # Este archivo – descripción de la estructura del proyecto
-│   └─ Recipes.md        # Listado de recetas y funciones de cada ítem del plugin
+│   ├─ Recipes.md        # Recetas y funciones de cada ítem del plugin
+│   └─ dev/              # Zona técnica / documentación para desarrolladores
+│       ├─ Structure.md  # Este archivo – estructura del proyecto
+│       ├─ Code.md       # Cómo funciona el código internamente
+│       └─ Tests.md      # Los tests: ejecución y qué cubre cada uno
 └─ Wiki-en/              # Wiki en inglés (espejo de la wiki en español)
     ├─ README.md         # Overview of the plugin in English
-    ├─ Structure.md      # Project structure description in English
-    └─ Recipes.md        # Recipes and functions of each item in English
+    ├─ Recipes.md        # Recipes and functions of each item in English
+    └─ dev/              # Developer documentation (mirror in English)
+        ├─ Structure.md  # Project structure description in English
+        ├─ Code.md       # How the code works internally in English
+        └─ Tests.md      # Tests: running them and what each covers in English
 ```
 
 ## Detalles de carpetas clave
@@ -41,5 +50,12 @@ MultiverseNets/
 - **`src/main/java/com/chagui68/multiversenets/persist/`** – Clases responsables de guardar y cargar la información de cada nodo de la red (por chunk).
 - **`src/main/resources/`** – Archivos de configuración (`config.yml`, `plugin.yml`) y demás recursos estáticos.
 - **`src/test/java/`** – Tests JUnit que validan la funcionalidad del plugin. Se ejecutan con `mvn test`.
+
+## Documentación por zona
+| Zona | Archivo | Cuando la consultas |
+| --- | --- | --- |
+| Estructura y organización | `Structure.md` | Quieres saber dónde está cada cosa en el repo. |
+| Funcionamiento interno | `Code.md` | Quieres entender cómo funciona la red, la persistencia o los menús. |
+| Tests | `Tests.md` | Quieres ejecutar los tests o saber qué cubre cada uno. |
 
 Esta estructura sigue el estándar de proyectos Maven, lo que facilita la compilación (`mvn clean package`) y la gestión de dependencias.

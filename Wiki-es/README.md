@@ -8,7 +8,7 @@
 
 **Redes de logística digital y almacenamiento masivo standalone para Paper — sin Slimefun.**
 
-> Índice de la wiki: [README](README.md) · [Estructura del proyecto](Structure.md) · [Recetas y funciones](Recipes.md)
+> Índice de la wiki: [README](README.md) · [Recetas y funciones](Recipes.md) · **Zona de desarrollo:** [Estructura](dev/Structure.md) · [Código](dev/Code.md) · [Tests](dev/Tests.md)
 
 ---
 

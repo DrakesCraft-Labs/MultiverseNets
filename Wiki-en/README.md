@@ -8,7 +8,7 @@
 
 **Standalone digital logistics networks and massive storage for Paper — no Slimefun.**
 
-> Wiki index: [README](README.md) · [Project structure](Structure.md) · [Recipes & functions](Recipes.md)
+> Wiki index: [README](README.md) · [Recipes & functions](Recipes.md) · **Development:** [Structure](dev/Structure.md) · [Code](dev/Code.md) · [Tests](dev/Tests.md)
 
 ---
 
