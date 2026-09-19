@@ -101,3 +101,11 @@ Cada dispositivo se fabrica en una mesa de crafteo 3×3 estándar. `·` marca el
 | `/mvnets reload` | Recarga la configuración | `multiversenets.admin` |
 
 Alias: `/mvn`
+
+## 📜 Licencia
+
+Este proyecto está bajo la licencia **GNU General Public License Versión 3 (GPL-3.0)**. Consulta el archivo [LICENSE](../LICENSE) para más detalles.
+
+---
+
+**Autor:** Chagui68 · Revisión y afinamiento: Jack · Un proyecto de [DrakesCraft Labs](https://github.com/DrakesCraft-Labs)

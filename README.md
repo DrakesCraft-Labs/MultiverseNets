@@ -8,6 +8,7 @@
 
 <img src="https://img.shields.io/badge/Paper-1.21.11-38BDF8?style=for-the-badge&logo=minecraft&logoColor=white" alt="Paper 1.21.11"/>
 <img src="https://img.shields.io/badge/Java-21-F89820?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java 21"/>
+<img src="https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge" alt="GPLv3"/>
 <img src="https://img.shields.io/badge/Author-Chagui68-22C55E?style=for-the-badge" alt="Chagui68"/>
 
 </div>
@@ -175,11 +176,15 @@ mvn clean package
 The jar is generated at `target/MultiverseNets-v<version>.jar`.
 
 ## 📋 Compatibility
-
+ 
 | Parameter | Requirement |
 |---|---|
 | **Server** | Paper / Purpur / Folia 1.21.11 |
 | **Java** | Java 21 LTS |
 | **Dependencies** | None (standalone) |
+
+## 📜 License
+
+This project is licensed under the terms of the **GNU General Public License Version 3 (GPL-3.0)**. See the [LICENSE](LICENSE) file for details.
 
 ---

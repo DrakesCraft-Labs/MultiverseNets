@@ -182,6 +182,10 @@ The jar is generated at `target/MultiverseNets-v<version>.jar`.
 | **Java** | Java 21 LTS |
 | **Dependencies** | None (standalone) |
 
+## 📜 License
+
+This project is licensed under the terms of the **GNU General Public License Version 3 (GPL-3.0)**. See the [LICENSE](../LICENSE) file for details.
+
 ---
 
 **Author:** Chagui68 · Review and tuning: Jack · A [DrakesCraft Labs](https://github.com/DrakesCraft-Labs) project
