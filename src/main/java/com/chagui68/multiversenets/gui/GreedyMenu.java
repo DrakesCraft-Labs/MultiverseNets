@@ -36,6 +36,8 @@ import java.util.function.Predicate;
 public class GreedyMenu extends MenuHolder {
 
     private static final int STORAGE_SLOTS = 36; // slots 0 to 35
+    private static final int PREV_PAGE_SLOT = 36;
+    private static final int NEXT_PAGE_SLOT = 44;
     private static final int FILTER_SLOT = 45;
     private static final int DEPOSIT_ALL_SLOT = 46;
     private static final int MONITOR_SLOT = 49;
@@ -45,6 +47,7 @@ public class GreedyMenu extends MenuHolder {
     private static final String[] FACES_CYCLE = {"ALL", "NORTH", "EAST", "SOUTH", "WEST", "UP", "DOWN"};
 
     private final Block block;
+    private int page = 0;
 
     public GreedyMenu(MultiverseNets plugin, Player player, Block block) {
         super(plugin, player);
@@ -67,12 +70,19 @@ public class GreedyMenu extends MenuHolder {
         long totalUsed = blob.totalGreedyAmount();
         long freeSpace = Math.max(0, cap - totalUsed);
 
-        // 1. Draw storage slots (0 to 35)
         int storedTypes = blob.greedySamples != null ? blob.greedySamples.size() : 0;
+        int maxPages = Math.max(1, (storedTypes + STORAGE_SLOTS - 1) / STORAGE_SLOTS);
+        if (page >= maxPages) {
+            page = Math.max(0, maxPages - 1);
+        }
+
+        // 1. Draw storage slots (0 to 35) for the current page
+        int startIndex = page * STORAGE_SLOTS;
         for (int i = 0; i < STORAGE_SLOTS; i++) {
-            if (i < storedTypes) {
-                ItemStack sample = blob.greedySamples.get(i);
-                Long amt = (blob.greedyAmounts != null && i < blob.greedyAmounts.size()) ? blob.greedyAmounts.get(i) : 0L;
+            int itemIndex = startIndex + i;
+            if (itemIndex < storedTypes) {
+                ItemStack sample = blob.greedySamples.get(itemIndex);
+                Long amt = (blob.greedyAmounts != null && itemIndex < blob.greedyAmounts.size()) ? blob.greedyAmounts.get(itemIndex) : 0L;
                 if (sample != null && amt != null && amt > 0) {
                     inv.setItem(i, createStoredItemIcon(sample, amt, totalUsed, cap));
                     continue;
@@ -81,10 +91,38 @@ public class GreedyMenu extends MenuHolder {
             inv.setItem(i, emptySlotIcon());
         }
 
-        // 2. Draw separator row (36 to 44)
+        // 2. Draw separator row (36 to 44) with pagination buttons
         ItemStack separator = panel(Material.GRAY_STAINED_GLASS_PANE, " ");
         for (int slot = 36; slot <= 44; slot++) {
             inv.setItem(slot, separator);
+        }
+
+        // Previous Page button on slot 36
+        if (page > 0) {
+            inv.setItem(PREV_PAGE_SLOT, panel(Material.RED_STAINED_GLASS_PANE, "◀ Previous Page (" + page + "/" + maxPages + ")"));
+        } else {
+            inv.setItem(PREV_PAGE_SLOT, panel(Material.GRAY_STAINED_GLASS_PANE, "◀ First Page (1/" + maxPages + ")"));
+        }
+
+        // Page indicator on middle slot 40
+        ItemStack pageIndicator = new ItemStack(Material.PAPER);
+        var pageMeta = pageIndicator.getItemMeta();
+        if (pageMeta != null) {
+            pageMeta.displayName(Component.text("Page " + (page + 1) + " of " + maxPages, NamedTextColor.AQUA)
+                    .decoration(TextDecoration.ITALIC, false));
+            pageMeta.lore(List.of(
+                    Component.text("Total Item Types: " + storedTypes, NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("Items " + (storedTypes == 0 ? 0 : startIndex + 1) + " - " + Math.min(startIndex + STORAGE_SLOTS, storedTypes), NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false)
+            ));
+            pageIndicator.setItemMeta(pageMeta);
+        }
+        inv.setItem(40, pageIndicator);
+
+        // Next Page button on slot 44
+        if (page < maxPages - 1) {
+            inv.setItem(NEXT_PAGE_SLOT, panel(Material.GREEN_STAINED_GLASS_PANE, "Next Page ▶ (" + (page + 2) + "/" + maxPages + ")"));
+        } else {
+            inv.setItem(NEXT_PAGE_SLOT, panel(Material.GRAY_STAINED_GLASS_PANE, "Last Page ▶ (" + maxPages + "/" + maxPages + ")"));
         }
 
         // 3. Control & Monitor row (45 to 53)
@@ -333,6 +371,25 @@ public class GreedyMenu extends MenuHolder {
             return;
         }
 
+        // Pagination buttons on separator row
+        if (raw == PREV_PAGE_SLOT) {
+            if (page > 0) {
+                page--;
+                draw();
+            }
+            return;
+        }
+
+        if (raw == NEXT_PAGE_SLOT) {
+            int storedTypes = blob.greedySamples != null ? blob.greedySamples.size() : 0;
+            int maxPages = Math.max(1, (storedTypes + STORAGE_SLOTS - 1) / STORAGE_SLOTS);
+            if (page < maxPages - 1) {
+                page++;
+                draw();
+            }
+            return;
+        }
+
         // Storage slots (0 to 35)
         if (raw >= 0 && raw < STORAGE_SLOTS) {
             handleStorageSlotClick(event, blob, raw);
@@ -371,7 +428,8 @@ public class GreedyMenu extends MenuHolder {
         ClickType click = event.getClick();
 
         int storedTypes = blob.greedySamples != null ? blob.greedySamples.size() : 0;
-        boolean hasItemInSlot = slotIndex < storedTypes;
+        int itemIndex = page * STORAGE_SLOTS + slotIndex;
+        boolean hasItemInSlot = itemIndex < storedTypes;
 
         // Player is holding an item on cursor: try deposit
         if (cursor != null && !cursor.getType().isAir()) {
@@ -402,8 +460,8 @@ public class GreedyMenu extends MenuHolder {
 
         // Slot has an item and cursor is empty: withdraw
         if (hasItemInSlot) {
-            ItemStack sample = blob.greedySamples.get(slotIndex);
-            long amount = blob.greedyAmounts.get(slotIndex);
+            ItemStack sample = blob.greedySamples.get(itemIndex);
+            long amount = blob.greedyAmounts.get(itemIndex);
             if (sample == null || amount <= 0) {
                 return;
             }
@@ -412,7 +470,7 @@ public class GreedyMenu extends MenuHolder {
             if (shift) {
                 int want = Math.min(sample.getMaxStackSize(), 64);
                 long take = Math.min(amount, (long) want);
-                blob.removeGreedyItem(slotIndex, take);
+                blob.removeGreedyItem(itemIndex, take);
                 ItemStack withdrawn = sample.clone();
                 withdrawn.setAmount((int) take);
                 int leftover = NetworkManager.insertInto(player.getInventory(), withdrawn);
@@ -427,7 +485,7 @@ public class GreedyMenu extends MenuHolder {
 
             int want = (click == ClickType.RIGHT) ? Math.min(sample.getMaxStackSize(), 64) : 1;
             long take = Math.min(amount, (long) want);
-            blob.removeGreedyItem(slotIndex, take);
+            blob.removeGreedyItem(itemIndex, take);
             ItemStack withdrawn = sample.clone();
             withdrawn.setAmount((int) take);
             view.setCursor(withdrawn);

@@ -141,6 +141,79 @@ class GreedyCellTest {
     }
 
     @Test
+    void greedyMenuPagination() {
+        Block block = world.getBlockAt(0, 64, 0);
+        block.setType(Material.SLIME_BLOCK);
+        NodeBlob blob = NodeBlob.create(DeviceType.MVN_GREEDY_CELL.name());
+
+        // Add 40 different types of items (more than the 36 slots per page)
+        Material[] materials = {
+                Material.STONE, Material.COBBLESTONE, Material.ANDESITE, Material.DIORITE, Material.GRANITE,
+                Material.DIRT, Material.COARSE_DIRT, Material.OAK_LOG, Material.SPRUCE_LOG, Material.BIRCH_LOG,
+                Material.JUNGLE_LOG, Material.ACACIA_LOG, Material.DARK_OAK_LOG, Material.MANGROVE_LOG, Material.CHERRY_LOG,
+                Material.SAND, Material.RED_SAND, Material.GRAVEL, Material.OAK_PLANKS, Material.SPRUCE_PLANKS,
+                Material.BIRCH_PLANKS, Material.JUNGLE_PLANKS, Material.ACACIA_PLANKS, Material.DARK_OAK_PLANKS, Material.GLASS,
+                Material.WHITE_WOOL, Material.ORANGE_WOOL, Material.MAGENTA_WOOL, Material.LIGHT_BLUE_WOOL, Material.YELLOW_WOOL,
+                Material.LIME_WOOL, Material.PINK_WOOL, Material.GRAY_WOOL, Material.LIGHT_GRAY_WOOL, Material.CYAN_WOOL,
+                Material.PURPLE_WOOL, // index 35 (last slot of page 1)
+                Material.BLUE_WOOL,   // index 36 (first slot of page 2)
+                Material.BROWN_WOOL,  // index 37
+                Material.GREEN_WOOL,  // index 38
+                Material.RED_WOOL     // index 39
+        };
+
+        for (int i = 0; i < materials.length; i++) {
+            blob.addGreedyItem(new ItemStack(materials[i]), (i + 1) * 100);
+        }
+        NodeStore.put(block, blob);
+
+        GreedyMenu menu = new GreedyMenu(plugin, player, block);
+        menu.openMenu();
+
+        // Page 1 assertions
+        assertEquals(Material.STONE, player.getOpenInventory().getTopInventory().getItem(0).getType());
+        assertEquals(Material.PURPLE_WOOL, player.getOpenInventory().getTopInventory().getItem(35).getType());
+
+        // Check page indicator at slot 40
+        ItemStack indicator = player.getOpenInventory().getTopInventory().getItem(40);
+        assertNotNull(indicator);
+        assertEquals(Material.PAPER, indicator.getType());
+
+        // Click slot 44 (Next Page)
+        InventoryClickEvent nextPageClick = new InventoryClickEvent(
+                player.getOpenInventory(),
+                InventoryType.SlotType.CONTAINER,
+                44,
+                ClickType.LEFT,
+                InventoryAction.PICKUP_ALL
+        );
+        server.getPluginManager().callEvent(nextPageClick);
+        server.getScheduler().performOneTick();
+
+        // Page 2 assertions: slot 0 should now be BLUE_WOOL (index 36)
+        assertEquals(Material.BLUE_WOOL, player.getOpenInventory().getTopInventory().getItem(0).getType());
+        assertEquals(Material.BROWN_WOOL, player.getOpenInventory().getTopInventory().getItem(1).getType());
+        assertEquals(Material.GREEN_WOOL, player.getOpenInventory().getTopInventory().getItem(2).getType());
+        assertEquals(Material.RED_WOOL, player.getOpenInventory().getTopInventory().getItem(3).getType());
+        // Slot 4 should be empty slot icon
+        assertEquals(Material.LIGHT_GRAY_STAINED_GLASS_PANE, player.getOpenInventory().getTopInventory().getItem(4).getType());
+
+        // Click slot 36 (Previous Page)
+        InventoryClickEvent prevPageClick = new InventoryClickEvent(
+                player.getOpenInventory(),
+                InventoryType.SlotType.CONTAINER,
+                36,
+                ClickType.LEFT,
+                InventoryAction.PICKUP_ALL
+        );
+        server.getPluginManager().callEvent(prevPageClick);
+        server.getScheduler().performOneTick();
+
+        // Back to Page 1
+        assertEquals(Material.STONE, player.getOpenInventory().getTopInventory().getItem(0).getType());
+    }
+
+    @Test
     void terminalMenuPurgerToggleAndGreedyBadge() {
         // Build a network with Controller, Terminal, Greedy Cell, and Purger
         Block controller = world.getBlockAt(0, 64, 0);
