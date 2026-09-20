@@ -38,9 +38,18 @@ import java.util.logging.Logger;
  */
 public final class SlimefunBridge {
 
-    private static final String[] PACKAGE_ROOTS = {
-            "com.github.drakescraft_labs.slimefun4.legacy",
-            "io.github.thebusybiscuit.slimefun4.legacy",
+    /**
+     * Prefijos completos del paquete de la API legacy. El jar vivo de Slimefun-Drake en DrakesCraft
+     * (1.2.DEV v11.0-Drake-1.21.11) expone {@code ...slimefun4.legacy.api.BlockStorage}, sin el
+     * segmento {@code .Slimefun}; el arbol de fuentes actual del fork lo tiene con el. Se prueban
+     * ambos y el upstream original, y el primero que resuelva gana.
+     */
+    private static final String[] API_ROOTS = {
+            "com.github.drakescraft_labs.slimefun4.legacy.api",
+            "com.github.drakescraft_labs.slimefun4.legacy.Slimefun.api",
+            "io.github.thebusybiscuit.slimefun4.legacy.api",
+            "io.github.thebusybiscuit.slimefun4.legacy.Slimefun.api",
+            "me.mrCookieSlime.Slimefun.api",
     };
 
     private static boolean available;
@@ -73,7 +82,7 @@ public final class SlimefunBridge {
             log.info("[Compat] Slimefun is not installed; the network will work only with vanilla containers.");
             return;
         }
-        for (String root : PACKAGE_ROOTS) {
+        for (String root : API_ROOTS) {
             if (tryHook(root)) {
                 available = true;
                 log.info("[Compat] Slimefun detected (" + root + "). Grabbers, pushers, and crafters can use machines.");
@@ -85,10 +94,10 @@ public final class SlimefunBridge {
 
     private static boolean tryHook(String root) {
         try {
-            Class<?> blockStorage = Class.forName(root + ".Slimefun.api.BlockStorage");
-            Class<?> dirtyMenu = Class.forName(root + ".Slimefun.api.inventory.DirtyChestMenu");
-            Class<?> preset = Class.forName(root + ".Slimefun.api.inventory.BlockMenuPreset");
-            Class<?> flow = Class.forName(root + ".Slimefun.api.item_transport.ItemTransportFlow");
+            Class<?> blockStorage = Class.forName(root + ".BlockStorage");
+            Class<?> dirtyMenu = Class.forName(root + ".inventory.DirtyChestMenu");
+            Class<?> preset = Class.forName(root + ".inventory.BlockMenuPreset");
+            Class<?> flow = Class.forName(root + ".item_transport.ItemTransportFlow");
 
             mGetInventory = blockStorage.getMethod("getInventory", Block.class);
             mCheckId = blockStorage.getMethod("checkID", Block.class);

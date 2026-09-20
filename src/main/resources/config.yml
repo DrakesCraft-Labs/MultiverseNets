@@ -14,6 +14,13 @@ language: en
 # -------------------------------------------------------------------------------------
 #  Plugin Compatibility / Compatibilidad con Otros Plugins
 # -------------------------------------------------------------------------------------
+# [EN] Worlds where network devices cannot be placed (DrakesCraft: Clasico stays vanilla).
+# [ES] Mundos donde no se pueden colocar dispositivos de red (en DrakesCraft, Clásico es vainilla).
+blocked-worlds:
+  - clasico
+  - clasico_nether
+  - clasico_the_end
+
 compat:
   # [EN] Allow grabbers and pushers to interact with Slimefun machines and containers.
   #      Set to false if you are running Networks or prefer MultiverseNets to manage

@@ -73,6 +73,12 @@ public class BlockListener implements Listener {
             event.setCancelled(true);
             return;
         }
+        if (com.chagui68.multiversenets.util.Settings.blockedWorld(event.getBlockPlaced().getWorld())) {
+            // Clasico y otros mundos vainilla: la red no existe ahi (config blocked-worlds).
+            event.setCancelled(true);
+            event.getPlayer().sendMessage(Text.msg("Network devices cannot be used in this world.", NamedTextColor.RED));
+            return;
+        }
         NodeStore.put(event.getBlockPlaced(), NodeBlob.create(type.name()));
 
         restoreCargo(event);

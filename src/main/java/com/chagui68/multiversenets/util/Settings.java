@@ -180,6 +180,19 @@ public final class Settings {
  *
      * ES: Devuelve true si la integración con Slimefun está habilitada en config.
      */
+    /**
+     * EN: True if network devices are forbidden in this world (config blocked-worlds).
+     * ES: True si los dispositivos de red están prohibidos en ese mundo (blocked-worlds).
+     */
+    public static boolean blockedWorld(org.bukkit.World world) {
+        if (cfg == null || world == null) return false;
+        String name = world.getName().toLowerCase(java.util.Locale.ROOT);
+        for (String w : cfg.getStringList("blocked-worlds")) {
+            if (w != null && w.toLowerCase(java.util.Locale.ROOT).equals(name)) return true;
+        }
+        return false;
+    }
+
     public static boolean compatSlimefun() {
         return cfg == null || cfg.getBoolean("compat.slimefun", true);
     }
