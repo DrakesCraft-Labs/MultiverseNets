@@ -5,6 +5,7 @@ import com.chagui68.multiversenets.gui.TerminalMenu;
 import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.item.Items;
 import com.chagui68.multiversenets.net.Network;
+import com.chagui68.multiversenets.net.NetworkStorage;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
 import com.chagui68.multiversenets.util.Keys;
@@ -288,6 +289,37 @@ class GreedyCellTest {
         ItemStack slot17NormalAgain = player.getOpenInventory().getTopInventory().getItem(17);
         assertNotNull(slot17NormalAgain);
         assertEquals(Material.MAGMA_BLOCK, slot17NormalAgain.getType());
+    }
+
+    @Test
+    void purgedItemsViewReadsSingleIdentityPerFilterEntry() {
+        // Build a network with a Controller and a Purger whose filter holds the SAME entry
+        // in both lists (custom template in filterItems + vanilla material name in
+        // filterMaterials), exactly like FilterMenu.addFilterItem produces.
+        Block controller = world.getBlockAt(0, 64, 0);
+        controller.setType(Material.LODESTONE);
+        NodeStore.put(controller, NodeBlob.create(DeviceType.MVN_CONTROLLER.name()));
+        plugin.networks().registerController(controller);
+
+        Block purger = world.getBlockAt(1, 64, 0);
+        purger.setType(Material.MAGMA_BLOCK);
+        NodeBlob purgerBlob = NodeBlob.create(DeviceType.MVN_PURGER.name());
+        ItemStack custom = Items.create(DeviceType.MVN_CELL_T1);
+        purgerBlob.filterItems.add(custom);
+        purgerBlob.filterMaterials.add(custom.getType().name());
+        NodeStore.put(purger, purgerBlob);
+
+        Network net = plugin.networks().networkAt(controller);
+        assertNotNull(net, "Network must be discovered");
+        net.scan();
+
+        List<NetworkStorage.View> purged = net.storage().getPurgedItemsView();
+        assertEquals(1, purged.size(),
+                "A single filter entry must be read once, not twice (custom id + vanilla id)");
+        ItemStack sample = purged.get(0).sample();
+        assertEquals(Material.TERRACOTTA, sample.getType());
+        assertEquals(DeviceType.MVN_CELL_T1, Items.typeOf(sample),
+                "The read identity must be the custom id, not a vanilla reconstruction");
     }
 
     @Test

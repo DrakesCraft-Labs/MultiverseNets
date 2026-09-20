@@ -500,14 +500,16 @@ public class NetworkStorage {
                         continue;
                     }
                     if (!blob.filterBlacklist) {
-                        if (blob.filterItems != null) {
+                        // Misma prioridad que NetworkManager.filterPredicate: si hay plantillas
+                        // (filterItems) se usan SOLO ellas; filterMaterials solo cuando no las hay.
+                        boolean hasItems = blob.filterItems != null && !blob.filterItems.isEmpty();
+                        if (hasItems) {
                             for (ItemStack sample : blob.filterItems) {
                                 if (sample != null && !sample.getType().isAir()) {
                                     addToBuckets(buckets, sample, 0);
                                 }
                             }
-                        }
-                        if (blob.filterMaterials != null) {
+                        } else if (blob.filterMaterials != null) {
                             for (String matName : blob.filterMaterials) {
                                 Material mat = Material.matchMaterial(matName);
                                 if (mat != null && !mat.isAir() && mat.isItem()) {
