@@ -1,3 +1,6 @@
+> ⚠️ **CONSOLIDADO EN DRAKES-SUITES (SUITE MULTIVERSE POR CHAGUI68):**  
+> Todo el desarrollo activo y soporte para Paper/Purpur 1.21.11+ se realiza oficialmente en el monorepo [`Drakes-Suites`](https://github.com/DrakesCraft-Labs/Drakes-Suites) dentro del módulo oficial `drakes-multiverse`, preservando la autoría y diseño soberano de **Chagui68**.
+
 <div align="center">
 
 <img src="docs/banner-en.svg" alt="MultiverseNets" width="100%"/>
