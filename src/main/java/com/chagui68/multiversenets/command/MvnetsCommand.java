@@ -28,7 +28,7 @@ import java.util.Locale;
 public class MvnetsCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS =
-            List.of("help", "info", "reload", "give", "devices", "doctor", "stats", "inspect", "repair");
+            List.of("help", "info", "reload", "give", "devices", "doctor", "stats", "inspect", "repair", "recipes");
 
     private final MultiverseNets plugin;
 
@@ -55,6 +55,7 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
             case "stats" -> stats(sender);
             case "inspect" -> inspect(sender);
             case "repair" -> repair(sender);
+            case "recipes" -> recipes(sender);
             default -> sender.sendMessage(Text.msg("Unknown subcommand. Use /" + label + " help.", NamedTextColor.RED));
         }
         return true;
@@ -83,7 +84,9 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("/mvnets repair", NamedTextColor.YELLOW)
                 .append(Component.text(" - Force rescan of the network you are looking at.", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/mvnets reload", NamedTextColor.YELLOW)
-                .append(Component.text(" - Reload the configuration.", NamedTextColor.GRAY)));
+                .append(Component.text(" - Reload configuration and crafting recipes.", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/mvnets recipes", NamedTextColor.YELLOW)
+                .append(Component.text(" - Synchronize and inspect all crafting recipes.", NamedTextColor.GRAY)));
     }
 
     private void sendInfo(CommandSender sender) {
@@ -97,7 +100,28 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
         }
         plugin.reloadConfig();
         com.chagui68.multiversenets.util.Settings.refresh(plugin);
-        sender.sendMessage(Text.msg("Configuration reloaded.", NamedTextColor.GREEN));
+        Items.registerRecipes(plugin);
+        for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+            Items.discoverRecipes(p);
+        }
+        sender.sendMessage(Text.msg("Configuration and " + Items.recipeCount() + " recipes reloaded.", NamedTextColor.GREEN));
+    }
+
+    private void recipes(CommandSender sender) {
+        if (!requireAdmin(sender)) {
+            return;
+        }
+        Items.registerRecipes(plugin);
+        for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
+            Items.discoverRecipes(p);
+        }
+        int active = 0;
+        for (var key : Items.recipeKeys()) {
+            if (org.bukkit.Bukkit.getRecipe(key) != null) {
+                active++;
+            }
+        }
+        sender.sendMessage(Text.msg("Recipes synchronized: " + active + "/" + Items.recipeCount() + " active in Bukkit.", NamedTextColor.GREEN));
     }
 
     private void sendDevices(CommandSender sender) {
@@ -159,6 +183,18 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Component.text("[MVN] ", NamedTextColor.AQUA)
                     .append(Component.text("@" + coord(net) + " | nodes: " + net.size()
                             + " | cells: " + cells + " | " + status, NamedTextColor.GRAY)));
+        }
+        int activeRecipes = 0;
+        for (var key : Items.recipeKeys()) {
+            if (org.bukkit.Bukkit.getRecipe(key) != null) {
+                activeRecipes++;
+            }
+        }
+        if (activeRecipes < Items.recipeCount()) {
+            Items.registerRecipes(plugin);
+            sender.sendMessage(Text.msg("Recipes: Restored (" + activeRecipes + " -> " + Items.recipeCount() + " active in Bukkit)", NamedTextColor.YELLOW));
+        } else {
+            sender.sendMessage(Text.msg("Recipes: " + activeRecipes + "/" + Items.recipeCount() + " active in Bukkit", NamedTextColor.GREEN));
         }
     }
 

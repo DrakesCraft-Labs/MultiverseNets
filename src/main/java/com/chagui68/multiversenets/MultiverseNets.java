@@ -57,6 +57,16 @@ public class MultiverseNets extends JavaPlugin {
         new BlockListener(this, networks);
         new GuiListener(this);
         new ChatPrompts(this);
+        new com.chagui68.multiversenets.listen.CraftingListener(this);
+
+        // Safety net: in case datapack/server reload wipes dynamic recipes during startup
+        getServer().getScheduler().runTask(this, () -> Items.registerRecipes(this));
+        getServer().getScheduler().runTaskLater(this, () -> {
+            Items.registerRecipes(this);
+            for (org.bukkit.entity.Player p : getServer().getOnlinePlayers()) {
+                Items.discoverRecipes(p);
+            }
+        }, 100L);
 
         ticker = new NetworkTicker(this, networks);
         ticker.start();

@@ -10,12 +10,14 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -398,7 +400,10 @@ public final class Items {
      *
      * @param plugin Main plugin instance / Instancia principal del plugin
      */
-    public static void registerRecipes(MultiverseNets plugin) {
+    public static synchronized void registerRecipes(MultiverseNets plugin) {
+        synchronized (RECIPE_KEYS) {
+            RECIPE_KEYS.clear();
+        }
         shaped(plugin, "controller", create(DeviceType.MVN_CONTROLLER), r -> {
             r.shape("III", "INI", "III");
             r.setIngredient('I', Material.IRON_BLOCK);
@@ -549,6 +554,45 @@ public final class Items {
             r.setIngredient('D', Material.DIAMOND_BLOCK);
             r.setIngredient('B', Material.BARREL);
         });
+        plugin.getLogger().info("Registered " + recipeCount() + " crafting recipes with Bukkit.");
+    }
+
+    private static final List<NamespacedKey> RECIPE_KEYS = new ArrayList<>();
+
+    /**
+     * @return Total count of registered recipe keys.
+     */
+    public static int recipeCount() {
+        synchronized (RECIPE_KEYS) {
+            return RECIPE_KEYS.size();
+        }
+    }
+
+    /**
+     * @return Unmodifiable snapshot of registered recipe keys.
+     */
+    public static List<NamespacedKey> recipeKeys() {
+        synchronized (RECIPE_KEYS) {
+            return Collections.unmodifiableList(new ArrayList<>(RECIPE_KEYS));
+        }
+    }
+
+    /**
+     * Unlocks all MultiverseNets recipes in the player's recipe book.
+     */
+    public static void discoverRecipes(Player player) {
+        if (player == null) {
+            return;
+        }
+        List<NamespacedKey> keys = recipeKeys();
+        for (NamespacedKey key : keys) {
+            try {
+                if (!player.hasDiscoveredRecipe(key)) {
+                    player.discoverRecipe(key);
+                }
+            } catch (Throwable ignored) {
+            }
+        }
     }
 
     private interface RecipeDef {
@@ -557,9 +601,25 @@ public final class Items {
 
     private static ShapedRecipe shaped(MultiverseNets plugin, String key, ItemStack result, RecipeDef def) {
         NamespacedKey nk = new NamespacedKey(plugin, key);
+        try {
+            Bukkit.removeRecipe(nk);
+        } catch (Throwable ignored) {
+        }
         ShapedRecipe recipe = new ShapedRecipe(nk, result);
         def.define(recipe);
-        Bukkit.addRecipe(recipe);
+        try {
+            boolean ok = Bukkit.addRecipe(recipe);
+            if (!ok) {
+                plugin.getLogger().warning("Bukkit.addRecipe returned false for: " + key);
+            }
+        } catch (Throwable t) {
+            plugin.getLogger().warning("Failed to register recipe " + key + ": " + t.getMessage());
+        }
+        synchronized (RECIPE_KEYS) {
+            if (!RECIPE_KEYS.contains(nk)) {
+                RECIPE_KEYS.add(nk);
+            }
+        }
         return recipe;
     }
 
