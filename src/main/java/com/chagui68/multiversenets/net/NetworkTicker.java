@@ -172,6 +172,26 @@ public class NetworkTicker {
             Block target = self.getRelative(face);
             Material mat = target.getType();
 
+            // 1. Slimefun machine compatibility FIRST (machines like Dispensers must not be hijacked by raw container logic)
+            if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
+                ItemStack extracted = SlimefunBridge.extract(target, pred, rate);
+                if (extracted != null) {
+                    int leftover = net.storage().deposit(extracted);
+                    if (leftover > 0) {
+                        extracted.setAmount(leftover);
+                        int unhoused = SlimefunBridge.insert(target, extracted);
+                        if (unhoused > 0) {
+                            extracted.setAmount(unhoused);
+                            dropAt(target, extracted);
+                        }
+                    }
+                    spark(net, pos);
+                    return;
+                }
+                continue;
+            }
+
+            // 2. Vanilla container fallback
             if (isPotentialContainer(mat) && target.getState() instanceof InventoryHolder holder) {
                 Inventory inv = holder.getInventory();
                 ItemStack extracted = NetworkManager.extractFirst(inv, pred, rate);
@@ -185,25 +205,6 @@ public class NetworkTicker {
                     int sinCasa = NetworkManager.insertInto(inv, extracted);
                     if (sinCasa > 0) {
                         extracted.setAmount(sinCasa);
-                        dropAt(target, extracted);
-                    }
-                }
-                spark(net, pos);
-                return;
-            }
-
-            // Slimefun machine compatibility branch
-            if (Settings.compatSlimefun() && SlimefunBridge.isAvailable()) {
-                ItemStack extracted = SlimefunBridge.extract(target, pred, rate);
-                if (extracted == null) {
-                    continue;
-                }
-                int leftover = net.storage().deposit(extracted);
-                if (leftover > 0) {
-                    extracted.setAmount(leftover);
-                    int unhoused = SlimefunBridge.insert(target, extracted);
-                    if (unhoused > 0) {
-                        extracted.setAmount(unhoused);
                         dropAt(target, extracted);
                     }
                 }
@@ -233,18 +234,7 @@ public class NetworkTicker {
             Block target = self.getRelative(face);
             Material mat = target.getType();
 
-            if (isPotentialContainer(mat) && target.getState() instanceof InventoryHolder holder) {
-                int leftover = NetworkManager.insertInto(holder.getInventory(), stack);
-                if (leftover < stack.getAmount()) {
-                    spark(net, pos);
-                }
-                stack.setAmount(leftover);
-                if (leftover <= 0) {
-                    break;
-                }
-                continue;
-            }
-
+            // 1. Slimefun machine compatibility FIRST (ensures items go to BlockMenu input slots instead of raw dispenser inventory)
             if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
                 int before = stack.getAmount();
                 int unhoused = SlimefunBridge.insert(target, stack);
@@ -255,6 +245,20 @@ public class NetworkTicker {
                 if (stack.getAmount() <= 0) {
                     break;
                 }
+                continue;
+            }
+
+            // 2. Vanilla container fallback
+            if (isPotentialContainer(mat) && target.getState() instanceof InventoryHolder holder) {
+                int leftover = NetworkManager.insertInto(holder.getInventory(), stack);
+                if (leftover < stack.getAmount()) {
+                    spark(net, pos);
+                }
+                stack.setAmount(leftover);
+                if (leftover <= 0) {
+                    break;
+                }
+                continue;
             }
         }
         if (stack.getAmount() > 0) {
@@ -335,16 +339,7 @@ public class NetworkTicker {
                 for (BlockFace face : facesFor(blob)) {
                     Block target = block.getRelative(face);
                     Material targetMat = target.getType();
-                    if (isPotentialContainer(targetMat) && target.getState() instanceof InventoryHolder holder) {
-                        ItemStack out = sample.clone();
-                        out.setAmount(want);
-                        int leftover = NetworkManager.insertInto(holder.getInventory(), out);
-                        int moved = want - leftover;
-                        if (moved > 0) {
-                            roundMoved += moved;
-                            want = leftover;
-                        }
-                    } else if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
+                    if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
                         ItemStack out = sample.clone();
                         out.setAmount(want);
                         int unhoused = SlimefunBridge.insert(target, out);
@@ -352,6 +347,15 @@ public class NetworkTicker {
                         if (moved > 0) {
                             roundMoved += moved;
                             want = unhoused;
+                        }
+                    } else if (isPotentialContainer(targetMat) && target.getState() instanceof InventoryHolder holder) {
+                        ItemStack out = sample.clone();
+                        out.setAmount(want);
+                        int leftover = NetworkManager.insertInto(holder.getInventory(), out);
+                        int moved = want - leftover;
+                        if (moved > 0) {
+                            roundMoved += moved;
+                            want = leftover;
                         }
                     }
                     if (want <= 0) {
