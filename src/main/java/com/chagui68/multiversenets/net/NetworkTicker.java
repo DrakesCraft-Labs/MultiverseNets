@@ -25,6 +25,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -161,10 +162,53 @@ public class NetworkTicker {
      * no las admite todas, el sobrante vuelve al origen; si el origen tampoco lo admite (alguien
      * lo lleno en medio), se suelta en el mundo. Al aire no se va nada.
      */
+    private ItemStack streamToPushers(Network net, ItemStack stack) {
+        if (stack == null || stack.getAmount() <= 0) return null;
+        for (DeviceType pusherType : List.of(DeviceType.MVN_PUSHER_HT, DeviceType.MVN_PUSHER)) {
+            final ItemStack currentStack = stack;
+            net.forEach(pusherType, (pos, type) -> {
+                if (currentStack.getAmount() <= 0) return;
+                NodeBlob pBlob = blobOf(net, pos);
+                if (pBlob == null) return;
+                Predicate<ItemStack> pPred = NetworkManager.filterPredicate(pBlob);
+                if (!pPred.test(currentStack)) return;
+                Block pBlock = net.block(pos);
+                for (BlockFace face : facesFor(pBlob)) {
+                    Block target = pBlock.getRelative(face);
+                    if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
+                        int unhoused = SlimefunBridge.insert(target, currentStack);
+                        currentStack.setAmount(unhoused);
+                        if (unhoused <= 0) return;
+                    } else if (isPotentialContainer(target.getType()) && target.getState() instanceof InventoryHolder holder) {
+                        int unhoused = NetworkManager.insertInto(holder.getInventory(), currentStack);
+                        currentStack.setAmount(unhoused);
+                        if (unhoused <= 0) return;
+                    }
+                }
+            });
+            if (stack.getAmount() <= 0) return null;
+        }
+        return stack.getAmount() > 0 ? stack : null;
+    }
+
     private void grabOnce(Network net, long pos, int rate) {
         NodeBlob blob = blobOf(net, pos);
         if (blob == null) {
             return;
+        }
+        // Zero-drop: process any transit buffer leftovers first
+        if (blob.transitBuffer != null && blob.transitBuffer.getAmount() > 0) {
+            int leftover = net.storage().deposit(blob.transitBuffer);
+            if (leftover <= 0) {
+                blob.transitBuffer = null;
+                NodeStore.put(net.block(pos), blob);
+            } else {
+                blob.transitBuffer.setAmount(leftover);
+                ItemStack unrouted = streamToPushers(net, blob.transitBuffer);
+                blob.transitBuffer = unrouted;
+                NodeStore.put(net.block(pos), blob);
+                return; // Wait until buffer clears before grabbing more
+            }
         }
         Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
         Block self = net.block(pos);
@@ -179,10 +223,14 @@ public class NetworkTicker {
                     int leftover = net.storage().deposit(extracted);
                     if (leftover > 0) {
                         extracted.setAmount(leftover);
-                        int unhoused = SlimefunBridge.insert(target, extracted);
-                        if (unhoused > 0) {
-                            extracted.setAmount(unhoused);
-                            dropAt(target, extracted);
+                        ItemStack unrouted = streamToPushers(net, extracted);
+                        if (unrouted != null && unrouted.getAmount() > 0) {
+                            int unhoused = SlimefunBridge.insert(target, unrouted);
+                            if (unhoused > 0) {
+                                unrouted.setAmount(unhoused);
+                                blob.transitBuffer = unrouted;
+                                NodeStore.put(self, blob);
+                            }
                         }
                     }
                     spark(net, pos);
@@ -202,10 +250,14 @@ public class NetworkTicker {
                 int leftover = net.storage().deposit(extracted);
                 if (leftover > 0) {
                     extracted.setAmount(leftover);
-                    int sinCasa = NetworkManager.insertInto(inv, extracted);
-                    if (sinCasa > 0) {
-                        extracted.setAmount(sinCasa);
-                        dropAt(target, extracted);
+                    ItemStack unrouted = streamToPushers(net, extracted);
+                    if (unrouted != null && unrouted.getAmount() > 0) {
+                        int sinCasa = NetworkManager.insertInto(inv, unrouted);
+                        if (sinCasa > 0) {
+                            unrouted.setAmount(sinCasa);
+                            blob.transitBuffer = unrouted;
+                            NodeStore.put(self, blob);
+                        }
                     }
                 }
                 spark(net, pos);

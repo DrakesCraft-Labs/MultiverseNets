@@ -50,6 +50,16 @@ public final class Items {
             lore.add(Component.text("Capacity: " + formatAmount(capacityOf(type)), NamedTextColor.GRAY)
                     .decoration(TextDecoration.ITALIC, false));
         }
+        if (type.isCacheModule()) {
+            lore.add(Component.text("Tier: " + type.display(), NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("Capacity: " + formatAmount(capacityOf(type)) + " items", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("Right-click Controller to install/upgrade.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+        }
+        if (type == DeviceType.MVN_ROUTER) {
+            lore.add(Component.text("Antenna that broadcasts network signal.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("Enables global wireless terminal access", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("across chunks and dimensions.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+        }
         if (type == DeviceType.MVN_WIRELESS_TERMINAL) {
             lore.add(Component.text("Status: ", NamedTextColor.GRAY)
                     .append(Component.text("Unbound", NamedTextColor.RED))
@@ -515,6 +525,41 @@ public final class Items {
             r.setIngredient('K', Material.INK_SAC);
             r.setIngredient('P', Material.PAPER);
             r.setIngredient('S', Material.SMITHING_TABLE);
+        });
+        shaped(plugin, "router", create(DeviceType.MVN_ROUTER), r -> {
+            r.shape(" L ", " C ", " R ");
+            r.setIngredient('L', Material.LIGHTNING_ROD);
+            r.setIngredient('C', new org.bukkit.inventory.RecipeChoice.ExactChoice(create(DeviceType.MVN_CABLE)));
+            r.setIngredient('R', Material.REDSTONE_BLOCK);
+        });
+        shaped(plugin, "cache_l1", create(DeviceType.MVN_CACHE_L1), r -> {
+            r.shape("CRC", "RCR", "CRC");
+            r.setIngredient('C', Material.COPPER_INGOT);
+            r.setIngredient('R', Material.REDSTONE);
+        });
+        shaped(plugin, "cache_l2", create(DeviceType.MVN_CACHE_L2), r -> {
+            r.shape("GLG", "LPL", "GLG");
+            r.setIngredient('G', Material.GOLD_INGOT);
+            r.setIngredient('L', Material.LAPIS_LAZULI);
+            r.setIngredient('P', new org.bukkit.inventory.RecipeChoice.ExactChoice(create(DeviceType.MVN_CACHE_L1)));
+        });
+        shaped(plugin, "cache_l3", create(DeviceType.MVN_CACHE_L3), r -> {
+            r.shape("DAD", "APA", "DAD");
+            r.setIngredient('D', Material.DIAMOND);
+            r.setIngredient('A', Material.AMETHYST_SHARD);
+            r.setIngredient('P', new org.bukkit.inventory.RecipeChoice.ExactChoice(create(DeviceType.MVN_CACHE_L2)));
+        });
+        shaped(plugin, "cache_dram", create(DeviceType.MVN_CACHE_DRAM), r -> {
+            r.shape("NEN", "EPE", "NEN");
+            r.setIngredient('N', Material.NETHERITE_INGOT);
+            r.setIngredient('E', Material.ENDER_EYE);
+            r.setIngredient('P', new org.bukkit.inventory.RecipeChoice.ExactChoice(create(DeviceType.MVN_CACHE_L3)));
+        });
+        shaped(plugin, "cache_quantum", create(DeviceType.MVN_CACHE_QUANTUM), r -> {
+            r.shape("NSN", "SPS", "NSN");
+            r.setIngredient('N', Material.NETHERITE_BLOCK);
+            r.setIngredient('S', Material.NETHER_STAR);
+            r.setIngredient('P', new org.bukkit.inventory.RecipeChoice.ExactChoice(create(DeviceType.MVN_CACHE_DRAM)));
         });
         shaped(plugin, "crafting_grid", create(DeviceType.MVN_CRAFTING_GRID), r -> {
             r.shape("CRC", "RGR", "CRC");

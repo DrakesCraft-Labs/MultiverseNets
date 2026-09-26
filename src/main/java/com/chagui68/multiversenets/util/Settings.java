@@ -52,6 +52,29 @@ public final class Settings {
         return cfg != null ? Math.max(16, cfg.getInt("network.max-nodes", 16384)) : 16384;
     }
 
+    public static int maxNodesPerChunk() {
+        return cfg != null ? Math.max(1, cfg.getInt("network.max-nodes-per-chunk", 64)) : 64;
+    }
+
+    public static long virtualCacheCapacity(int tier) {
+        return switch (tier) {
+            case 1 -> cfg != null ? cfg.getLong("virtual-cache.tier-1", 2048L) : 2048L;
+            case 2 -> cfg != null ? cfg.getLong("virtual-cache.tier-2", 8192L) : 8192L;
+            case 3 -> cfg != null ? cfg.getLong("virtual-cache.tier-3", 32768L) : 32768L;
+            case 4 -> cfg != null ? cfg.getLong("virtual-cache.tier-4", 131072L) : 131072L;
+            case 5 -> cfg != null ? cfg.getLong("virtual-cache.tier-5", 524288L) : 524288L;
+            default -> 0L;
+        };
+    }
+
+    public static int wirelessCombatCooldownSeconds() {
+        return cfg != null ? Math.max(1, cfg.getInt("wireless.combat-cooldown-seconds", 10)) : 10;
+    }
+
+    public static int wirelessLocalRange() {
+        return cfg != null ? Math.max(1, cfg.getInt("wireless.local-range-without-router", 64)) : 64;
+    }
+
     /**
      * EN: Returns the interval (in ticks) between transfer operations (grabbers/pushers).
      *
