@@ -42,7 +42,8 @@
 
 ### 🛠️ Auto-crafting
 * **Auto-Crafter**: accepts **Blueprints** (real 3×3 grid) and result-based recipes (legacy mode). Each blueprint is attempted once per cycle with **atomic extraction**: either there are ingredients for everything or nothing is touched.
-* **Request Terminal**: On-demand batch crafting console linked to auto-crafters across the network. Left-click crafts 1, right-click crafts 64, and shift+right-click prompts in chat to specify an exact custom quantity with strict numeric validation.
+* **Request Crafter**: dedicated on-demand crafting node managed exclusively by Request Terminals. Blueprints placed here are not auto-crafted periodically, keeping manual crafting orders clean and isolated.
+* **Request Terminal**: on-demand crafting console linked strictly to Request Crafters across the network. Resolves recursive chained dependencies (e.g., Oak Logs -> Planks -> Crafting Table). Left-click crafts 1x, right-click crafts 64x, and shift+right-click prompts in chat to specify an exact custom quantity with strict numeric validation.
 * **Recipe Encoder**: builds the recipe in a persistent 3×3 template grid (click to fix slots, without spending items) and encodes a blank Blueprint with one click.
 * **Slimefun Recipe Encoder**: Dedicated encoder for Slimefun recipes (toggleable via `sf-encoder.enabled`).
 * **Network Quota Limiter**: Regulates maximum stock allowed in network storage for a specified target item.
@@ -126,6 +127,7 @@ Each device is crafted on a standard 3×3 crafting table. `·` marks an empty sl
 4. Shift+click with a **Wireless Terminal** on the controller to bind it (then right-click in the air to open the network from a distance).
 5. **Encoder**: build the recipe in the template grid, put a blank **Blueprint** in the blue slot, and press *Encode*. That Blueprint is installed in an Auto-Crafter with a click on its list.
 6. **Receiver**: shift+click with the receiver item on a Transmitter, place it in another base and open it; give it a filter and it will also **bring items** from the transmitter's network.
+7. **Request Terminal & Request Crafter**: Encode blueprints into a **Request Crafter** (using the Recipe Encoder). Open the **Request Terminal** to order crafting jobs on-demand. The system automatically resolves recursive chained crafting dependencies (e.g., crafting logs into planks, then planks into a crafting table) and supports custom chat amount entry via Shift+Right Click.
 
 ## 🤝 Coexistence with Networks
 

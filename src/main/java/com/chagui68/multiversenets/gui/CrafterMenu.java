@@ -49,14 +49,17 @@ public class CrafterMenu extends MenuHolder {
     }
 
     public void openMenu() {
-        open(27, Component.text("Auto-Crafter", NamedTextColor.DARK_AQUA)
+        DeviceType type = NodeStore.getType(block);
+        String title = (type != null && type.isRequestCrafter()) ? "Request Crafter" : "Auto-Crafter";
+        open(27, Component.text(title, NamedTextColor.DARK_AQUA)
                 .decoration(TextDecoration.ITALIC, false));
     }
 
     private NodeBlob blob() {
         NodeBlob blob = NodeStore.get(block);
         if (blob == null) {
-            blob = NodeBlob.create(DeviceType.MVN_CRAFTER.name());
+            DeviceType type = NodeStore.getType(block);
+            blob = NodeBlob.create(type != null ? type.name() : DeviceType.MVN_CRAFTER.name());
         }
         if (blob.blueprintData == null) {
             blob.blueprintData = new ArrayList<>();

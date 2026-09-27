@@ -26,7 +26,10 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.Recipe;
 import org.bukkit.inventory.RecipeChoice;
 
+import com.chagui68.multiversenets.net.NetworkStorage;
+
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,7 +100,6 @@ public class RequestTerminalMenu extends MenuHolder {
 
     private void scanCraftables() {
         options.clear();
-        network.forEach(DeviceType.MVN_CRAFTER, (pos, type) -> scanCrafter(pos));
         network.forEach(DeviceType.MVN_REQUEST_CRAFTER, (pos, type) -> scanCrafter(pos));
     }
 
@@ -130,7 +132,7 @@ public class RequestTerminalMenu extends MenuHolder {
                 boolean merged = false;
                 for (int i = 0; i < needs.size(); i++) {
                     IngredientNeed n = needs.get(i);
-                    if (StackUtils.itemsMatch(n.sample(), in)) {
+                    if (StackUtils.itemsMatch(n.sample(), in, false)) {
                         needs.set(i, new IngredientNeed(n.sample(), n.amount() + 1));
                         merged = true;
                         break;
@@ -232,6 +234,171 @@ public class RequestTerminalMenu extends MenuHolder {
         inv.setItem(NEXT_PAGE_SLOT, button(Material.ARROW, "Next Page", NamedTextColor.YELLOW));
     }
 
+    public record CraftingJobStep(CraftableOption option, int batches) {
+    }
+
+    private static final class SimulatedStock {
+        private final List<StockEntry> entries = new ArrayList<>();
+
+        static final class StockEntry {
+            ItemStack sample;
+            long amount;
+            StockEntry(ItemStack sample, long amount) {
+                this.sample = sample;
+                this.amount = amount;
+            }
+        }
+
+        SimulatedStock(List<NetworkStorage.View> initialViews) {
+            if (initialViews != null) {
+                for (NetworkStorage.View v : initialViews) {
+                    if (v.sample() != null && v.amount() > 0) {
+                        entries.add(new StockEntry(v.sample().clone(), v.amount()));
+                    }
+                }
+            }
+        }
+
+        long available(ItemStack item) {
+            long total = 0;
+            for (StockEntry e : entries) {
+                if (StackUtils.itemsMatch(e.sample, item, false)) {
+                    total += e.amount;
+                }
+            }
+            return total;
+        }
+
+        long take(ItemStack item, long needed) {
+            long taken = 0;
+            for (StockEntry e : entries) {
+                if (StackUtils.itemsMatch(e.sample, item, false)) {
+                    long toTake = Math.min(e.amount, needed - taken);
+                    e.amount -= toTake;
+                    taken += toTake;
+                    if (taken >= needed) {
+                        break;
+                    }
+                }
+            }
+            return taken;
+        }
+
+        void add(ItemStack item, long count) {
+            if (item == null || count <= 0) return;
+            for (StockEntry e : entries) {
+                if (StackUtils.itemsMatch(e.sample, item, false)) {
+                    e.amount += count;
+                    return;
+                }
+            }
+            entries.add(new StockEntry(StackUtils.getAsQuantity(item, 1), count));
+        }
+    }
+
+    private CraftableOption findProducer(ItemStack needed, Set<CraftableOption> branch, SimulatedStock stock) {
+        CraftableOption bestCandidate = null;
+        for (CraftableOption opt : options) {
+            if (branch.contains(opt)) {
+                continue;
+            }
+            if (StackUtils.itemsMatch(opt.output, needed, false)) {
+                if (stock != null) {
+                    boolean allInStock = true;
+                    for (IngredientNeed in : opt.ingredients) {
+                        if (stock.available(in.sample()) < in.amount()) {
+                            allInStock = false;
+                            break;
+                        }
+                    }
+                    if (allInStock) {
+                        return opt;
+                    }
+                }
+                if (bestCandidate == null) {
+                    bestCandidate = opt;
+                }
+            }
+        }
+        return bestCandidate;
+    }
+
+    private List<CraftingJobStep> planCraft(CraftableOption target, int batches, SimulatedStock stock, Set<CraftableOption> branch, int depth) {
+        if (batches <= 0) {
+            return List.of();
+        }
+        if (depth > 12 || branch.contains(target)) {
+            return null;
+        }
+        branch.add(target);
+        List<CraftingJobStep> steps = new ArrayList<>();
+
+        for (IngredientNeed need : target.ingredients) {
+            long totalNeeded = (long) need.amount() * batches;
+            long takenFromStock = stock.take(need.sample(), totalNeeded);
+            long missing = totalNeeded - takenFromStock;
+
+            if (missing > 0) {
+                CraftableOption producer = findProducer(need.sample(), branch, stock);
+                if (producer == null) {
+                    return null;
+                }
+                int yieldPerBatch = producer.output.getAmount() > 0 ? producer.output.getAmount() : 1;
+                int subBatches = (int) Math.ceil((double) missing / yieldPerBatch);
+
+                List<CraftingJobStep> subSteps = planCraft(producer, subBatches, stock, new HashSet<>(branch), depth + 1);
+                if (subSteps == null) {
+                    return null;
+                }
+                steps.addAll(subSteps);
+
+                long totalProduced = (long) subBatches * yieldPerBatch;
+                stock.add(producer.output, totalProduced);
+                long takenMissing = stock.take(need.sample(), missing);
+                if (takenMissing < missing) {
+                    return null;
+                }
+            }
+        }
+
+        steps.add(new CraftingJobStep(target, batches));
+        return steps;
+    }
+
+    private int calculateMaxBatches(CraftableOption opt) {
+        SimulatedStock s1 = new SimulatedStock(network.storage().view());
+        if (planCraft(opt, 1, s1, new HashSet<>(), 0) == null) {
+            return 0;
+        }
+
+        int low = 1;
+        int high = 64;
+        while (high <= 10_000) {
+            SimulatedStock s = new SimulatedStock(network.storage().view());
+            if (planCraft(opt, high, s, new HashSet<>(), 0) != null) {
+                low = high;
+                high *= 2;
+            } else {
+                break;
+            }
+        }
+
+        int best = low;
+        int l = low;
+        int r = Math.min(high, 10_000);
+        while (l <= r) {
+            int mid = (l + r) >>> 1;
+            SimulatedStock s = new SimulatedStock(network.storage().view());
+            if (planCraft(opt, mid, s, new HashSet<>(), 0) != null) {
+                best = mid;
+                l = mid + 1;
+            } else {
+                r = mid - 1;
+            }
+        }
+        return best;
+    }
+
     private ItemStack buildOptionIcon(CraftableOption opt) {
         ItemStack icon = opt.output.clone();
         var meta = icon.getItemMeta();
@@ -241,30 +408,32 @@ public class RequestTerminalMenu extends MenuHolder {
         }
 
         lore.add(Component.empty());
-        lore.add(Component.text("Crafter at: " + PosUtil.unpackX(opt.crafterPos) + ", "
+        lore.add(Component.text("Request Crafter at: " + PosUtil.unpackX(opt.crafterPos) + ", "
                 + PosUtil.unpackY(opt.crafterPos) + ", " + PosUtil.unpackZ(opt.crafterPos), NamedTextColor.DARK_GRAY)
                 .decoration(TextDecoration.ITALIC, false));
         lore.add(Component.text("Required Ingredients:", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
 
-        long maxBatches = Long.MAX_VALUE;
         for (IngredientNeed need : opt.ingredients) {
-            long count = network.storage().count(item -> StackUtils.itemsMatch(item, need.sample()));
-            long possible = need.amount() > 0 ? count / need.amount() : 0;
-            if (possible < maxBatches) {
-                maxBatches = possible;
-            }
+            long count = network.storage().count(item -> StackUtils.itemsMatch(item, need.sample(), false));
             String ingName = Blueprints.readableName(need.sample());
-            NamedTextColor col = count >= need.amount() ? NamedTextColor.GREEN : NamedTextColor.RED;
-            lore.add(Component.text(" • " + ingName + ": " + count + " / " + need.amount(), col)
-                    .decoration(TextDecoration.ITALIC, false));
+            if (count >= need.amount()) {
+                lore.add(Component.text(" • " + ingName + ": " + count + " / " + need.amount(), NamedTextColor.GREEN)
+                        .decoration(TextDecoration.ITALIC, false));
+            } else {
+                CraftableOption sub = findProducer(need.sample(), Set.of(opt), null);
+                if (sub != null) {
+                    lore.add(Component.text(" • " + ingName + ": " + count + " / " + need.amount() + " (Auto-Craftable via " + sub.name + ")", NamedTextColor.YELLOW)
+                            .decoration(TextDecoration.ITALIC, false));
+                } else {
+                    lore.add(Component.text(" • " + ingName + ": " + count + " / " + need.amount(), NamedTextColor.RED)
+                            .decoration(TextDecoration.ITALIC, false));
+                }
+            }
         }
 
-        if (opt.ingredients.isEmpty()) {
-            maxBatches = 0;
-        }
-
+        int maxBatches = calculateMaxBatches(opt);
         lore.add(Component.empty());
-        lore.add(Component.text("Max Craftable Batches: " + (maxBatches == Long.MAX_VALUE ? 0 : maxBatches),
+        lore.add(Component.text("Max Craftable Batches: " + maxBatches,
                 maxBatches > 0 ? NamedTextColor.AQUA : NamedTextColor.RED).decoration(TextDecoration.ITALIC, false));
         lore.add(Component.empty());
         lore.add(Component.text("Left Click: Order 1", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
@@ -332,6 +501,15 @@ public class RequestTerminalMenu extends MenuHolder {
                         }
                         int unitsPerCraft = opt.output.getAmount() > 0 ? opt.output.getAmount() : 1;
                         int batches = (int) Math.ceil((double) qty / unitsPerCraft);
+                        int maxBatches = calculateMaxBatches(opt);
+                        if (batches > maxBatches) {
+                            batches = maxBatches;
+                        }
+                        if (batches <= 0) {
+                            player.sendMessage(Text.msg("Cannot craft: missing raw materials in network.", NamedTextColor.RED));
+                            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+                            return;
+                        }
                         executeOrder(opt, batches);
                     } catch (NumberFormatException e) {
                         player.sendMessage(Text.msg("Invalid quantity! Crafting cancelled. Only numeric values are allowed.", NamedTextColor.RED));
@@ -343,7 +521,7 @@ public class RequestTerminalMenu extends MenuHolder {
 
             int batches = calculateOrderAmount(event.getClick(), opt);
             if (batches <= 0) {
-                player.sendMessage(Text.msg("Cannot craft: missing ingredients in network.", NamedTextColor.RED));
+                player.sendMessage(Text.msg("Cannot craft: missing raw materials in network.", NamedTextColor.RED));
                 player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
                 return;
             }
@@ -353,15 +531,8 @@ public class RequestTerminalMenu extends MenuHolder {
     }
 
     private int calculateOrderAmount(ClickType click, CraftableOption opt) {
-        long maxBatches = Long.MAX_VALUE;
-        for (IngredientNeed need : opt.ingredients) {
-            long count = network.storage().count(item -> StackUtils.itemsMatch(item, need.sample()));
-            long possible = need.amount() > 0 ? count / need.amount() : 0;
-            if (possible < maxBatches) {
-                maxBatches = possible;
-            }
-        }
-        if (maxBatches <= 0 || maxBatches == Long.MAX_VALUE) {
+        int maxBatches = calculateMaxBatches(opt);
+        if (maxBatches <= 0) {
             return 0;
         }
 
@@ -371,56 +542,192 @@ public class RequestTerminalMenu extends MenuHolder {
             default -> 1;
         };
 
-        return (int) Math.min(requested, maxBatches);
+        return Math.min(requested, maxBatches);
     }
 
     private void executeOrder(CraftableOption opt, int requestedBatches) {
-        int crafted = 0;
-        for (int i = 0; i < requestedBatches; i++) {
-            boolean success;
-            if (opt.blueprintData != null) {
-                success = CraftingSupport.tryCraftBlueprint(network, opt.blueprintData);
-            } else if (opt.vanillaRecipe != null) {
-                success = CraftingSupport.tryCraftOnce(network, opt.vanillaRecipe);
-            } else {
-                break;
-            }
-            if (!success) {
-                break;
-            }
-            crafted++;
-        }
-
-        if (crafted <= 0) {
-            player.sendMessage(Text.msg("Crafting Job Failed: Insufficient raw materials or full storage.", NamedTextColor.RED));
+        SimulatedStock checkStock = new SimulatedStock(network.storage().view());
+        List<CraftingJobStep> plan = planCraft(opt, requestedBatches, checkStock, new HashSet<>(), 0);
+        if (plan == null || plan.isEmpty()) {
+            player.sendMessage(Text.msg("Crafting Job Failed: Insufficient raw materials in network.", NamedTextColor.RED));
             player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
             return;
         }
 
+        List<ItemStack> intermediateBuffer = new ArrayList<>();
         int unitsPerCraft = opt.output.getAmount() > 0 ? opt.output.getAmount() : 1;
-        int totalItemsCrafted = crafted * unitsPerCraft;
+        int totalTargetCrafted = 0;
+        boolean failedMidway = false;
 
-        if (deliverToInventory) {
-            // Withdraw from network storage and put directly into player inventory
-            int remainingToDeliver = totalItemsCrafted;
-            while (remainingToDeliver > 0) {
-                int batchTake = Math.min(remainingToDeliver, opt.output.getMaxStackSize());
-                ItemStack pulled = network.storage().withdraw(item -> StackUtils.itemsMatch(item, opt.output), batchTake);
-                if (pulled == null || pulled.getAmount() <= 0) {
+        for (int stepIdx = 0; stepIdx < plan.size(); stepIdx++) {
+            CraftingJobStep step = plan.get(stepIdx);
+            boolean isLastTargetStep = (stepIdx == plan.size() - 1) && (step.option() == opt);
+
+            for (int b = 0; b < step.batches(); b++) {
+                List<ItemStack> outputSink = isLastTargetStep ? new ArrayList<>() : intermediateBuffer;
+                boolean success = executeSingleCraftStep(step.option(), intermediateBuffer, outputSink);
+                if (!success) {
+                    failedMidway = true;
                     break;
                 }
-                remainingToDeliver -= pulled.getAmount();
-                giveOrDrop(pulled);
+                if (isLastTargetStep) {
+                    for (ItemStack out : outputSink) {
+                        if (deliverToInventory) {
+                            giveOrDrop(out);
+                        } else {
+                            int left = network.storage().deposit(out);
+                            if (left > 0) {
+                                giveOrDrop(StackUtils.getAsQuantity(out, left));
+                            }
+                        }
+                    }
+                    totalTargetCrafted++;
+                }
+            }
+            if (failedMidway) {
+                break;
             }
         }
 
+        // Return any remaining intermediate items to network storage (or give to player if full)
+        for (ItemStack leftover : intermediateBuffer) {
+            if (leftover != null && leftover.getAmount() > 0) {
+                int left = network.storage().deposit(leftover);
+                if (left > 0) {
+                    giveOrDrop(StackUtils.getAsQuantity(leftover, left));
+                }
+            }
+        }
+        intermediateBuffer.clear();
+
+        if (failedMidway && totalTargetCrafted <= 0) {
+            player.sendMessage(Text.msg("Crafting Job Failed: Materials exhausted during multi-step execution.", NamedTextColor.RED));
+            player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_NO, 1f, 1f);
+            return;
+        }
+
+        int totalItemsCrafted = totalTargetCrafted * unitsPerCraft;
         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1f, 1.2f);
-        if (crafted == requestedBatches) {
+        if (totalTargetCrafted == requestedBatches) {
             player.sendMessage(Text.msg("Crafting Job Complete: Ordered " + totalItemsCrafted + "x " + opt.name
                     + (deliverToInventory ? " (delivered to inventory)." : " (deposited in network)."), NamedTextColor.GREEN));
         } else {
             player.sendMessage(Text.msg("Crafting Job Partial: Ordered " + (requestedBatches * unitsPerCraft)
                     + "x " + opt.name + ", crafted " + totalItemsCrafted + " (materials exhausted).", NamedTextColor.YELLOW));
+        }
+    }
+
+    private boolean executeSingleCraftStep(CraftableOption stepOpt, List<ItemStack> intermediateBuffer, List<ItemStack> outputSink) {
+        List<IngredientNeed> needs = stepOpt.ingredients;
+
+        // Check availability
+        for (IngredientNeed need : needs) {
+            long inBuf = countInBuffer(intermediateBuffer, need.sample());
+            long inStore = network.storage().count(item -> StackUtils.itemsMatch(item, need.sample(), false));
+            if (inBuf + inStore < need.amount()) {
+                return false;
+            }
+        }
+
+        // Extract ingredients
+        List<ItemStack> extracted = new ArrayList<>();
+        for (IngredientNeed need : needs) {
+            int remaining = need.amount();
+            remaining -= takeFromBuffer(intermediateBuffer, need.sample(), remaining, extracted);
+            if (remaining > 0) {
+                ItemStack pulled = network.storage().withdraw(item -> StackUtils.itemsMatch(item, need.sample(), false), remaining);
+                if (pulled != null && pulled.getAmount() > 0) {
+                    extracted.add(pulled);
+                    remaining -= pulled.getAmount();
+                }
+            }
+            if (remaining > 0) {
+                // Rollback
+                for (ItemStack ext : extracted) {
+                    addToBuffer(intermediateBuffer, ext);
+                }
+                return false;
+            }
+        }
+
+        // Resolve result
+        ItemStack result = null;
+        if (stepOpt.blueprintData != null) {
+            Recipe rec = Blueprints.resolve(stepOpt.blueprintData.inputs, network.world());
+            if (Blueprints.matchesOutput(rec, stepOpt.blueprintData.output)) {
+                result = rec.getResult().clone();
+            } else if (SlimefunBridge.isAvailable()) {
+                ItemStack sf = SlimefunBridge.findSlimefunRecipe(stepOpt.blueprintData.inputs);
+                if (sf != null && StackUtils.itemsMatch(sf, stepOpt.blueprintData.output, false)) {
+                    result = sf.clone();
+                }
+            }
+            if (result == null && stepOpt.blueprintData.output != null) {
+                result = stepOpt.blueprintData.output.clone();
+            }
+        } else if (stepOpt.vanillaRecipe != null) {
+            result = stepOpt.vanillaRecipe.getResult().clone();
+        }
+
+        if (result == null) {
+            for (ItemStack ext : extracted) {
+                addToBuffer(intermediateBuffer, ext);
+            }
+            return false;
+        }
+
+        addToBuffer(outputSink, result);
+        return true;
+    }
+
+    private long countInBuffer(List<ItemStack> buffer, ItemStack sample) {
+        long total = 0;
+        for (ItemStack is : buffer) {
+            if (is != null && StackUtils.itemsMatch(is, sample, false)) {
+                total += is.getAmount();
+            }
+        }
+        return total;
+    }
+
+    private int takeFromBuffer(List<ItemStack> buffer, ItemStack sample, int needed, List<ItemStack> extracted) {
+        int taken = 0;
+        var it = buffer.iterator();
+        while (it.hasNext() && taken < needed) {
+            ItemStack is = it.next();
+            if (is != null && StackUtils.itemsMatch(is, sample, false)) {
+                int take = Math.min(is.getAmount(), needed - taken);
+                is.setAmount(is.getAmount() - take);
+                taken += take;
+                if (extracted != null) {
+                    extracted.add(StackUtils.getAsQuantity(is, take));
+                }
+                if (is.getAmount() <= 0) {
+                    it.remove();
+                }
+            }
+        }
+        return taken;
+    }
+
+    private void addToBuffer(List<ItemStack> buffer, ItemStack item) {
+        if (item == null || item.getAmount() <= 0) return;
+        int remaining = item.getAmount();
+        for (ItemStack is : buffer) {
+            if (is != null && StackUtils.itemsMatch(is, item, false)) {
+                int space = is.getMaxStackSize() - is.getAmount();
+                if (space > 0) {
+                    int add = Math.min(space, remaining);
+                    is.setAmount(is.getAmount() + add);
+                    remaining -= add;
+                    if (remaining <= 0) break;
+                }
+            }
+        }
+        while (remaining > 0) {
+            int batch = Math.min(remaining, item.getMaxStackSize());
+            buffer.add(StackUtils.getAsQuantity(item, batch));
+            remaining -= batch;
         }
     }
 

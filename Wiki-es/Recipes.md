@@ -541,7 +541,7 @@ Almacenamiento interno multi-ítem instalado directamente sobre el **Network Con
   ```
   > G = **Cristal** · L = **Atril (Lectern)** · C = **Mesa de crafteo** · R = **Redstone**
 - **Resultado**: 1× Request Terminal
-- **Función**: Consola de solicitud de crafteos bajo demanda. Descubre todas las recetas configuradas en Crafters de la red, muestra materias primas necesarias vs disponibles en almacén y permite ordenar lotes entregados directamente al inventario o a la red. Clic izquierdo elabora 1x, Clic derecho elabora 64x (1 stack), y Shift + Clic Derecho abre un diálogo interactivo en el chat para solicitar una cantidad numérica exacta personalizada (cancelándose automáticamente si no se introduce un número o si este es $\le 0$).
+- **Función**: Consola de solicitud de crafteos bajo demanda. Descubre planos configurados estrictamente en **Request Crafters** (`MVN_REQUEST_CRAFTER`) conectados a la red, totalmente aislado de los Auto-Crafters regulares. Cuenta con resolución recursiva / encadenada de dependencias: si pides un ítem (por ejemplo una Mesa de crafteo) y en el almacén no hay materiales intermedios (como Tablones) pero sí materias primas básicas (como Troncos de roble) con sus planos instalados en Request Crafters, la terminal planificará y elaborará automáticamente todos los pasos previos necesarios antes de entregar el producto final. Clic izquierdo elabora 1x, Clic derecho elabora 64x (1 stack), y Shift + Clic Derecho abre un diálogo interactivo en el chat para solicitar una cantidad numérica exacta personalizada (cancelándose automáticamente si no se introduce un número o si este es $\le 0$).
 
 ---
 
@@ -554,7 +554,7 @@ Almacenamiento interno multi-ítem instalado directamente sobre el **Network Con
   ```
   > R = **Redstone** · C = **Mesa de crafteo** · I = **Lingote de Hierro** · L = **Atril (Lectern)**
 - **Resultado**: 1× Request Crafter
-- **Función**: Unidad de ejecución de crafteo bajo demanda controlada exclusivamente desde la Request Terminal. Almacena planos (blueprints) codificados para órdenes de crafteo personalizadas sin elaborarlos de forma automática en los ciclos periódicos de la red.
+- **Función**: Unidad de ejecución de crafteo bajo demanda controlada exclusivamente desde la Request Terminal. Almacena planos (blueprints) codificados (tanto Vanilla como Slimefun) para órdenes de crafteo manuales/bajo demanda sin elaborarlos de forma automática en los ciclos periódicos de fondo de la red. Solo las recetas ubicadas en Request Crafters son leídas y procesadas por las Request Terminals para el crafteo bajo demanda y recursivo por dependencias.
 
 ---
 

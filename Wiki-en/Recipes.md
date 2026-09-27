@@ -541,7 +541,7 @@ Internal multi-item storage installed directly into the **Network Controller** b
   ```
   > G = **Glass** · L = **Lectern** · C = **Crafting Table** · R = **Redstone**
 - **Result**: 1× Request Terminal
-- **Function**: On-demand crafting console. Discovers all recipes configured in connected Crafters across the network, displays required raw materials vs on-hand storage, and allows players to order batch crafting jobs delivered directly to inventory or network storage. Left click crafts 1x, Right click crafts 64x, and Shift + Right Click opens an interactive chat prompt allowing the player to specify a custom numeric batch amount (canceling automatically on non-numeric inputs or values $\le 0$).
+- **Function**: On-demand crafting console. Discovers blueprints strictly configured in connected **Request Crafters** (`MVN_REQUEST_CRAFTER`) across the network, completely isolated from regular Auto-Crafters. Features recursive / chained crafting dependency resolution: if you request an item (such as a Crafting Table) and network storage lacks intermediate items (such as Planks) but contains base raw materials (such as Oak Logs) with their corresponding recipes installed in Request Crafters, the terminal will automatically plan and craft all prerequisites in sequence before producing and delivering the final item. Left click crafts 1x, Right click crafts 64x, and Shift + Right Click opens an interactive chat prompt allowing the player to specify an exact custom numeric batch amount (canceling automatically on non-numeric inputs or values $\le 0$).
 
 ---
 
@@ -554,7 +554,7 @@ Internal multi-item storage installed directly into the **Network Controller** b
   ```
   > R = **Redstone** · C = **Crafting Table** · I = **Iron Ingot** · L = **Lectern**
 - **Result**: 1× Request Crafter
-- **Function**: On-demand crafting execution unit managed exclusively via the Request Terminal. Holds encoded blueprints for custom crafting jobs without automatically crafting them on recurring network cycles.
+- **Function**: On-demand crafting execution unit managed exclusively via the Request Terminal. Holds encoded blueprints (both Vanilla and Slimefun) for manual/on-demand crafting orders without automatically executing them during background network ticks. Only blueprints placed in Request Crafters are discovered and processed by Request Terminals for manual and recursive dependency crafting.
 
 ---
 

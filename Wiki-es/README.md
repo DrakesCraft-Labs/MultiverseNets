@@ -42,7 +42,8 @@
 
 ### 🛠️ Autocrafteo
 * **Auto‑Crafteador**: acepta **Blueprints** (matriz 3×3 real) y recetas por resultado (modo antiguo). Cada blueprint se intenta una vez por ciclo con **extracción atómica**: o hay ingredientes para todo o no se toca nada.
-* **Request Terminal**: Consola de crafteo masivo bajo demanda conectada a los autocrafteadores de la red. Clic izquierdo craftea 1x, clic derecho 64x, y shift+clic derecho abre prompt de chat para definir cantidad numérica exacta con validación estricta.
+* **Request Crafter**: nodo de crafteo dedicado bajo demanda administrado exclusivamente por la Request Terminal. Los blueprints colocados aquí no se elaboran automáticamente en segundo plano.
+* **Request Terminal**: consola de crafteo bajo demanda conectada estrictamente a los Request Crafters de la red. Resuelve dependencias recursivas y encadenadas (ej. Troncos -> Tablones -> Mesa de crafteo). Clic izquierdo craftea 1x, clic derecho 64x, y shift+clic derecho abre prompt de chat para definir cantidad numérica exacta con validación estricta.
 * **Recipe Encoder**: monta la receta en una matriz 3×3 de plantillas persistente (clic para fijar huecos, sin gastar ítems) y codifica un Blueprint en blanco con un clic.
 * **Slimefun Recipe Encoder**: Codificador exclusivo para recetas de Slimefun (configurable mediante `sf-encoder.enabled`).
 * **Network Quota Limiter**: Regula la cantidad máxima permitida en el almacén de la red para un ítem determinado.

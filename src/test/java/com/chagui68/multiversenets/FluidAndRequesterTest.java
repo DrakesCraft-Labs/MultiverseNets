@@ -153,13 +153,13 @@ class FluidAndRequesterTest {
         place(1, 64, 0, DeviceType.MVN_CELL_T1);
         place(2, 64, 0, DeviceType.MVN_CELL_T1);
         place(3, 64, 0, DeviceType.MVN_CELL_T1);
-        Block crafter = place(0, 64, 1, DeviceType.MVN_CRAFTER);
+        Block crafter = place(0, 64, 1, DeviceType.MVN_REQUEST_CRAFTER);
         Block req = place(0, 64, -1, DeviceType.MVN_REQUEST_TERMINAL);
 
         Network net = plugin.networks().networkByController(ctrl.getLocation());
         net.scan();
 
-        // Install blueprint in Auto-Crafter for Cable (8 Glass + 1 Redstone in center -> 16 Cable)
+        // Install blueprint in Request Crafter for Cable (8 Glass + 1 Redstone in center -> 16 Cable)
         net.storage().deposit(new ItemStack(Material.GLASS, 16));
         net.storage().deposit(new ItemStack(Material.REDSTONE, 2));
 
@@ -211,7 +211,7 @@ class FluidAndRequesterTest {
         place(1, 64, 0, DeviceType.MVN_CELL_T1);
         place(2, 64, 0, DeviceType.MVN_CELL_T1);
         place(3, 64, 0, DeviceType.MVN_CELL_T1);
-        Block crafter = place(0, 64, 1, DeviceType.MVN_CRAFTER);
+        Block crafter = place(0, 64, 1, DeviceType.MVN_REQUEST_CRAFTER);
         Block req = place(0, 64, -1, DeviceType.MVN_REQUEST_TERMINAL);
 
         Network net = plugin.networks().networkByController(ctrl.getLocation());
@@ -259,6 +259,74 @@ class FluidAndRequesterTest {
         assertEquals(24, net.storage().count(i -> i.getType() == Material.GLASS));
         assertEquals(3, net.storage().count(i -> i.getType() == Material.REDSTONE));
         assertTrue(player.getInventory().contains(DeviceType.MVN_CABLE.material()));
+    }
+
+    @Test
+    void testRecursiveChainedCraftingLogsToPlanksToCraftingTable() {
+        Block ctrl = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
+        plugin.networks().registerController(ctrl);
+        place(1, 64, 0, DeviceType.MVN_CELL_T1);
+        place(2, 64, 0, DeviceType.MVN_CELL_T1);
+        Block reqCrafter = place(0, 64, 1, DeviceType.MVN_REQUEST_CRAFTER);
+        Block reqTerm = place(0, 64, -1, DeviceType.MVN_REQUEST_TERMINAL);
+
+        Network net = plugin.networks().networkByController(ctrl.getLocation());
+        net.scan();
+
+        // Deposit 5 OAK_LOG into storage (0 planks in storage!)
+        net.storage().deposit(new ItemStack(Material.OAK_LOG, 5));
+
+        // Recipe 1: 1 Oak Log -> 4 Oak Planks
+        ItemStack[] logInputs = new ItemStack[9];
+        logInputs[0] = new ItemStack(Material.OAK_LOG);
+        ItemStack planksOutput = new ItemStack(Material.OAK_PLANKS, 4);
+        RecipeData logToPlanks = new RecipeData(logInputs, planksOutput);
+
+        // Recipe 2: 4 Oak Planks -> 1 Crafting Table
+        ItemStack[] tableInputs = new ItemStack[9];
+        tableInputs[0] = new ItemStack(Material.OAK_PLANKS);
+        tableInputs[1] = new ItemStack(Material.OAK_PLANKS);
+        tableInputs[3] = new ItemStack(Material.OAK_PLANKS);
+        tableInputs[4] = new ItemStack(Material.OAK_PLANKS);
+        ItemStack tableOutput = new ItemStack(Material.CRAFTING_TABLE, 1);
+        RecipeData planksToTable = new RecipeData(tableInputs, tableOutput);
+
+        NodeBlob blob = NodeStore.get(reqCrafter);
+        blob.blueprintData.add(Blueprints.encode(logToPlanks));
+        blob.blueprintData.add(Blueprints.encode(planksToTable));
+        NodeStore.put(reqCrafter, blob);
+
+        // Open Request Terminal
+        RequestTerminalMenu menu = new RequestTerminalMenu(plugin, player, net, reqTerm);
+        menu.openMenu();
+
+        // Verify Crafting Table option is found in terminal
+        int tableSlot = -1;
+        for (int s = 0; s < 45; s++) {
+            ItemStack it = player.getOpenInventory().getTopInventory().getItem(s);
+            if (it != null && it.getType() == Material.CRAFTING_TABLE) {
+                tableSlot = s;
+                break;
+            }
+        }
+        assertTrue(tableSlot >= 0, "Crafting Table option should be found in terminal");
+
+        // Order 1 Crafting Table via click
+        InventoryClickEvent clickOrder = new InventoryClickEvent(
+                player.getOpenInventory(),
+                org.bukkit.event.inventory.InventoryType.SlotType.CONTAINER,
+                tableSlot,
+                ClickType.LEFT,
+                InventoryAction.PICKUP_ALL
+        );
+        server.getPluginManager().callEvent(clickOrder);
+
+        // Assert: 1 Oak Log was consumed from storage (4 remaining)
+        assertEquals(4, net.storage().count(i -> i.getType() == Material.OAK_LOG), "1 Oak Log must be consumed");
+        // Player received 1 Crafting Table
+        assertTrue(player.getInventory().contains(Material.CRAFTING_TABLE), "Player must receive 1 Crafting Table");
+        // Storage has 0 Crafting Table because it was delivered directly to inventory
+        assertEquals(0, net.storage().count(i -> i.getType() == Material.CRAFTING_TABLE));
     }
 
     @Test
@@ -449,5 +517,50 @@ class FluidAndRequesterTest {
         assertTrue(text.contains("MultiverseNets"), "Hologram must contain MultiverseNets");
         assertFalse(text.toLowerCase(java.util.Locale.ROOT).contains("flow"), "Hologram must NOT contain 'flow'");
         assertFalse(text.toLowerCase(java.util.Locale.ROOT).contains("routed"), "Hologram must NOT contain 'routed'");
+    }
+
+    @Test
+    void testRequestTerminalIgnoresAutoCrafterRecipes() {
+        Block ctrl = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
+        plugin.networks().registerController(ctrl);
+        place(1, 64, 0, DeviceType.MVN_CELL_T1);
+        Block autoCrafter = place(0, 64, 1, DeviceType.MVN_CRAFTER);
+        Block reqCrafter = place(0, 64, 2, DeviceType.MVN_REQUEST_CRAFTER);
+        Block reqTerm = place(0, 64, -1, DeviceType.MVN_REQUEST_TERMINAL);
+
+        Network net = plugin.networks().networkByController(ctrl.getLocation());
+        net.scan();
+
+        // Recipe A: Iron Ingot -> Iron Block in autoCrafter
+        ItemStack[] ironInputs = new ItemStack[9];
+        for (int i = 0; i < 9; i++) ironInputs[i] = new ItemStack(Material.IRON_INGOT);
+        RecipeData ironRecipe = new RecipeData(ironInputs, new ItemStack(Material.IRON_BLOCK));
+        NodeBlob autoBlob = NodeStore.get(autoCrafter);
+        autoBlob.blueprintData.add(Blueprints.encode(ironRecipe));
+        NodeStore.put(autoCrafter, autoBlob);
+
+        // Recipe B: Gold Ingot -> Gold Block in reqCrafter
+        ItemStack[] goldInputs = new ItemStack[9];
+        for (int i = 0; i < 9; i++) goldInputs[i] = new ItemStack(Material.GOLD_INGOT);
+        RecipeData goldRecipe = new RecipeData(goldInputs, new ItemStack(Material.GOLD_BLOCK));
+        NodeBlob reqBlob = NodeStore.get(reqCrafter);
+        reqBlob.blueprintData.add(Blueprints.encode(goldRecipe));
+        NodeStore.put(reqCrafter, reqBlob);
+
+        RequestTerminalMenu menu = new RequestTerminalMenu(plugin, player, net, reqTerm);
+        menu.openMenu();
+
+        // Check top inventory: slot 0 should be Gold Block, and Iron Block must not exist
+        ItemStack slot0 = player.getOpenInventory().getTopInventory().getItem(0);
+        assertNotNull(slot0, "Slot 0 should contain the recipe from Request Crafter");
+        assertEquals(Material.GOLD_BLOCK, slot0.getType(), "Slot 0 must be Gold Block");
+
+        // Assert Iron Block is not anywhere in the menu
+        for (int s = 0; s < 45; s++) {
+            ItemStack item = player.getOpenInventory().getTopInventory().getItem(s);
+            if (item != null) {
+                assertNotEquals(Material.IRON_BLOCK, item.getType(), "Request Terminal must NOT display recipes from MVN_CRAFTER");
+            }
+        }
     }
 }
