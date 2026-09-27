@@ -2,6 +2,7 @@ package com.chagui68.multiversenets.command;
 
 import com.chagui68.multiversenets.MultiverseNets;
 import com.chagui68.multiversenets.item.DeviceType;
+import com.chagui68.multiversenets.item.GuideBook;
 import com.chagui68.multiversenets.item.Items;
 import com.chagui68.multiversenets.net.Network;
 import com.chagui68.multiversenets.net.NetworkStorage;
@@ -47,7 +48,7 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
         }
         switch (args[0].toLowerCase(Locale.ROOT)) {
             case "help" -> sendHelp(sender);
-            case "guide" -> guide(sender);
+            case "guide" -> guide(sender, args);
             case "info" -> sendInfo(sender);
             case "reload" -> reload(sender);
             case "give" -> give(sender, args);
@@ -72,8 +73,8 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage(Component.text("=== MultiverseNets ===", NamedTextColor.AQUA));
-        sender.sendMessage(Component.text("/mvnets guide", NamedTextColor.YELLOW)
-                .append(Component.text(" - Receive the official MultiverseNets Guide Book.", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/mvnets guide [en|es|both]", NamedTextColor.YELLOW)
+                .append(Component.text(" - Receive official guide book (English or Español).", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/mvnets devices", NamedTextColor.YELLOW)
                 .append(Component.text(" - List of devices.", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/mvnets give <id> [n]", NamedTextColor.YELLOW)
@@ -92,231 +93,69 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
                 .append(Component.text(" - Synchronize and inspect all crafting recipes.", NamedTextColor.GRAY)));
     }
 
-    private void guide(CommandSender sender) {
+    private void guide(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage(Text.msg("Only players can receive the guide book.", NamedTextColor.RED));
             return;
         }
 
-        ItemStack book = new ItemStack(org.bukkit.Material.WRITTEN_BOOK);
-        org.bukkit.inventory.meta.BookMeta meta = (org.bukkit.inventory.meta.BookMeta) book.getItemMeta();
-        if (meta != null) {
-            meta.setTitle("MultiverseNets Guide");
-            meta.setAuthor("Chagui68");
+        boolean requestedSpanish = false;
+        boolean requestedBoth = false;
 
-            // Page 1: Welcome & Overview
-            meta.addPage("§1§lMultiverseNets§r\n"
-                    + "§8Digital Logistics Guide§r\n\n"
-                    + "Welcome to MultiverseNets!\n\n"
-                    + "High-performance digital item & fluid networking, deep quantum storage, and recipe automation.\n\n"
-                    + "Everything is crafted in a standard Crafting Table.\n\n"
-                    + "§8Flip pages for all crafting recipes!§0");
-
-            // Page 2: Core Components
-            meta.addPage("§1§lCore System§r\n\n"
-                    + "§9Controller:§0 Brain of the network. Connect cables to it. Accepts CPU Caches.\n\n"
-                    + "§9Cables:§0 Connects all network devices together.\n\n"
-                    + "§9Terminal:§0 Search & manage items. Includes the §1Network Fluids Storage§0 button for liquid tanks!");
-
-            // Page 3: Controller Recipe
-            meta.addPage("§1§lController§r\n"
-                    + "§8Central Network Brain§r\n\n"
-                    + "§9Recipe:§0\n"
-                    + "[IronBlk] [IronBlk] [IronBlk]\n"
-                    + "[IronBlk] [Nether*] [IronBlk]\n"
-                    + "[IronBlk] [IronBlk] [IronBlk]\n\n"
-                    + "§8• 8x Iron Block\n"
-                    + "• 1x Nether Star§0");
-
-            // Page 4: Cables & Terminal Recipe
-            meta.addPage("§1§lCables & Terminal§r\n\n"
-                    + "§9Cable (x16):§0\n"
-                    + "[Glass] [Glass] [Glass]\n"
-                    + "[Glass] [Redst] [Glass]\n"
-                    + "[Glass] [Glass] [Glass]\n\n"
-                    + "§9Terminal:§0\n"
-                    + "[Glass] [E-Pearl] [Glass]\n"
-                    + "[E-Pearl] [Beacon] [E-Pearl]\n"
-                    + "[Glass] [E-Pearl] [Glass]");
-
-            // Page 5: Quantum Cells Recipe
-            meta.addPage("§1§lQuantum Cells§r\n\n"
-                    + "§9Cell Tier 1 (65K):§0\n"
-                    + "[Glass] [Glass] [Glass]\n"
-                    + "[Glass] [Diamd] [Glass]\n"
-                    + "[Glass] [Glass] [Glass]\n\n"
-                    + "§9Tiers 2 to 6:§0\n"
-                    + "Surround the previous tier cell with 8 Diamonds in the Crafting Table!");
-
-            // Page 6: Greedy Cell & Infinity Barrel
-            meta.addPage("§1§lSpecial Storage§r\n\n"
-                    + "§9Greedy Cell:§0\n"
-                    + "[Gold] [Hopper] [Gold]\n"
-                    + "[Hopper] [Slime] [Hopper]\n"
-                    + "[Gold] [Hopper] [Gold]\n\n"
-                    + "§9Infinity Barrel:§0\n"
-                    + "[Netherite] [DiaBlk] [Netherite]\n"
-                    + "[DiaBlk] [Barrel] [DiaBlk]\n"
-                    + "[Netherite] [DiaBlk] [Netherite]");
-
-            // Page 7: Fluids System
-            meta.addPage("§1§lFluids System§r\n\n"
-                    + "§9Quantum Fluid Cell:§0\n"
-                    + "[Glass] [Bucket] [Glass]\n"
-                    + "[Glass] [LapisBlk] [Glass]\n"
-                    + "[Glass] [Glass] [Glass]\n\n"
-                    + "§9Liquid Pump:§0\n"
-                    + "[Air] [BlueGlass] [Air]\n"
-                    + "[Piston] [Bucket] [Piston]\n"
-                    + "[Air] [Redstone] [Air]\n"
-                    + "§8Pumps Water/Lava directly below it into the net!§0");
-
-            // Page 8: Grabbers
-            meta.addPage("§1§lImport Grabbers§r\n\n"
-                    + "§9Standard Grabber:§0\n"
-                    + "[Iron] [Observ] [Iron]\n"
-                    + "[Observ] [RedBlk] [Observ]\n"
-                    + "[Iron] [Observ] [Iron]\n\n"
-                    + "§9Grabber HT:§0\n"
-                    + "[Observ] [StickyPist] [Observ]\n"
-                    + "§8Single row recipe. Moves up to 128 items!§0");
-
-            // Page 9: Pushers
-            meta.addPage("§1§lExport Pushers§r\n\n"
-                    + "§9Standard Pusher:§0\n"
-                    + "[Iron] [Droppr] [Iron]\n"
-                    + "[Droppr] [RedBlk] [Droppr]\n"
-                    + "[Iron] [Droppr] [Iron]\n\n"
-                    + "§9Pusher HT:§0\n"
-                    + "[Droppr] [Piston] [Droppr]\n"
-                    + "§8Single row recipe. Exports up to 128 items!§0");
-
-            // Page 10: Vacuum & Purger
-            meta.addPage("§1§lCleanup Devices§r\n\n"
-                    + "§9Vacuum:§0\n"
-                    + "[String] [Redst] [String]\n"
-                    + "[Redst] [Hopper] [Redst]\n"
-                    + "[String] [Redst] [String]\n\n"
-                    + "§9Purger (Incinerator):§0\n"
-                    + "[Iron] [Magma] [Iron]\n"
-                    + "[Magma] [Hopper] [Magma]\n"
-                    + "[Iron] [Magma] [Iron]");
-
-            // Page 11: Limiter & Router
-            meta.addPage("§1§lLogistics Control§r\n\n"
-                    + "§9Quota Limiter:§0\n"
-                    + "[Redst] [Compar] [Redst]\n"
-                    + "[Compar] [Target] [Compar]\n"
-                    + "[Redst] [Compar] [Redst]\n\n"
-                    + "§9Subnet Router:§0\n"
-                    + "[Air] [LightningRod] [Air]\n"
-                    + "[Air] [Cable] [Air]\n"
-                    + "[Air] [RedstoneBlock] [Air]");
-
-            // Page 12: Crafters
-            meta.addPage("§1§lCrafters§r\n\n"
-                    + "§9Auto-Crafter:§0\n"
-                    + "[Redst] [CraftTbl] [Redst]\n"
-                    + "[Iron] [Target] [Iron]\n"
-                    + "[Redst] [CraftTbl] [Redst]\n\n"
-                    + "§9Request Crafter:§0\n"
-                    + "[Redst] [CraftTbl] [Redst]\n"
-                    + "[Iron] [Lectern] [Iron]\n"
-                    + "[Redst] [CraftTbl] [Redst]\n"
-                    + "§8Only crafts when ordered!§0");
-
-            // Page 13: Request Terminal & Blueprint
-            meta.addPage("§1§lJob Ordering§r\n\n"
-                    + "§9Request Terminal:§0\n"
-                    + "[Glass] [Lectern] [Glass]\n"
-                    + "[Redst] [CraftTbl] [Redst]\n"
-                    + "[Glass] [Glass] [Glass]\n\n"
-                    + "§9Blank Blueprint (x4):§0\n"
-                    + "[Paper] [Paper] [Paper]\n"
-                    + "[Paper] [BlueDye] [Paper]\n"
-                    + "[Paper] [Paper] [Paper]");
-
-            // Page 14: Recipe Encoders
-            meta.addPage("§1§lRecipe Encoders§r\n\n"
-                    + "§9Vanilla Encoder:§0\n"
-                    + "[InkSac] [Paper] [InkSac]\n"
-                    + "[Paper] [Smithing] [Paper]\n"
-                    + "[InkSac] [Paper] [InkSac]\n\n"
-                    + "§9Slimefun Encoder:§0\n"
-                    + "[E-Pearl] [Paper] [E-Pearl]\n"
-                    + "[Paper] [EnchantT] [Paper]\n"
-                    + "[E-Pearl] [Paper] [E-Pearl]");
-
-            // Page 15: Workbenches
-            meta.addPage("§1§lWorkbenches§r\n\n"
-                    + "§9Crafting Grid:§0\n"
-                    + "[CraftTbl] [Redst] [CraftTbl]\n"
-                    + "[Redst] [Cartography] [Redst]\n"
-                    + "[CraftTbl] [Redst] [CraftTbl]\n\n"
-                    + "§9Quantum Workbench:§0\n"
-                    + "[Diamd] [Diamd] [Diamd]\n"
-                    + "[Diamd] [CraftTbl] [Diamd]\n"
-                    + "[Diamd] [Diamd] [Diamd]");
-
-            // Page 16: Monitor & Wireless Terminal
-            meta.addPage("§1§lMonitor & Wireless§r\n\n"
-                    + "§9Network Monitor:§0\n"
-                    + "Surround 1x Comparator with 8x Glass Panes.\n\n"
-                    + "§9Wireless Terminal:§0\n"
-                    + "[Air] [E-Pearl] [Air]\n"
-                    + "[E-Pearl] [Nether*] [E-Pearl]\n"
-                    + "[Air] [Compass] [Air]\n"
-                    + "§8Shift+Right click Controller to bind!§0");
-
-            // Page 17: Transmitter & Receiver
-            meta.addPage("§1§lCross-Chunk Links§r\n\n"
-                    + "§9Transmitter:§0\n"
-                    + "[Iron] [RedBlk] [Iron]\n"
-                    + "[RedBlk] [Conduit] [RedBlk]\n"
-                    + "[Iron] [RedBlk] [Iron]\n\n"
-                    + "§9Receiver:§0\n"
-                    + "[Iron] [E-Pearl] [Iron]\n"
-                    + "[E-Pearl] [RedLamp] [E-Pearl]\n"
-                    + "[Iron] [E-Pearl] [Iron]");
-
-            // Page 18: CPU Caches
-            meta.addPage("§1§lCPU Cache Modules§r\n\n"
-                    + "§9Cache L1:§0 Copper & Redstone.\n\n"
-                    + "§9Cache L2:§0 Gold & Lapis around L1.\n\n"
-                    + "§9Cache L3:§0 Diamond & Amethyst around L2.\n\n"
-                    + "§9Cache DRAM:§0 Netherite & Eye of Ender around L3.\n\n"
-                    + "§9Quantum Cache:§0 Netherite Block & Nether Star around DRAM.\n\n"
-                    + "§8Right-click Controller to install!§0");
-
-            // Page 19: Tools
-            meta.addPage("§1§lNetwork Tools§r\n\n"
-                    + "§9Network Probe:§0\n"
-                    + "Amethyst shards surrounding Spyglass.\n\n"
-                    + "§9Network Rake:§0\n"
-                    + "[DeadBush] [Air] [DeadBush]\n"
-                    + "[Air] [Stick] [Air]\n"
-                    + "[Air] [Stick] [Air]\n\n"
-                    + "§9Configurator:§0\n"
-                    + "Iron Ingots & Comparator.");
-
-            // Page 20: Controls & Tips
-            meta.addPage("§1§lTips & Interactions§r\n\n"
-                    + "§9Shift + Right Click:§0\n"
-                    + "Access containers and machines through any network node (supports Vanilla & Slimefun)!\n\n"
-                    + "§9Network Fluids:§0\n"
-                    + "In Terminal, click Network Fluids Storage to inspect and withdraw liquids using buckets/bottles.\n\n"
-                    + "§9Request Terminal:§0\n"
-                    + "Shift+Right Click to type custom amount in chat!");
-
-            book.setItemMeta(meta);
+        if (args.length >= 2) {
+            String sub = args[1].toLowerCase(Locale.ROOT);
+            if (sub.equals("es") || sub.equals("spanish") || sub.equals("español")) {
+                requestedSpanish = true;
+            } else if (sub.equals("en") || sub.equals("english") || sub.equals("inglés") || sub.equals("ingles")) {
+                requestedSpanish = false;
+            } else if (sub.equals("both") || sub.equals("all") || sub.equals("ambas") || sub.equals("ambos")) {
+                requestedBoth = true;
+            } else {
+                sender.sendMessage(Text.msg("Unknown language. Use: /mvnets guide [en|es|both]", NamedTextColor.RED));
+                return;
+            }
+        } else {
+            // Auto-detect player client locale
+            java.util.Locale loc = player.locale();
+            if (loc != null && loc.getLanguage().equalsIgnoreCase("es")) {
+                requestedSpanish = true;
+            }
         }
 
-        var leftovers = player.getInventory().addItem(book);
+        if (requestedBoth) {
+            ItemStack bookEn = GuideBook.createEnglishBook();
+            ItemStack bookEs = GuideBook.createSpanishBook();
+            giveItem(player, bookEn);
+            giveItem(player, bookEs);
+            player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_BOOK_PAGE_TURN, 1f, 1f);
+            player.sendMessage(Text.msg("Received both MultiverseNets Guide books (English & Español)!", NamedTextColor.GREEN));
+            return;
+        }
+
+        if (requestedSpanish) {
+            ItemStack book = GuideBook.createSpanishBook();
+            giveItem(player, book);
+            player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_BOOK_PAGE_TURN, 1f, 1f);
+            player.sendMessage(Component.text("¡Has recibido la Guía de MultiverseNets (Español)!", NamedTextColor.GREEN)
+                    .append(Component.text(" (Usa ", NamedTextColor.GRAY))
+                    .append(Component.text("/mvnets guide en", NamedTextColor.YELLOW))
+                    .append(Component.text(" para inglés)", NamedTextColor.GRAY)));
+        } else {
+            ItemStack book = GuideBook.createEnglishBook();
+            giveItem(player, book);
+            player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_BOOK_PAGE_TURN, 1f, 1f);
+            player.sendMessage(Component.text("You received the MultiverseNets Guide Book (English)!", NamedTextColor.GREEN)
+                    .append(Component.text(" (Use ", NamedTextColor.GRAY))
+                    .append(Component.text("/mvnets guide es", NamedTextColor.YELLOW))
+                    .append(Component.text(" for Spanish)", NamedTextColor.GRAY)));
+        }
+    }
+
+    private void giveItem(Player player, ItemStack item) {
+        var leftovers = player.getInventory().addItem(item);
         for (ItemStack rem : leftovers.values()) {
             player.getWorld().dropItemNaturally(player.getLocation(), rem);
         }
-        player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_BOOK_PAGE_TURN, 1f, 1f);
-        player.sendMessage(Text.msg("You received the MultiverseNets Guide Book!", NamedTextColor.GREEN));
     }
 
     private void sendInfo(CommandSender sender) {
@@ -528,6 +367,16 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
             for (DeviceType type : DeviceType.values()) {
                 if (type.id().startsWith(args[1].toLowerCase(Locale.ROOT))) {
                     out.add(type.id());
+                }
+            }
+            return out;
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("guide")) {
+            List<String> list = List.of("en", "es", "both");
+            List<String> out = new ArrayList<>();
+            for (String s : list) {
+                if (s.startsWith(args[1].toLowerCase(Locale.ROOT))) {
+                    out.add(s);
                 }
             }
             return out;

@@ -77,7 +77,7 @@
 
 | Command | Description | Permission |
 |---|---|---|
-| `/mvnets guide` | Receive an interactive guide book detailing all network mechanics | `multiversenets.use` |
+| `/mvnets guide [en\|es\|both]` | Receive official interactive guide book (English, Spanish, or both) | `multiversenets.use` |
 | `/mvnets devices` | List the device IDs | `multiversenets.use` |
 | `/mvnets give <id> [n]` | Give a device | `multiversenets.admin` |
 | `/mvnets doctor` | Rescan and diagnose networks | `multiversenets.admin` |

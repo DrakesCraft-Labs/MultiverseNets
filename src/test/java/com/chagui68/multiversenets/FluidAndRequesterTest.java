@@ -396,11 +396,52 @@ class FluidAndRequesterTest {
         assertNotNull(book);
         org.bukkit.inventory.meta.BookMeta meta = (org.bukkit.inventory.meta.BookMeta) book.getItemMeta();
         assertNotNull(meta);
-        assertTrue(meta.getPageCount() >= 18, "Guide book should have at least 18 pages of content and recipes");
+        assertTrue(meta.getPageCount() >= 30, "Guide book should have at least 30 pages of content and recipes");
         String p1 = meta.getPage(1);
         assertTrue(p1.contains("MultiverseNets"));
         String p3 = meta.getPage(3);
         assertTrue(p3.contains("Controller") && p3.contains("Nether Star"));
+        assertTrue(p3.contains("[ I ] [ N ] [ I ]"), "Page 3 should render 3x3 recipe grid like the wiki");
+    }
+
+    @Test
+    void guideCommandSpanishDeliversSpanishBook() {
+        player.getInventory().clear();
+        boolean ok = server.dispatchCommand(player, "mvnets guide es");
+        assertTrue(ok);
+        ItemStack book = player.getInventory().getItem(0);
+        assertNotNull(book);
+        assertEquals(Material.WRITTEN_BOOK, book.getType());
+        org.bukkit.inventory.meta.BookMeta meta = (org.bukkit.inventory.meta.BookMeta) book.getItemMeta();
+        assertNotNull(meta);
+        assertEquals("Guía MultiverseNets", meta.getTitle());
+        assertTrue(meta.getPageCount() >= 30);
+        String p3 = meta.getPage(3);
+        assertTrue(p3.contains("Controlador") && p3.contains("Estrella del Nether"));
+        assertTrue(p3.contains("[ I ] [ N ] [ I ]"), "Spanish guide should render 3x3 recipe grid like the wiki");
+    }
+
+    @Test
+    void guideCommandBothDeliversBothBooks() {
+        player.getInventory().clear();
+        boolean ok = server.dispatchCommand(player, "mvnets guide both");
+        assertTrue(ok);
+        int bookCount = 0;
+        boolean hasEn = false;
+        boolean hasEs = false;
+        for (ItemStack is : player.getInventory().getContents()) {
+            if (is != null && is.getType() == Material.WRITTEN_BOOK) {
+                bookCount++;
+                org.bukkit.inventory.meta.BookMeta meta = (org.bukkit.inventory.meta.BookMeta) is.getItemMeta();
+                if (meta != null) {
+                    if ("MultiverseNets Guide".equals(meta.getTitle())) hasEn = true;
+                    if ("Guía MultiverseNets".equals(meta.getTitle())) hasEs = true;
+                }
+            }
+        }
+        assertEquals(2, bookCount);
+        assertTrue(hasEn, "Must deliver English guide book");
+        assertTrue(hasEs, "Must deliver Spanish guide book");
     }
 
     @Test

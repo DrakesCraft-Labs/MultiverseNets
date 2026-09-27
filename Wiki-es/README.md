@@ -110,7 +110,7 @@ Cada dispositivo se fabrica en una mesa de crafteo 3×3 estándar. `·` marca el
 
 | Comando | Descripción | Permiso |
 |---|---|---|
-| `/mvnets guide` | Entrega un libro guía interactivo con todas las mecánicas de red | `multiversenets.use` |
+| `/mvnets guide [en\|es\|both]` | Entrega el libro guía interactivo oficial (Español, Inglés o ambos) | `multiversenets.use` |
 | `/mvnets devices` | Lista los IDs de dispositivos | `multiversenets.use` |
 | `/mvnets give <id> [n]` | Da un dispositivo | `multiversenets.admin` |
 | `/mvnets doctor` | Reescanea y diagnostica redes | `multiversenets.admin` |
