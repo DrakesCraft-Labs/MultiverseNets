@@ -14,6 +14,7 @@ import org.bukkit.persistence.PersistentDataType;
 
 import javax.annotation.Nonnull;
 import java.text.NumberFormat;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -80,23 +81,71 @@ public final class NetworkHologramManager {
             HOLOGRAM_ENTITIES.put(pos, textDisplay.getUniqueId());
         }
 
-        double flowRate = net.throughput().getItemsPerSecond();
-        long totalTransferred = net.throughput().getTotalTransferredItems();
         int nodeCount = net.size();
         int maxNodes = com.chagui68.multiversenets.util.Settings.maxNodes();
 
-        Component text = Component.text("✦ MULTIVERSENETS ✦", NamedTextColor.GOLD, TextDecoration.BOLD)
+        // 1. Header: "MultiverseNets"
+        Component header = Component.text("MultiverseNets", NamedTextColor.AQUA, TextDecoration.BOLD);
+
+        // 2. Network Core Status
+        Component statusLine;
+        if (net.error == null || net.error.isBlank()) {
+            statusLine = Component.text("● ", NamedTextColor.GREEN)
+                    .append(Component.text("System Online", NamedTextColor.WHITE));
+        } else {
+            statusLine = Component.text("⚠ ", NamedTextColor.RED)
+                    .append(Component.text(net.error, NamedTextColor.RED));
+        }
+
+        // 3. Grid Infrastructure Scale
+        Component gridLine = Component.text("Grid Scale: ", NamedTextColor.GRAY)
+                .append(Component.text(NumberFormat.getInstance(Locale.ROOT).format(nodeCount), NamedTextColor.WHITE))
+                .append(Component.text(" / " + NumberFormat.getInstance(Locale.ROOT).format(maxNodes) + " nodes", NamedTextColor.DARK_GRAY));
+
+        // 4. Storage Overview (Items & Fluids)
+        List<NetworkStorage.View> view = net.storage().view();
+        long totalItems = 0;
+        for (NetworkStorage.View v : view) {
+            totalItems += v.amount();
+        }
+        long fluidMb = net.fluidStorage().totalStored();
+
+        Component storageLine;
+        if (totalItems > 0 && fluidMb > 0) {
+            storageLine = Component.text("Storage: ", NamedTextColor.GRAY)
+                    .append(Component.text(com.chagui68.multiversenets.item.Items.formatAmount(totalItems) + " items", NamedTextColor.GOLD))
+                    .append(Component.text(" · ", NamedTextColor.DARK_GRAY))
+                    .append(Component.text(com.chagui68.multiversenets.item.Items.formatAmount(fluidMb) + " mB", NamedTextColor.AQUA));
+        } else if (totalItems > 0) {
+            storageLine = Component.text("Storage: ", NamedTextColor.GRAY)
+                    .append(Component.text(NumberFormat.getInstance(Locale.ROOT).format(totalItems) + " items", NamedTextColor.GOLD))
+                    .append(Component.text(" (" + view.size() + " types)", NamedTextColor.DARK_GRAY));
+        } else if (fluidMb > 0) {
+            storageLine = Component.text("Storage: ", NamedTextColor.GRAY)
+                    .append(Component.text(NumberFormat.getInstance(Locale.ROOT).format(fluidMb) + " mB fluids", NamedTextColor.AQUA));
+        } else {
+            int storageNodes = 0;
+            for (com.chagui68.multiversenets.item.DeviceType dt : com.chagui68.multiversenets.item.DeviceType.values()) {
+                if (dt.isCell() || dt.isBarrel() || dt.isFluidCell() || dt == com.chagui68.multiversenets.item.DeviceType.MVN_GREEDY_CELL) {
+                    storageNodes += net.count(dt);
+                }
+            }
+            if (storageNodes > 0) {
+                storageLine = Component.text("Storage: ", NamedTextColor.GRAY)
+                        .append(Component.text("Ready (" + storageNodes + " cells)", NamedTextColor.DARK_GRAY));
+            } else {
+                storageLine = Component.text("Storage: ", NamedTextColor.GRAY)
+                        .append(Component.text("No Cells Connected", NamedTextColor.DARK_GRAY));
+            }
+        }
+
+        Component text = header
                 .append(Component.newline())
-                .append(Component.text("Nodes: ", NamedTextColor.GRAY))
-                .append(Component.text(nodeCount + "/" + maxNodes, NamedTextColor.WHITE))
-                .append(Component.text(" | Flow: ", NamedTextColor.DARK_GRAY))
-                .append(Component.text(String.format(Locale.ROOT, "+%.1f items/s", flowRate), NamedTextColor.GREEN))
+                .append(statusLine)
                 .append(Component.newline())
-                .append(Component.text("Routed: ", NamedTextColor.GRAY))
-                .append(Component.text(NumberFormat.getInstance().format(totalTransferred), NamedTextColor.YELLOW))
-                .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
-                .append(Component.text(net.error == null || net.error.isBlank() ? "● Online" : "⚠ " + net.error,
-                        net.error == null || net.error.isBlank() ? NamedTextColor.AQUA : NamedTextColor.RED));
+                .append(gridLine)
+                .append(Component.newline())
+                .append(storageLine);
 
         textDisplay.text(text);
     }

@@ -8,8 +8,10 @@ import com.chagui68.multiversenets.gui.RequestTerminalMenu;
 import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.item.Items;
 import com.chagui68.multiversenets.net.Network;
+import com.chagui68.multiversenets.net.NetworkHologramManager;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -317,5 +319,29 @@ class FluidAndRequesterTest {
         boolean ok = server.dispatchCommand(player, "mvnets guide");
         assertTrue(ok);
         assertTrue(player.getInventory().contains(Material.WRITTEN_BOOK));
+    }
+
+    @Test
+    void testHologramRedesignNoFlowOrRouted() {
+        Block ctrl = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
+        plugin.networks().registerController(ctrl);
+        Network net = plugin.networks().networkByController(ctrl.getLocation());
+        net.scan();
+
+        NetworkHologramManager.updateHologram(net);
+
+        org.bukkit.entity.TextDisplay td = null;
+        for (org.bukkit.entity.Entity e : world.getEntities()) {
+            if (e instanceof org.bukkit.entity.TextDisplay display) {
+                td = display;
+                break;
+            }
+        }
+        assertNotNull(td, "Hologram TextDisplay should be spawned");
+        String text = PlainTextComponentSerializer.plainText().serialize(td.text());
+
+        assertTrue(text.contains("MultiverseNets"), "Hologram must contain MultiverseNets");
+        assertFalse(text.toLowerCase(java.util.Locale.ROOT).contains("flow"), "Hologram must NOT contain 'flow'");
+        assertFalse(text.toLowerCase(java.util.Locale.ROOT).contains("routed"), "Hologram must NOT contain 'routed'");
     }
 }
