@@ -139,7 +139,9 @@ public class BlockListener implements Listener {
             return;
         }
         event.setDropItems(false);
-        block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), createDropItem(type, blob));
+        if (event.getPlayer().getGameMode() != org.bukkit.GameMode.CREATIVE) {
+            block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), createDropItem(type, blob));
+        }
 
         NodeStore.remove(block);
         if (type == DeviceType.MVN_CONTROLLER) {
@@ -177,6 +179,20 @@ public class BlockListener implements Listener {
         } else if (blob.totalGreedyAmount() > 0) {
             lore.add(Component.text("Cargo: " + Items.formatAmount(blob.totalGreedyAmount()) + " items ("
                     + (blob.greedySamples != null ? blob.greedySamples.size() : 0) + " types)", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
+        } else if (blob.virtualCacheTier > 0) {
+            String tierName = switch (blob.virtualCacheTier) {
+                case 1 -> "L1 CPU Cache";
+                case 2 -> "L2 CPU Cache";
+                case 3 -> "L3 CPU Cache";
+                case 4 -> "System DRAM";
+                case 5 -> "Quantum Cache";
+                default -> "T" + blob.virtualCacheTier;
+            };
+            lore.add(Component.text("CPU Cache: " + tierName, NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
+            if (blob.totalVirtualAmount() > 0) {
+                lore.add(Component.text("Virtual Cargo: " + Items.formatAmount(blob.totalVirtualAmount()) + " items ("
+                        + (blob.virtualSamples != null ? blob.virtualSamples.size() : 0) + " types)", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
+            }
         }
         meta.lore(lore);
         item.setItemMeta(meta);
@@ -233,6 +249,10 @@ public class BlockListener implements Listener {
         actual.recipes = loaded.recipes;
         actual.blueprintData = loaded.blueprintData;
         actual.craftingMatrix = loaded.craftingMatrix;
+        actual.virtualCacheTier = loaded.virtualCacheTier;
+        actual.virtualSamples = loaded.virtualSamples != null ? new ArrayList<>(loaded.virtualSamples) : new ArrayList<>();
+        actual.virtualAmounts = loaded.virtualAmounts != null ? new ArrayList<>(loaded.virtualAmounts) : new ArrayList<>();
+        actual.transitBuffer = loaded.transitBuffer;
         if (loaded.txWorld != null) {
             actual.txWorld = loaded.txWorld;
             actual.txX = loaded.txX;
@@ -266,6 +286,12 @@ public class BlockListener implements Listener {
             return;
         }
         NodeBlob blob = NodeStore.get(block);
+
+        if (blob != null && !canAccessIslandNetwork(event.getPlayer(), block.getLocation())) {
+            event.getPlayer().sendMessage(Text.msg("You do not have permission to access network devices on this island.", NamedTextColor.RED));
+            event.setCancelled(true);
+            return;
+        }
 
         // Handheld tools: handled before general menus
         if (heldType == DeviceType.MVN_PROBE) {
@@ -567,9 +593,14 @@ public class BlockListener implements Listener {
             player.sendMessage(Text.msg("This Controller already has " + cacheType.display() + " or higher installed.", NamedTextColor.RED));
             return;
         }
+        if (DeviceType.parse(blob.typeName) != DeviceType.MVN_CONTROLLER) {
+            return;
+        }
         blob.virtualCacheTier = tier;
         NodeStore.put(block, blob);
-        held.subtract(1);
+        if (player.getGameMode() != org.bukkit.GameMode.CREATIVE) {
+            held.subtract(1);
+        }
         player.playSound(block.getLocation(), org.bukkit.Sound.BLOCK_BEACON_POWER_SELECT, 1.0f, 1.2f);
         player.sendMessage(Text.msg("Installed " + cacheType.display() + "! Virtual Cache capacity: "
                 + Items.formatAmount(Settings.virtualCacheCapacity(tier)) + " items.", NamedTextColor.GREEN));

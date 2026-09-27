@@ -131,4 +131,50 @@ class UpgradedFeaturesTest {
         assertNotNull(reloaded.transitBuffer);
         assertEquals(16, reloaded.transitBuffer.getAmount());
     }
+
+    @Test
+    void testPreserveVirtualCacheOnBreakAndPlace() {
+        Block ctrl = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
+        NodeBlob blob = NodeStore.get(ctrl);
+        assertNotNull(blob);
+        blob.virtualCacheTier = 2; // L2 Cache
+        blob.addVirtualItem(new ItemStack(Material.GOLD_INGOT), 500);
+        NodeStore.put(ctrl, blob);
+
+        // Encode and simulate drop
+        String encoded = NodeStore.encode(blob);
+        assertNotNull(encoded);
+
+        NodeBlob decoded = NodeStore.decode(encoded);
+        assertNotNull(decoded);
+        assertEquals(2, decoded.virtualCacheTier);
+        assertEquals(500L, decoded.totalVirtualAmount());
+
+        // Simulate restore cargo on place
+        Block newCtrl = place(10, 64, 10, DeviceType.MVN_CONTROLLER);
+        NodeBlob actual = NodeStore.get(newCtrl);
+        assertNotNull(actual);
+        actual.virtualCacheTier = decoded.virtualCacheTier;
+        actual.virtualSamples = decoded.virtualSamples;
+        actual.virtualAmounts = decoded.virtualAmounts;
+        NodeStore.put(newCtrl, actual);
+
+        NodeBlob reloaded = NodeStore.get(newCtrl);
+        assertEquals(2, reloaded.virtualCacheTier);
+        assertEquals(500L, reloaded.totalVirtualAmount());
+    }
+
+    @Test
+    void testCreativePlayerDoesNotDropItemOnBreak() {
+        org.mockbukkit.mockbukkit.entity.PlayerMock player = server.addPlayer();
+        player.setGameMode(org.bukkit.GameMode.CREATIVE);
+
+        Block ctrl = place(5, 64, 5, DeviceType.MVN_CONTROLLER);
+        org.bukkit.event.block.BlockBreakEvent event = new org.bukkit.event.block.BlockBreakEvent(ctrl, player);
+        server.getPluginManager().callEvent(event);
+
+        // Verify no dropped entities in world
+        assertEquals(0, world.getEntitiesByClass(org.bukkit.entity.Item.class).size(),
+                "Creative player breaking network node should not drop item");
+    }
 }

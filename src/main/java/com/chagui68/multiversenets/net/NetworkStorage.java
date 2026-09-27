@@ -80,7 +80,7 @@ public class NetworkStorage {
         this.network = network;
     }
 
-    public void invalidate() {
+    public synchronized void invalidate() {
         boundVersion = -1;
         viewCache = null;
     }
@@ -197,7 +197,7 @@ public class NetworkStorage {
         }
     }
 
-    public int deposit(ItemStack item) {
+    public synchronized int deposit(ItemStack item) {
         if (item == null || item.getType().isAir() || item.getAmount() <= 0) {
             return 0;
         }
@@ -311,7 +311,7 @@ public class NetworkStorage {
         return remaining - take;
     }
 
-    public int depositAll(List<ItemStack> items) {
+    public synchronized int depositAll(List<ItemStack> items) {
         int leftover = 0;
         for (ItemStack item : items) {
             leftover += deposit(item);
@@ -319,11 +319,11 @@ public class NetworkStorage {
         return leftover;
     }
 
-    public ItemStack withdraw(Predicate<ItemStack> matcher, int want) {
+    public synchronized ItemStack withdraw(Predicate<ItemStack> matcher, int want) {
         return withdraw(matcher, want, -1L);
     }
 
-    public ItemStack withdraw(Predicate<ItemStack> matcher, int want, long excludePos) {
+    public synchronized ItemStack withdraw(Predicate<ItemStack> matcher, int want, long excludePos) {
         if (want <= 0) {
             return null;
         }
@@ -440,7 +440,7 @@ public class NetworkStorage {
         return blob.cellSample == null || blob.cellAmount <= 0;
     }
 
-    public long count(Predicate<ItemStack> matcher) {
+    public synchronized long count(Predicate<ItemStack> matcher) {
         long total = 0;
         VirtualCacheState vCache = loadVirtualCache();
         if (vCache != null && vCache.blob.virtualSamples != null) {
@@ -478,7 +478,7 @@ public class NetworkStorage {
         return total;
     }
 
-    public List<View> view() {
+    public synchronized List<View> view() {
         long now = System.currentTimeMillis();
         if (viewCache != null && now - viewCacheAt < VIEW_CACHE_MS) {
             return new ArrayList<>(viewCache);
@@ -537,7 +537,7 @@ public class NetworkStorage {
     }
 
 
-    public long getGreedyStoredAmount(ItemStack item) {
+    public synchronized long getGreedyStoredAmount(ItemStack item) {
         if (item == null) {
             return 0;
         }
@@ -556,7 +556,7 @@ public class NetworkStorage {
         return total;
     }
 
-    public boolean isItemPurged(ItemStack item) {
+    public synchronized boolean isItemPurged(ItemStack item) {
         if (item == null || item.getType().isAir()) {
             return false;
         }
@@ -589,7 +589,7 @@ public class NetworkStorage {
         return false;
     }
 
-    public List<View> getPurgedItemsView() {
+    public synchronized List<View> getPurgedItemsView() {
         Map<Material, List<View>> buckets = new EnumMap<>(Material.class);
         List<View> allStored = view();
 
@@ -664,7 +664,7 @@ public class NetworkStorage {
         return count;
     }
 
-    public boolean isEmpty() {
+    public synchronized boolean isEmpty() {
         return view().isEmpty();
     }
 
