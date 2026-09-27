@@ -1,6 +1,7 @@
 package com.chagui68.multiversenets.compat;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.inventory.ItemStack;
 
@@ -62,6 +63,10 @@ public final class SlimefunBridge {
     private static Method mReplaceExistingItem;
     private static Object flowInsert;
     private static Object flowWithdraw;
+    private static Method mGetLocationInfo;
+    private static Method mAddBlockInfo;
+    private static Method mCheckItem;
+    private static final int BARREL_DISPLAY_SLOT = 31;
 
     private SlimefunBridge() {
     }
@@ -251,6 +256,184 @@ public final class SlimefunBridge {
      * @param stack The items to insert / ES: Ítems a insertar.
      * @return Number of items that did not fit (0 if all inserted) / ES: Cantidad que no cupo (0 si entró todo).
      */
+    /**
+     * EN: Returns true if the block is a Slimefun Barrel or storage unit.
+     * ES: Devuelve true si el bloque es un barril de Slimefun o unidad de almacenamiento.
+     */
+    public static boolean isBarrel(Block block) {
+        if (!available || block == null) return false;
+        try {
+            if (mGetLocationInfo != null) {
+                Object stored = mGetLocationInfo.invoke(null, block.getLocation(), "stored");
+                if (stored != null) {
+                    String id = getId(block);
+                    return id != null && (id.toUpperCase().contains("BARREL") || id.toUpperCase().contains("STORAGE") || isMachine(block));
+                }
+            }
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+        }
+        return false;
+    }
+
+    /**
+     * EN: Gets the total stored item count from a Slimefun Barrel.
+     * ES: Obtiene la cantidad total almacenada en un barril de Slimefun.
+     */
+    public static long getBarrelStoredAmount(Block block) {
+        if (!isBarrel(block)) return 0;
+        try {
+            if (mGetLocationInfo != null) {
+                Object raw = mGetLocationInfo.invoke(null, block.getLocation(), "stored");
+                if (raw != null) {
+                    return Math.max(0, Long.parseLong(raw.toString().trim()));
+                }
+            }
+        } catch (ReflectiveOperationException | NumberFormatException ignored) {
+        }
+        return 0;
+    }
+
+    /**
+     * EN: Gets the template item stored in a Slimefun Barrel (slot 31).
+     * ES: Obtiene la muestra de ítem almacenada en un barril de Slimefun (slot 31).
+     */
+    public static ItemStack getBarrelStoredItem(Block block) {
+        if (!isBarrel(block)) return null;
+        Object menu = menuOf(block);
+        if (menu == null) return null;
+        try {
+            Object raw = mGetItemInSlot.invoke(menu, BARREL_DISPLAY_SLOT);
+            if (raw instanceof ItemStack item && !item.getType().isAir() && item.getType() != Material.BARRIER) {
+                ItemStack clone = item.clone();
+                clone.setAmount(1);
+                // Clean unclickable / fluffy PDC tags from sample clone
+                if (clone.hasItemMeta()) {
+                    var meta = clone.getItemMeta();
+                    var pdc = meta.getPersistentDataContainer();
+                    for (var key : pdc.getKeys()) {
+                        if ("unclickable".equalsIgnoreCase(key.getKey())) {
+                            pdc.remove(key);
+                        }
+                    }
+                    clone.setItemMeta(meta);
+                }
+                return clone;
+            }
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+        }
+        return null;
+    }
+
+    /**
+     * EN: Gets capacity of a Slimefun Barrel.
+     * ES: Obtiene la capacidad máxima de un barril de Slimefun.
+     */
+    public static long getBarrelCapacity(Block block) {
+        if (!isBarrel(block)) return 0;
+        try {
+            if (mCheckItem != null) {
+                Object sfItem = mCheckItem.invoke(null, block);
+                if (sfItem != null) {
+                    try {
+                        Method mCap = sfItem.getClass().getMethod("getCapacity", Block.class);
+                        Object cap = mCap.invoke(sfItem, block);
+                        if (cap instanceof Number num) return num.longValue();
+                    } catch (NoSuchMethodException ignored) {
+                    }
+                    try {
+                        Method mMaxCap = sfItem.getClass().getMethod("getMaxCapacity");
+                        Object cap = mMaxCap.invoke(sfItem);
+                        if (cap instanceof Number num) return num.longValue();
+                    } catch (NoSuchMethodException ignored) {
+                    }
+                }
+            }
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+        }
+        return 1_000_000L;
+    }
+
+    /**
+     * EN: Deposits items directly into a Slimefun Barrel.
+     * ES: Deposita ítems directamente en un barril de Slimefun.
+     * @return Number of items that did not fit (0 if all deposited).
+     */
+    public static int depositBarrel(Block block, ItemStack stack) {
+        if (stack == null || stack.getType().isAir() || stack.getAmount() <= 0 || !isBarrel(block)) {
+            return stack == null ? 0 : stack.getAmount();
+        }
+        long stored = getBarrelStoredAmount(block);
+        long capacity = getBarrelCapacity(block);
+        long space = capacity - stored;
+        if (space <= 0) {
+            return stack.getAmount();
+        }
+
+        ItemStack currentSample = getBarrelStoredItem(block);
+        if (stored == 0 || currentSample == null) {
+            // Adopt new item type
+            long take = Math.min(space, stack.getAmount());
+            setBarrelState(block, stack, take, capacity);
+            return (int) (stack.getAmount() - take);
+        } else if (com.chagui68.multiversenets.util.StackUtils.itemsMatch(currentSample, stack)) {
+            long take = Math.min(space, stack.getAmount());
+            setBarrelState(block, currentSample, stored + take, capacity);
+            return (int) (stack.getAmount() - take);
+        }
+        return stack.getAmount();
+    }
+
+    /**
+     * EN: Extracts up to {@code want} items matching {@code matcher} from a Slimefun Barrel.
+     * ES: Extrae hasta {@code want} ítems de un barril de Slimefun.
+     */
+    public static ItemStack withdrawBarrel(Block block, Predicate<ItemStack> matcher, int want) {
+        if (want <= 0 || !isBarrel(block)) return null;
+        long stored = getBarrelStoredAmount(block);
+        if (stored <= 0) return null;
+        ItemStack sample = getBarrelStoredItem(block);
+        if (sample == null || (matcher != null && !matcher.test(sample))) return null;
+
+        long take = Math.min(want, stored);
+        long remaining = stored - take;
+        long capacity = getBarrelCapacity(block);
+        setBarrelState(block, remaining > 0 ? sample : null, remaining, capacity);
+
+        ItemStack out = sample.clone();
+        out.setAmount((int) take);
+        return out;
+    }
+
+    private static void setBarrelState(Block block, ItemStack sample, long newAmount, long capacity) {
+        try {
+            if (mAddBlockInfo != null) {
+                mAddBlockInfo.invoke(null, block.getLocation(), "stored", String.valueOf(newAmount));
+            }
+            Object menu = menuOf(block);
+            if (menu != null) {
+                if (newAmount > 0 && sample != null) {
+                    ItemStack display = sample.clone();
+                    display.setAmount(1);
+                    mReplaceExistingItem.invoke(menu, BARREL_DISPLAY_SLOT, display);
+                } else {
+                    mReplaceExistingItem.invoke(menu, BARREL_DISPLAY_SLOT, new ItemStack(Material.BARRIER));
+                }
+                // Try to trigger menu update
+                if (mCheckItem != null) {
+                    Object sfItem = mCheckItem.invoke(null, block);
+                    if (sfItem != null) {
+                        try {
+                            Method upd = sfItem.getClass().getMethod("updateMenu", Block.class, menu.getClass(), boolean.class, int.class);
+                            upd.invoke(sfItem, block, menu, false, (int) Math.min(capacity, Integer.MAX_VALUE));
+                        } catch (NoSuchMethodException ignored) {
+                        }
+                    }
+                }
+            }
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+        }
+    }
+
     public static int insert(Block block, ItemStack stack) {
         Object menu = menuOf(block);
         if (menu == null || stack == null || stack.getAmount() <= 0) {

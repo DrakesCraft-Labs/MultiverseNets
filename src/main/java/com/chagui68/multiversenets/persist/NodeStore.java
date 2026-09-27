@@ -136,6 +136,12 @@ public final class NodeStore {
         if (blob.greedyAmounts == null) {
             blob.greedyAmounts = new ArrayList<>();
         }
+        if (blob.virtualSamples == null) {
+            blob.virtualSamples = new ArrayList<>();
+        }
+        if (blob.virtualAmounts == null) {
+            blob.virtualAmounts = new ArrayList<>();
+        }
         if (("GREEDY_CELL".equals(blob.typeName) || "MVN_GREEDY_CELL".equals(blob.typeName))
                 && blob.cellSample != null && blob.cellAmount > 0) {
             if (blob.greedySamples.isEmpty()) {
@@ -215,6 +221,21 @@ public final class NodeStore {
         var pdc = chunk.getPersistentDataContainer();
         pdc.remove(nodeKey(block));
         pdc.remove(nodeTypeKey(block));
+    }
+
+    public static int countNodesInChunk(Chunk chunk) {
+        if (!chunk.isLoaded()) {
+            return 0;
+        }
+        var pdc = chunk.getPersistentDataContainer();
+        int count = 0;
+        for (org.bukkit.NamespacedKey key : pdc.getKeys()) {
+            if (plugin != null && key.getNamespace().equalsIgnoreCase(plugin.getName())
+                    && key.getKey().startsWith("t")) {
+                count++;
+            }
+        }
+        return count;
     }
 
     public static boolean chunkHasNodes(Chunk chunk) {

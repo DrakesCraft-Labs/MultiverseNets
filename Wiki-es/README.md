@@ -87,6 +87,13 @@ Cada dispositivo se fabrica en una mesa de crafteo 3×3 estándar. `·` marca el
 | Network Probe | <pre>· A ·<br/>A S A<br/>· A ·</pre> | A = Fragmento de amatista · S = Catalejo |
 | Quantum Workbench | <pre>D D D<br/>D C D<br/>D D D</pre> | D = Diamante · C = Mesa de crafteo |
 | Infinity Barrel | <pre>N D N<br/>D B D<br/>N D N</pre> | N = Lingote de netherita · D = Bloque de diamante · B = Barril |
+| Network Router | <pre>· L ·<br/>· C ·<br/>· R ·</pre> | L = Pararrayos · C = Network Cable · R = Bloque de redstone |
+| L1 CPU Cache | <pre>C R C<br/>R C R<br/>C R C</pre> | C = Lingote de cobre · R = Redstone |
+| L2 CPU Cache | <pre>G L G<br/>L P L<br/>G L G</pre> | G = Lingote de oro · L = Lapislázuli · P = L1 CPU Cache |
+| L3 CPU Cache | <pre>D A D<br/>A P A<br/>D A D</pre> | D = Diamante · A = Amatista · P = L2 CPU Cache |
+| DRAM Module | <pre>N E N<br/>E P E<br/>N E N</pre> | N = Lingote de netherita · E = Ojo de ender · P = L3 CPU Cache |
+| Quantum Cache Matrix | <pre>N S N<br/>S P S<br/>N S N</pre> | N = Bloque de netherita · S = Estrella del nether · P = DRAM Module |
+
 
 ## ⌨️ Comandos
 

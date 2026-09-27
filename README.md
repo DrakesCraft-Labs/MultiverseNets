@@ -55,6 +55,13 @@
 * **Network Crayon**: marks the controller and the network shows particles when its machines work.
 * Filters with **whitelist/blacklist mode** on any device with a filter (grabbers, pushers, vacuum, purger, greedy cell, receiver).
 
+
+### ⚡ CPU Virtual Storage & Wireless Routing
+* **CPU Virtual Cache (L1–Quantum)**: Internal multi-item memory installed directly into the Network Controller via Cache Modules (T1: 2,048, T2: 8,192, T3: 32,768, DRAM: 131,072, Quantum: 524,288 items). Stored data is zero-drop and preserved in PDC when the controller is relocated.
+* **Network Router Antenna**: High-frequency broadcast antenna (`MVN_ROUTER`) that lifts the 64-block wireless restriction to full global multi-chunk reach.
+* **Slimefun Bridge**: Native automatic recognition and bidirectional routing with Slimefun Barrels and machine containers when Slimefun is present, maintaining 100% standalone Paper execution when absent.
+* **Security & Island Protection**: Atomic synchronized transaction locks preventing duplicate item race conditions, BentoBox Skyblock claim validation on both physical devices and wireless remotes, 10s combat cooldown, and 64 nodes/chunk density limit.
+
 ### 🛡️ Reliability
 * Protection against pistons and explosions on nodes.
 * When you break a node, its state travels inside the item (like in Networks): cell cargo, filters, blueprints, grid matrix, and receiver binding. When you place it again, it is as it was.

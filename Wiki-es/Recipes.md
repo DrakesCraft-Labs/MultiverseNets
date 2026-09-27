@@ -421,4 +421,76 @@ verías en la mesa de crafteo (cuadrícula 3×3) y una breve **descripción** de
 
 ---
 
+
+---
+
+## Network Router Antenna
+- **Receta (3×3)**:
+
+  ```
+  · L ·
+  · C ·
+  · R ·
+  ```
+
+  > L = **Pararrayos (Lightning Rod)** · C = **Network Cable** · R = **Bloque de redstone**
+
+- **Resultado**: 1× Network Router
+- **Función**: Antena emisora que amplifica la señal de red a través de chunks y dimensiones. Al tener al menos una antena instalada en la red, la Terminal Inalámbrica obtiene alcance global ilimitado (sin antena el alcance máximo es de 64 bloques locales).
+
+---
+
+## Módulos de Caché Virtual de CPU (L1 – Quantum)
+Almacenamiento interno multi-ítem instalado directamente sobre el **Network Controller** haciendo clic derecho sobre él con el módulo en mano. Permite guardar ítems sin necesidad de celdas físicas externas.
+
+### L1 CPU Cache Module (2,048 ítems)
+- **Receta (3×3)**:
+  ```
+  C R C
+  R C R
+  C R C
+  ```
+  > C = **Lingote de cobre** · R = **Polvo de redstone**
+- **Capacidad**: 2,048 ítems
+
+### L2 CPU Cache Module (8,192 ítems)
+- **Receta (3×3)**:
+  ```
+  G L G
+  L P L
+  G L G
+  ```
+  > G = **Lingote de oro** · L = **Lapislázuli** · P = **L1 CPU Cache Module**
+- **Capacidad**: 8,192 ítems
+
+### L3 CPU Cache Module (32,768 ítems)
+- **Receta (3×3)**:
+  ```
+  D A D
+  A P A
+  D A D
+  ```
+  > D = **Diamante** · A = **Fragmento de amatista** · P = **L2 CPU Cache Module**
+- **Capacidad**: 32,768 ítems
+
+### DRAM Memory Module (131,072 ítems)
+- **Receta (3×3)**:
+  ```
+  N E N
+  E P E
+  N E N
+  ```
+  > N = **Lingote de netherite** · E = **Ojo de ender** · P = **L3 CPU Cache Module**
+- **Capacidad**: 131,072 ítems
+
+### Quantum Cache Matrix (524,288 ítems)
+- **Receta (3×3)**:
+  ```
+  N S N
+  S P S
+  N S N
+  ```
+  > N = **Bloque de netherite** · S = **Estrella del nether** · P = **DRAM Memory Module**
+- **Capacidad**: 524,288 ítems
+
 Esta documentación está pensada para servir como referencia rápida tanto a jugadores como a desarrolladores que quieran entender el funcionamiento de cada ítem y cómo fabricarlos. Las capacidades y velocidades citadas corresponden a los valores por defecto de `config.yml` y pueden ajustarse en ese archivo.

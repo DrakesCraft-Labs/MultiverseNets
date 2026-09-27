@@ -87,6 +87,13 @@ Each device is crafted on a standard 3×3 crafting table. `·` marks an empty sl
 | Network Probe | <pre>· A ·<br/>A S A<br/>· A ·</pre> | A = Amethyst Shard · S = Spyglass |
 | Quantum Workbench | <pre>D D D<br/>D C D<br/>D D D</pre> | D = Diamond · C = Crafting Table |
 | Infinity Barrel | <pre>N D N<br/>D B D<br/>N D N</pre> | N = Netherite Ingot · D = Diamond Block · B = Barrel |
+| Network Router | <pre>· L ·<br/>· C ·<br/>· R ·</pre> | L = Lightning Rod · C = Network Cable · R = Redstone Block |
+| L1 CPU Cache | <pre>C R C<br/>R C R<br/>C R C</pre> | C = Copper Ingot · R = Redstone Dust |
+| L2 CPU Cache | <pre>G L G<br/>L P L<br/>G L G</pre> | G = Gold Ingot · L = Lapis Lazuli · P = L1 CPU Cache |
+| L3 CPU Cache | <pre>D A D<br/>A P A<br/>D A D</pre> | D = Diamond · A = Amethyst Shard · P = L2 CPU Cache |
+| DRAM Module | <pre>N E N<br/>E P E<br/>N E N</pre> | N = Netherite Ingot · E = Eye of Ender · P = L3 CPU Cache |
+| Quantum Cache Matrix | <pre>N S N<br/>S P S<br/>N S N</pre> | N = Netherite Block · S = Nether Star · P = DRAM Module |
+
 
 ## ⌨️ Commands
 

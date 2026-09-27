@@ -29,6 +29,7 @@ public class MonitorMenu extends MenuHolder {
 
     private final Network network;
     private final Block block;
+    private org.bukkit.scheduler.BukkitTask refreshTask;
 
     public MonitorMenu(MultiverseNets plugin, Player player, Network network, Block block) {
         super(plugin, player);
@@ -39,6 +40,7 @@ public class MonitorMenu extends MenuHolder {
     public void openMenu() {
         open(27, Component.text("Network Monitor", NamedTextColor.DARK_AQUA)
                 .decoration(TextDecoration.ITALIC, false));
+        startAutoRefresh();
     }
 
     @Override
@@ -117,6 +119,28 @@ public class MonitorMenu extends MenuHolder {
                 .decoration(TextDecoration.ITALIC, false));
         item.setItemMeta(meta);
         return item;
+    }
+
+    private void startAutoRefresh() {
+        if (refreshTask != null) refreshTask.cancel();
+        refreshTask = plugin.getServer().getScheduler().runTaskTimer(plugin, () -> {
+            if (inv == null || !player.getOpenInventory().getTopInventory().equals(inv)) {
+                if (refreshTask != null) {
+                    refreshTask.cancel();
+                    refreshTask = null;
+                }
+                return;
+            }
+            draw();
+        }, 20L, 20L);
+    }
+
+    @Override
+    protected void onClose(org.bukkit.event.inventory.InventoryCloseEvent event) {
+        if (refreshTask != null) {
+            refreshTask.cancel();
+            refreshTask = null;
+        }
     }
 
     @Override

@@ -19,6 +19,7 @@ import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
 import com.chagui68.multiversenets.util.Keys;
 import com.chagui68.multiversenets.util.PosUtil;
+import com.chagui68.multiversenets.util.Settings;
 import com.chagui68.multiversenets.util.Text;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -52,7 +53,14 @@ import java.util.List;
  * Listener de eventos responsable de la colocación, rotura, explosiones, pistones,
  * uso de herramientas e interacción con dispositivos de red.
  */
+import com.chagui68.multiversenets.gui.ControllerMenu;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 public class BlockListener implements Listener {
+
+    private static final java.util.Map<UUID, Long> LAST_COMBAT = new ConcurrentHashMap<>();
 
     private final MultiverseNets plugin;
     private final NetworkManager manager;
@@ -61,6 +69,16 @@ public class BlockListener implements Listener {
         this.plugin = plugin;
         this.manager = manager;
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onEntityDamage(EntityDamageByEntityEvent event) {
+        if (event.getEntity() instanceof Player p) {
+            LAST_COMBAT.put(p.getUniqueId(), System.currentTimeMillis());
+        }
+        if (event.getDamager() instanceof Player attacker) {
+            LAST_COMBAT.put(attacker.getUniqueId(), System.currentTimeMillis());
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -77,6 +95,12 @@ public class BlockListener implements Listener {
             // Clasico y otros mundos vainilla: la red no existe ahi (config blocked-worlds).
             event.setCancelled(true);
             event.getPlayer().sendMessage(Text.msg("Network devices cannot be used in this world.", NamedTextColor.RED));
+            return;
+        }
+        if (NodeStore.countNodesInChunk(event.getBlockPlaced().getChunk()) >= Settings.maxNodesPerChunk()) {
+            event.setCancelled(true);
+            event.getPlayer().sendMessage(Text.msg("Chunk device limit reached! Maximum "
+                    + Settings.maxNodesPerChunk() + " network devices per chunk.", NamedTextColor.RED));
             return;
         }
         NodeStore.put(event.getBlockPlaced(), NodeBlob.create(type.name()));
@@ -115,7 +139,9 @@ public class BlockListener implements Listener {
             return;
         }
         event.setDropItems(false);
-        block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), createDropItem(type, blob));
+        if (event.getPlayer().getGameMode() != org.bukkit.GameMode.CREATIVE) {
+            block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), createDropItem(type, blob));
+        }
 
         NodeStore.remove(block);
         if (type == DeviceType.MVN_CONTROLLER) {
@@ -132,7 +158,7 @@ public class BlockListener implements Listener {
      */
     private ItemStack createDropItem(DeviceType type, NodeBlob blob) {
         ItemStack item = Items.create(type);
-        if (type == DeviceType.MVN_CONTROLLER || type == DeviceType.MVN_CABLE || isEmptyState(blob)) {
+        if (type == DeviceType.MVN_CABLE || isEmptyState(blob)) {
             return item;
         }
         var meta = item.getItemMeta();
@@ -153,6 +179,20 @@ public class BlockListener implements Listener {
         } else if (blob.totalGreedyAmount() > 0) {
             lore.add(Component.text("Cargo: " + Items.formatAmount(blob.totalGreedyAmount()) + " items ("
                     + (blob.greedySamples != null ? blob.greedySamples.size() : 0) + " types)", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
+        } else if (blob.virtualCacheTier > 0) {
+            String tierName = switch (blob.virtualCacheTier) {
+                case 1 -> "L1 CPU Cache";
+                case 2 -> "L2 CPU Cache";
+                case 3 -> "L3 CPU Cache";
+                case 4 -> "System DRAM";
+                case 5 -> "Quantum Cache";
+                default -> "T" + blob.virtualCacheTier;
+            };
+            lore.add(Component.text("CPU Cache: " + tierName, NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
+            if (blob.totalVirtualAmount() > 0) {
+                lore.add(Component.text("Virtual Cargo: " + Items.formatAmount(blob.totalVirtualAmount()) + " items ("
+                        + (blob.virtualSamples != null ? blob.virtualSamples.size() : 0) + " types)", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
+            }
         }
         meta.lore(lore);
         item.setItemMeta(meta);
@@ -169,6 +209,8 @@ public class BlockListener implements Listener {
         }
         return blob.cellAmount <= 0
                 && blob.totalGreedyAmount() <= 0
+                && blob.virtualCacheTier <= 0
+                && blob.totalVirtualAmount() <= 0
                 && blob.filterMaterials.isEmpty()
                 && blob.recipes.isEmpty()
                 && blob.blueprintData.isEmpty()
@@ -207,6 +249,10 @@ public class BlockListener implements Listener {
         actual.recipes = loaded.recipes;
         actual.blueprintData = loaded.blueprintData;
         actual.craftingMatrix = loaded.craftingMatrix;
+        actual.virtualCacheTier = loaded.virtualCacheTier;
+        actual.virtualSamples = loaded.virtualSamples != null ? new ArrayList<>(loaded.virtualSamples) : new ArrayList<>();
+        actual.virtualAmounts = loaded.virtualAmounts != null ? new ArrayList<>(loaded.virtualAmounts) : new ArrayList<>();
+        actual.transitBuffer = loaded.transitBuffer;
         if (loaded.txWorld != null) {
             actual.txWorld = loaded.txWorld;
             actual.txX = loaded.txX;
@@ -240,6 +286,12 @@ public class BlockListener implements Listener {
             return;
         }
         NodeBlob blob = NodeStore.get(block);
+
+        if (blob != null && !canAccessIslandNetwork(event.getPlayer(), block.getLocation())) {
+            event.getPlayer().sendMessage(Text.msg("You do not have permission to access network devices on this island.", NamedTextColor.RED));
+            event.setCancelled(true);
+            return;
+        }
 
         // Handheld tools: handled before general menus
         if (heldType == DeviceType.MVN_PROBE) {
@@ -305,7 +357,17 @@ public class BlockListener implements Listener {
 
         switch (type) {
             case MVN_CONTROLLER -> {
-                // The controller is the brain/heart of the network; no inventory GUI.
+                event.setCancelled(true);
+                if (heldType != null && heldType.isCacheModule()) {
+                    installCacheModule(player, block, blob, heldType, held);
+                    return;
+                }
+                Network net = manager.networkAt(block);
+                if (net == null) {
+                    player.sendMessage(Text.msg("This controller is not active.", NamedTextColor.RED));
+                    return;
+                }
+                new ControllerMenu(plugin, player, net, block).openMenu();
             }
             case MVN_TERMINAL, MVN_TRANSMITTER -> {
                 event.setCancelled(true);
@@ -521,27 +583,116 @@ public class BlockListener implements Listener {
         }
     }
 
+    private void installCacheModule(Player player, Block block, NodeBlob blob, DeviceType cacheType, ItemStack held) {
+        int tier = cacheType.cacheTier();
+        if (blob == null) {
+            blob = NodeStore.get(block);
+        }
+        if (blob == null) return;
+        if (blob.virtualCacheTier >= tier) {
+            player.sendMessage(Text.msg("This Controller already has " + cacheType.display() + " or higher installed.", NamedTextColor.RED));
+            return;
+        }
+        if (DeviceType.parse(blob.typeName) != DeviceType.MVN_CONTROLLER) {
+            return;
+        }
+        blob.virtualCacheTier = tier;
+        NodeStore.put(block, blob);
+        if (player.getGameMode() != org.bukkit.GameMode.CREATIVE) {
+            held.subtract(1);
+        }
+        player.playSound(block.getLocation(), org.bukkit.Sound.BLOCK_BEACON_POWER_SELECT, 1.0f, 1.2f);
+        player.sendMessage(Text.msg("Installed " + cacheType.display() + "! Virtual Cache capacity: "
+                + Items.formatAmount(Settings.virtualCacheCapacity(tier)) + " items.", NamedTextColor.GREEN));
+        Network net = manager.networkAt(block);
+        if (net != null) {
+            net.storage().invalidate();
+        }
+    }
+
     private void useWirelessInAir(PlayerInteractEvent event) {
         ItemStack held = event.getItem();
+        Player player = event.getPlayer();
         Location bind = Items.readWirelessBind(held);
         if (bind == null) {
-            event.getPlayer().sendMessage(Text.msg("Unbound: shift+click a controller.", NamedTextColor.YELLOW));
+            player.sendMessage(Text.msg("Unbound: shift+click a controller.", NamedTextColor.YELLOW));
             return;
         }
-        // Requisito de alcance del remote de NetworksV6: el chunk del controlador debe estar
-        // cargado y la red viva; sin eso no hay nada que abrir.
-        if (!bind.getWorld().isChunkLoaded(bind.getBlockX() >> 4, bind.getBlockZ() >> 4)) {
-            event.getPlayer().sendMessage(Text.msg("The bound network is not loaded.", NamedTextColor.RED));
+
+        // 1. Modality restriction: Blocked worlds
+        if (Settings.blockedWorld(player.getWorld())) {
+            player.sendMessage(Text.msg("Wireless network devices cannot be used in this world.", NamedTextColor.RED));
             return;
         }
+
+        // 2. Modality restriction: Cross-world boundary
+        if (!player.getWorld().equals(bind.getWorld())) {
+            player.sendMessage(Text.msg("Wireless terminal out of range: Network is in world '" + bind.getWorld().getName() + "'.", NamedTextColor.RED));
+            return;
+        }
+
+        // 3. Combat restriction
+        long lastDmg = LAST_COMBAT.getOrDefault(player.getUniqueId(), 0L);
+        long combatCooldownMs = Settings.wirelessCombatCooldownSeconds() * 1000L;
+        if (System.currentTimeMillis() - lastDmg < combatCooldownMs) {
+            player.sendMessage(Text.msg("Cannot access wireless terminal while in active combat!", NamedTextColor.RED));
+            return;
+        }
+
+        // 4. Modality restriction: BentoBox / Skyblock Island ownership check
+        if (!canAccessIslandNetwork(player, bind)) {
+            player.sendMessage(Text.msg("You do not have permission to access network devices on this island.", NamedTextColor.RED));
+            return;
+        }
+
         Network net = manager.networkByController(bind);
         if (net == null) {
-            event.getPlayer().sendMessage(Text.msg("That network no longer exists.", NamedTextColor.RED));
+            net = manager.networkAt(bind.getBlock());
+            if (net == null) {
+                player.sendMessage(Text.msg("The bound network is not loaded or no longer exists.", NamedTextColor.RED));
+                return;
+            }
+        }
+
+        // 5. Router Antenna check
+        boolean hasRouter = net.count(DeviceType.MVN_ROUTER) > 0;
+        int maxLocalDist = Settings.wirelessLocalRange();
+        double distSq = player.getLocation().distanceSquared(bind);
+        if (!hasRouter && distSq > ((double) maxLocalDist * maxLocalDist)) {
+            player.sendMessage(Text.msg("Signal lost! Install a Network Router antenna to access globally.", NamedTextColor.RED));
             return;
         }
+
         event.setCancelled(true);
-        new TerminalMenu(plugin, event.getPlayer(), net).openMenu();
+        new TerminalMenu(plugin, player, net).openMenu();
     }
+
+        private boolean canAccessIslandNetwork(Player player, Location loc) {
+        if (player.hasPermission("multiversenets.admin")) {
+            return true;
+        }
+        try {
+            if (org.bukkit.Bukkit.getPluginManager().isPluginEnabled("BentoBox")) {
+                Class<?> cBentoBox = Class.forName("world.bentobox.bentobox.BentoBox");
+                Object bbox = cBentoBox.getMethod("getInstance").invoke(null);
+                if (bbox != null) {
+                    Object islands = bbox.getClass().getMethod("getIslands").invoke(bbox);
+                    if (islands != null) {
+                        java.util.Optional<?> opt = (java.util.Optional<?>) islands.getClass()
+                                .getMethod("getIslandAt", Location.class).invoke(islands, loc);
+                        if (opt.isPresent()) {
+                            Object island = opt.get();
+                            java.util.Set<?> members = (java.util.Set<?>) island.getClass().getMethod("getMemberSet").invoke(island);
+                            return members != null && members.contains(player.getUniqueId());
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return true;
+    }
+
 
     private void openTerminal(Player player, Block nodeBlock) {
         Network net = manager.networkAt(nodeBlock);

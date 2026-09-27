@@ -56,6 +56,14 @@ public class NodeBlob implements Serializable {
     public List<ItemStack> greedySamples = new ArrayList<>();
     /** EN: Multi-item storage quantities for Greedy Cell / ES: Cantidades de almacenamiento multi-ítem para Greedy Cell. */
     public List<Long> greedyAmounts = new ArrayList<>();
+    /** EN: CPU Virtual Cache Tier (1: L1, 2: L2, 3: L3, 4: DRAM, 5: Quantum) / ES: Nivel de Caché Virtual de CPU. */
+    public int virtualCacheTier;
+    /** EN: Multi-item storage templates for Virtual Cache / ES: Plantillas de ítems en la caché virtual. */
+    public List<ItemStack> virtualSamples = new ArrayList<>();
+    /** EN: Multi-item storage quantities for Virtual Cache / ES: Cantidades de ítems en la caché virtual. */
+    public List<Long> virtualAmounts = new ArrayList<>();
+    /** EN: Transit buffer holding items during backpressure / ES: Búfer de tránsito ante contrapresión. */
+    public ItemStack transitBuffer;
 
     /**
      * EN: Returns the combined sum of all items stored in the Greedy Cell.
@@ -132,6 +140,65 @@ public class NodeBlob implements Serializable {
             greedyAmounts.remove(index);
         } else {
             greedyAmounts.set(index, remaining);
+        }
+        return take;
+    }
+
+    public long totalVirtualAmount() {
+        long total = 0;
+        if (virtualAmounts != null) {
+            for (Long amt : virtualAmounts) {
+                if (amt != null) {
+                    total += amt;
+                }
+            }
+        }
+        return total;
+    }
+
+    public int indexOfVirtualSample(ItemStack item) {
+        if (item == null || virtualSamples == null) {
+            return -1;
+        }
+        for (int i = 0; i < virtualSamples.size(); i++) {
+            if (com.chagui68.multiversenets.util.StackUtils.itemsMatch(virtualSamples.get(i), item)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    public void addVirtualItem(ItemStack item, long amount) {
+        if (item == null || amount <= 0) {
+            return;
+        }
+        if (virtualSamples == null) {
+            virtualSamples = new ArrayList<>();
+        }
+        if (virtualAmounts == null) {
+            virtualAmounts = new ArrayList<>();
+        }
+        int idx = indexOfVirtualSample(item);
+        if (idx >= 0) {
+            virtualAmounts.set(idx, virtualAmounts.get(idx) + amount);
+        } else {
+            virtualSamples.add(com.chagui68.multiversenets.util.StackUtils.getAsQuantity(item, 1));
+            virtualAmounts.add(amount);
+        }
+    }
+
+    public long removeVirtualItem(int index, long amount) {
+        if (virtualAmounts == null || index < 0 || index >= virtualAmounts.size() || amount <= 0) {
+            return 0;
+        }
+        long current = virtualAmounts.get(index);
+        long take = Math.min(current, amount);
+        long remaining = current - take;
+        if (remaining <= 0) {
+            virtualSamples.remove(index);
+            virtualAmounts.remove(index);
+        } else {
+            virtualAmounts.set(index, remaining);
         }
         return take;
     }

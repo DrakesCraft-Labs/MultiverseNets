@@ -1,8 +1,10 @@
 package com.chagui68.multiversenets.net;
 
+import com.chagui68.multiversenets.compat.SlimefunBridge;
 import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
+import com.chagui68.multiversenets.util.PosUtil;
 import com.chagui68.multiversenets.util.Settings;
 import com.chagui68.multiversenets.util.StackUtils;
 import org.bukkit.Material;
@@ -17,33 +19,25 @@ import java.util.function.Predicate;
 
 /**
  * [EN] Network Storage Engine
- * Aggregated virtual storage summing all Quantum Cells (T1-T6), Greedy Cells, and Infinity Barrels.
- * - Insertion priority: Greedy cells matching type -> Normal cells matching type -> Empty cells.
- * - Extraction priority: Normal cells first -> Greedy cells last (acting as output buffers).
- * - Linear deduplication: Aggregated view is merged using {@link StackUtils#itemsMatch} to avoid Bukkit ItemStack hash bugs.
+ * Aggregated storage engine combining:
+ * 1. CPU Virtual Cache (T1-T5 on Controller) - High-speed internal memory
+ * 2. Quantum Cells (T1-T6) & Infinity Barrels
+ * 3. External Slimefun Barrels (Native integration via SlimefunBridge)
+ * 4. Dedicated Greedy Cells (Output buffers / sinks)
  *
  * [ES] Motor de Almacenamiento Agregado de Red
- * Almacenamiento virtual agregado que suma todas las celdas (T1-T6), celdas greedy y barriles infinitos.
- * - Prioridad de inserción: Greedy cells con muestra -> Celdas normales con muestra -> Celdas vacías.
- * - Prioridad de extracción: Celdas normales primero -> Greedy cells al final.
- * - Deduplicación lineal: Fusión de vista mediante {@link StackUtils#itemsMatch} para evitar fallos de hash.
+ * Combina Caché Virtual de CPU en el Controlador, Celdas Cuánticas, Barriles de Slimefun y Celdas Greedy.
  */
 public class NetworkStorage {
 
     private static final long VIEW_CACHE_MS = 500;
 
-    /**
-     * EN: Consolidated view entry for an item sample and its total network count.
- *
-     * ES: Entrada de vista consolidada para una muestra de ítem y su conteo total en la red.
-     */
     public record View(ItemStack sample, long amount) {
     }
 
     private record CellRef(long pos, int tier, boolean greedy, boolean barrel) {
     }
 
-    /** Una celda con su blob ya decodificado para una operacion concreta. */
     private static final class CellState {
         private final long pos;
         private final boolean greedy;
@@ -63,6 +57,19 @@ public class NetworkStorage {
         }
     }
 
+    private static final class VirtualCacheState {
+        private final Block block;
+        private final NodeBlob blob;
+        private final long capacity;
+        private boolean dirty;
+
+        private VirtualCacheState(Block block, NodeBlob blob, long capacity) {
+            this.block = block;
+            this.blob = blob;
+            this.capacity = capacity;
+        }
+    }
+
     private final Network network;
     private final List<CellRef> cells = new ArrayList<>();
     private long boundVersion = -1;
@@ -73,7 +80,7 @@ public class NetworkStorage {
         this.network = network;
     }
 
-    public void invalidate() {
+    public synchronized void invalidate() {
         boundVersion = -1;
         viewCache = null;
     }
@@ -100,16 +107,50 @@ public class NetworkStorage {
         viewCache = null;
     }
 
-    /** Las celdas con su blob decodificado, en el orden del indice. Salta las ilegibles. */
+    private VirtualCacheState loadVirtualCache() {
+        long ctrlPos = network.controllerPos();
+        int cx = PosUtil.unpackX(ctrlPos) >> 4;
+        int cz = PosUtil.unpackZ(ctrlPos) >> 4;
+        if (!network.world().isChunkLoaded(cx, cz)) {
+            return null;
+        }
+        Block ctrlBlock = network.block(ctrlPos);
+        NodeBlob blob = NodeStore.get(ctrlBlock);
+        if (blob == null || blob.virtualCacheTier <= 0) {
+            return null;
+        }
+        long cap = Settings.virtualCacheCapacity(blob.virtualCacheTier);
+        if (cap <= 0) {
+            return null;
+        }
+        return new VirtualCacheState(ctrlBlock, blob, cap);
+    }
+
+    private List<Block> loadSfBarrels() {
+        if (!Settings.compatSlimefun() || !SlimefunBridge.isAvailable()) {
+            return List.of();
+        }
+        List<Block> list = new ArrayList<>();
+        for (long pos : network.slimefunBarrels()) {
+            int cx = PosUtil.unpackX(pos) >> 4;
+            int cz = PosUtil.unpackZ(pos) >> 4;
+            if (!network.world().isChunkLoaded(cx, cz)) {
+                continue;
+            }
+            Block b = network.block(pos);
+            if (SlimefunBridge.isBarrel(b)) {
+                list.add(b);
+            }
+        }
+        return list;
+    }
+
     private List<CellState> load() {
         sync();
         List<CellState> states = new ArrayList<>(cells.size());
         for (CellRef ref : cells) {
-            // Si el chunk se descargo despues del scan, la celda se salta en vez de forzar una
-            // carga sincrona desde el ticker. Su contenido no desaparece: vuelve en cuanto el
-            // chunk cargue y el scan la redescubra.
-            int cx = com.chagui68.multiversenets.util.PosUtil.unpackX(ref.pos()) >> 4;
-            int cz = com.chagui68.multiversenets.util.PosUtil.unpackZ(ref.pos()) >> 4;
+            int cx = PosUtil.unpackX(ref.pos()) >> 4;
+            int cz = PosUtil.unpackZ(ref.pos()) >> 4;
             if (!network.world().isChunkLoaded(cx, cz)) {
                 continue;
             }
@@ -139,7 +180,7 @@ public class NetworkStorage {
         return states;
     }
 
-    private void flush(List<CellState> states) {
+    private void flush(List<CellState> states, VirtualCacheState vCache) {
         boolean anyDirty = false;
         for (CellState state : states) {
             if (state.dirty) {
@@ -147,34 +188,29 @@ public class NetworkStorage {
                 anyDirty = true;
             }
         }
+        if (vCache != null && vCache.dirty) {
+            NodeStore.put(vCache.block, vCache.blob);
+            anyDirty = true;
+        }
         if (anyDirty) {
             viewCache = null;
         }
     }
 
-    /**
-     * Mete un item en la red. Devuelve cuantas unidades NO entraron (0 = todo dentro).
-     *
-     * No muta el stack recibido; el llamante decide que hacer con el sobrante restandolo el
-     * mismo, como hace addItemStack0 en NetworksV6.
-     */
-    public int deposit(ItemStack item) {
+    public synchronized int deposit(ItemStack item) {
         if (item == null || item.getType().isAir() || item.getAmount() <= 0) {
             return 0;
         }
         List<CellState> states = load();
+        VirtualCacheState vCache = loadVirtualCache();
+        List<Block> sfBarrels = loadSfBarrels();
         long remaining = item.getAmount();
 
-        // 1) Greedy cells: preferred network sink if they already store this item or if their filter accepts it.
-        // Shared capacity (Option B): blob.totalGreedyAmount() <= state.capacity.
+        // 1. Greedy cells
         for (CellState state : states) {
-            if (!state.greedy) {
-                continue;
-            }
+            if (!state.greedy) continue;
             long space = state.capacity - state.blob.totalGreedyAmount();
-            if (space <= 0) {
-                continue;
-            }
+            if (space <= 0) continue;
             boolean matchesExisting = state.blob.indexOfGreedySample(item) >= 0;
             boolean matchesFilter = (state.blob.filterMaterials != null && !state.blob.filterMaterials.isEmpty())
                     || (state.blob.filterItems != null && !state.blob.filterItems.isEmpty());
@@ -183,12 +219,36 @@ public class NetworkStorage {
                 state.blob.addGreedyItem(item, take);
                 state.dirty = true;
                 remaining -= take;
-                if (remaining <= 0) {
-                    break;
+                if (remaining <= 0) break;
+            }
+        }
+
+        // 2. CPU Virtual Cache (matching existing sample)
+        if (remaining > 0 && vCache != null) {
+            long space = vCache.capacity - vCache.blob.totalVirtualAmount();
+            if (space > 0 && vCache.blob.indexOfVirtualSample(item) >= 0) {
+                long take = Math.min(space, remaining);
+                vCache.blob.addVirtualItem(item, take);
+                vCache.dirty = true;
+                remaining -= take;
+            }
+        }
+
+        // 3. Slimefun Barrels (matching existing sample)
+        if (remaining > 0 && !sfBarrels.isEmpty()) {
+            for (Block barrel : sfBarrels) {
+                ItemStack storedSample = SlimefunBridge.getBarrelStoredItem(barrel);
+                if (storedSample != null && StackUtils.itemsMatch(storedSample, item)) {
+                    ItemStack toDeposit = StackUtils.getAsQuantity(item, (int) Math.min(Integer.MAX_VALUE, remaining));
+                    int unhoused = SlimefunBridge.depositBarrel(barrel, toDeposit);
+                    long deposited = toDeposit.getAmount() - unhoused;
+                    remaining -= deposited;
+                    if (remaining <= 0) break;
                 }
             }
         }
-        // 2) celdas normales con el mismo tipo.
+
+        // 4. Normal cells with same type
         if (remaining > 0) {
             for (CellState state : states) {
                 if (state.greedy || state.blob.cellSample == null
@@ -196,13 +256,35 @@ public class NetworkStorage {
                     continue;
                 }
                 remaining = pour(state, item, remaining);
-                if (remaining <= 0) {
-                    break;
+                if (remaining <= 0) break;
+            }
+        }
+
+        // 5. CPU Virtual Cache (empty / new item space)
+        if (remaining > 0 && vCache != null) {
+            long space = vCache.capacity - vCache.blob.totalVirtualAmount();
+            if (space > 0) {
+                long take = Math.min(space, remaining);
+                vCache.blob.addVirtualItem(item, take);
+                vCache.dirty = true;
+                remaining -= take;
+            }
+        }
+
+        // 6. Empty Slimefun Barrels
+        if (remaining > 0 && !sfBarrels.isEmpty()) {
+            for (Block barrel : sfBarrels) {
+                if (SlimefunBridge.getBarrelStoredAmount(barrel) == 0) {
+                    ItemStack toDeposit = StackUtils.getAsQuantity(item, (int) Math.min(Integer.MAX_VALUE, remaining));
+                    int unhoused = SlimefunBridge.depositBarrel(barrel, toDeposit);
+                    long deposited = toDeposit.getAmount() - unhoused;
+                    remaining -= deposited;
+                    if (remaining <= 0) break;
                 }
             }
         }
-        // 3) celdas vacias: adoptan el tipo entrante (una greedy vacia NO se auto-asigna aqui;
-        //    su tipo lo fija ella misma tirando de su filtro, que es para lo que existe).
+
+        // 7. Empty normal cells
         if (remaining > 0) {
             for (CellState state : states) {
                 if (state.greedy || state.blob.cellSample != null) {
@@ -210,12 +292,11 @@ public class NetworkStorage {
                 }
                 state.blob.cellSample = StackUtils.getAsQuantity(item, 1);
                 remaining = pour(state, item, remaining);
-                if (remaining <= 0) {
-                    break;
-                }
+                if (remaining <= 0) break;
             }
         }
-        flush(states);
+
+        flush(states, vCache);
         return (int) remaining;
     }
 
@@ -230,7 +311,7 @@ public class NetworkStorage {
         return remaining - take;
     }
 
-    public int depositAll(List<ItemStack> items) {
+    public synchronized int depositAll(List<ItemStack> items) {
         int leftover = 0;
         for (ItemStack item : items) {
             leftover += deposit(item);
@@ -238,83 +319,116 @@ public class NetworkStorage {
         return leftover;
     }
 
-    /**
-     * Saca hasta {@code want} unidades que cumplan el matcher, combinando celdas: normales
-     * primero y greedy al final, que es su papel de "buffer de salida".
-     *
-     * @return el stack con lo obtenido, o null si no habia nada
-     */
-    public ItemStack withdraw(Predicate<ItemStack> matcher, int want) {
+    public synchronized ItemStack withdraw(Predicate<ItemStack> matcher, int want) {
         return withdraw(matcher, want, -1L);
     }
 
-    /**
-     * Variante con una celda excluida: la greedy cell se auto-surtiria con su propio contenido
-     * cada tick (sacar para volver a meter) si no se le prohibe tocarse a si misma.
-     */
-    public ItemStack withdraw(Predicate<ItemStack> matcher, int want, long excludePos) {
+    public synchronized ItemStack withdraw(Predicate<ItemStack> matcher, int want, long excludePos) {
         if (want <= 0) {
             return null;
         }
         List<CellState> states = load();
+        VirtualCacheState vCache = loadVirtualCache();
+        List<Block> sfBarrels = loadSfBarrels();
         ItemStack result = null;
         long got = 0;
-        for (int pass = 0; pass < 2 && got < want; pass++) {
-            boolean greedyPass = pass == 1;
-            for (CellState state : states) {
-                if (state.greedy != greedyPass || state.pos == excludePos) {
+
+        // Pass 0: Controller CPU Virtual Cache (ultra-fast L1-Quantum memory)
+        if (vCache != null && vCache.blob.virtualSamples != null) {
+            for (int i = 0; i < vCache.blob.virtualSamples.size(); i++) {
+                ItemStack sample = vCache.blob.virtualSamples.get(i);
+                Long amount = vCache.blob.virtualAmounts.get(i);
+                if (sample == null || amount == null || amount <= 0 || !matcher.test(sample)) {
                     continue;
                 }
-                if (state.greedy) {
-                    if (state.blob.greedySamples == null || state.blob.greedyAmounts == null) {
-                        continue;
-                    }
-                    for (int i = 0; i < state.blob.greedySamples.size(); i++) {
-                        ItemStack sample = state.blob.greedySamples.get(i);
-                        Long amount = state.blob.greedyAmounts.get(i);
-                        if (sample == null || amount == null || amount <= 0 || !matcher.test(sample)) {
-                            continue;
-                        }
-                        if (result == null) {
-                            result = StackUtils.getAsQuantity(sample, 0);
-                        } else if (!StackUtils.itemsMatch(result, sample)) {
-                            continue;
-                        }
-                        long take = Math.min(want - got, amount);
-                        long removed = state.blob.removeGreedyItem(i, take);
-                        got += removed;
-                        state.dirty = true;
-                        if (removed >= amount) {
-                            i--;
-                        }
-                        if (got >= want) {
-                            break;
-                        }
-                    }
-                } else {
-                    if (blobEmpty(state.blob) || !matcher.test(state.blob.cellSample)) {
+                if (result == null) {
+                    result = StackUtils.getAsQuantity(sample, 0);
+                } else if (!StackUtils.itemsMatch(result, sample)) {
+                    continue;
+                }
+                long take = Math.min(want - got, amount);
+                long removed = vCache.blob.removeVirtualItem(i, take);
+                got += removed;
+                vCache.dirty = true;
+                if (removed >= amount) {
+                    i--;
+                }
+                if (got >= want) break;
+            }
+        }
+
+        // Pass 1: Quantum Cells & Infinity Barrels
+        if (got < want) {
+            for (CellState state : states) {
+                if (state.greedy || state.pos == excludePos || blobEmpty(state.blob) || !matcher.test(state.blob.cellSample)) {
+                    continue;
+                }
+                if (result == null) {
+                    result = StackUtils.getAsQuantity(state.blob.cellSample, 0);
+                } else if (!StackUtils.itemsMatch(result, state.blob.cellSample)) {
+                    continue;
+                }
+                long take = Math.min(want - got, state.blob.cellAmount);
+                state.blob.cellAmount -= take;
+                got += take;
+                if (state.blob.cellAmount <= 0) {
+                    state.blob.cellAmount = 0;
+                    state.blob.cellSample = null;
+                }
+                state.dirty = true;
+                if (got >= want) break;
+            }
+        }
+
+        // Pass 2: Slimefun Barrels
+        if (got < want && !sfBarrels.isEmpty()) {
+            for (Block barrel : sfBarrels) {
+                ItemStack sample = SlimefunBridge.getBarrelStoredItem(barrel);
+                if (sample == null || !matcher.test(sample)) continue;
+                if (result == null) {
+                    result = StackUtils.getAsQuantity(sample, 0);
+                } else if (!StackUtils.itemsMatch(result, sample)) {
+                    continue;
+                }
+                ItemStack extracted = SlimefunBridge.withdrawBarrel(barrel, matcher, (int) Math.min(Integer.MAX_VALUE, want - got));
+                if (extracted != null) {
+                    got += extracted.getAmount();
+                }
+                if (got >= want) break;
+            }
+        }
+
+        // Pass 3: Greedy cells (output buffer sink)
+        if (got < want) {
+            for (CellState state : states) {
+                if (!state.greedy || state.pos == excludePos || state.blob.greedySamples == null || state.blob.greedyAmounts == null) {
+                    continue;
+                }
+                for (int i = 0; i < state.blob.greedySamples.size(); i++) {
+                    ItemStack sample = state.blob.greedySamples.get(i);
+                    Long amount = state.blob.greedyAmounts.get(i);
+                    if (sample == null || amount == null || amount <= 0 || !matcher.test(sample)) {
                         continue;
                     }
                     if (result == null) {
-                        result = StackUtils.getAsQuantity(state.blob.cellSample, 0);
-                    } else if (!StackUtils.itemsMatch(result, state.blob.cellSample)) {
+                        result = StackUtils.getAsQuantity(sample, 0);
+                    } else if (!StackUtils.itemsMatch(result, sample)) {
                         continue;
                     }
-                    long take = Math.min(want - got, state.blob.cellAmount);
-                    state.blob.cellAmount -= take;
-                    got += take;
-                    if (state.blob.cellAmount <= 0) {
-                        state.blob.cellAmount = 0;
-                        state.blob.cellSample = null;
-                    }
+                    long take = Math.min(want - got, amount);
+                    long removed = state.blob.removeGreedyItem(i, take);
+                    got += removed;
                     state.dirty = true;
+                    if (removed >= amount) {
+                        i--;
+                    }
+                    if (got >= want) break;
                 }
-                if (got >= want) {
-                    break;
-                }
+                if (got >= want) break;
             }
         }
-        flush(states);
+
+        flush(states, vCache);
         if (result == null || got <= 0) {
             return null;
         }
@@ -326,8 +440,18 @@ public class NetworkStorage {
         return blob.cellSample == null || blob.cellAmount <= 0;
     }
 
-    public long count(Predicate<ItemStack> matcher) {
+    public synchronized long count(Predicate<ItemStack> matcher) {
         long total = 0;
+        VirtualCacheState vCache = loadVirtualCache();
+        if (vCache != null && vCache.blob.virtualSamples != null) {
+            for (int i = 0; i < vCache.blob.virtualSamples.size(); i++) {
+                ItemStack sample = vCache.blob.virtualSamples.get(i);
+                Long amt = vCache.blob.virtualAmounts.get(i);
+                if (sample != null && amt != null && amt > 0 && matcher.test(sample)) {
+                    total += amt;
+                }
+            }
+        }
         for (CellState state : load()) {
             if (state.greedy) {
                 if (state.blob.greedySamples != null && state.blob.greedyAmounts != null) {
@@ -345,19 +469,35 @@ public class NetworkStorage {
                 }
             }
         }
+        for (Block barrel : loadSfBarrels()) {
+            ItemStack sample = SlimefunBridge.getBarrelStoredItem(barrel);
+            if (sample != null && matcher.test(sample)) {
+                total += SlimefunBridge.getBarrelStoredAmount(barrel);
+            }
+        }
         return total;
     }
 
-    /**
-     * La foto del contenido para las grillas, cacheada 500 ms (equivalente al CACHE_ITEMS_MS del
-     * NetworkRoot). La agregacion es por escaneo lineal con itemsMatch, nunca por hash.
-     */
-    public List<View> view() {
+    public synchronized List<View> view() {
         long now = System.currentTimeMillis();
         if (viewCache != null && now - viewCacheAt < VIEW_CACHE_MS) {
             return new ArrayList<>(viewCache);
         }
         Map<Material, List<View>> buckets = new EnumMap<>(Material.class);
+
+        // Virtual Cache
+        VirtualCacheState vCache = loadVirtualCache();
+        if (vCache != null && vCache.blob.virtualSamples != null) {
+            for (int i = 0; i < vCache.blob.virtualSamples.size(); i++) {
+                ItemStack sample = vCache.blob.virtualSamples.get(i);
+                Long amt = vCache.blob.virtualAmounts.get(i);
+                if (sample != null && amt != null && amt > 0) {
+                    addToBuckets(buckets, sample, amt);
+                }
+            }
+        }
+
+        // Cells
         for (CellState state : load()) {
             if (state.greedy) {
                 if (state.blob.greedySamples != null && state.blob.greedyAmounts != null) {
@@ -377,42 +517,27 @@ public class NetworkStorage {
                 addToBuckets(buckets, state.blob.cellSample, state.blob.cellAmount);
             }
         }
+
+        // Slimefun Barrels
+        for (Block barrel : loadSfBarrels()) {
+            ItemStack sample = SlimefunBridge.getBarrelStoredItem(barrel);
+            long amt = SlimefunBridge.getBarrelStoredAmount(barrel);
+            if (sample != null && amt > 0) {
+                addToBuckets(buckets, sample, amt);
+            }
+        }
+
         List<View> merged = new ArrayList<>();
         for (List<View> bucket : buckets.values()) {
             merged.addAll(bucket);
         }
-        viewCache = new ArrayList<>(merged);
+        viewCache = List.copyOf(merged);
         viewCacheAt = now;
-        return merged;
+        return new ArrayList<>(viewCache);
     }
 
-    private static void addToBuckets(Map<Material, List<View>> buckets, ItemStack sample, long amount) {
-        Material mat = sample.getType();
-        List<View> bucket = buckets.computeIfAbsent(mat, k -> new ArrayList<>());
-        boolean found = false;
-        for (int i = 0; i < bucket.size(); i++) {
-            View v = bucket.get(i);
-            if (StackUtils.itemsMatch(v.sample(), sample)) {
-                long sum = v.amount() + amount;
-                if (sum < 0) {
-                    sum = Long.MAX_VALUE;
-                }
-                bucket.set(i, new View(v.sample(), sum));
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            bucket.add(new View(StackUtils.getAsQuantity(sample, 1), amount));
-        }
-    }
 
-    /**
-     * EN: Returns the total quantity of this item stored across all Greedy Cells in the network.
-     *
-     * ES: Devuelve la cantidad total de este ítem almacenada en celdas Greedy de la red.
-     */
-    public long getGreedyStoredAmount(ItemStack item) {
+    public synchronized long getGreedyStoredAmount(ItemStack item) {
         if (item == null) {
             return 0;
         }
@@ -431,12 +556,7 @@ public class NetworkStorage {
         return total;
     }
 
-    /**
-     * EN: Checks if an item matches the filter of any active Purger on the network.
-     *
-     * ES: Comprueba si un ítem cumple los filtros de algún Purger activo en la red.
-     */
-    public boolean isItemPurged(ItemStack item) {
+    public synchronized boolean isItemPurged(ItemStack item) {
         if (item == null || item.getType().isAir()) {
             return false;
         }
@@ -444,8 +564,8 @@ public class NetworkStorage {
             for (var entry : network.nodes().entrySet()) {
                 if (entry.getValue() == DeviceType.MVN_PURGER) {
                     long pos = entry.getKey();
-                    int cx = com.chagui68.multiversenets.util.PosUtil.unpackX(pos) >> 4;
-                    int cz = com.chagui68.multiversenets.util.PosUtil.unpackZ(pos) >> 4;
+                    int cx = PosUtil.unpackX(pos) >> 4;
+                    int cz = PosUtil.unpackZ(pos) >> 4;
                     if (!network.world().isChunkLoaded(cx, cz)) {
                         continue;
                     }
@@ -469,13 +589,7 @@ public class NetworkStorage {
         return false;
     }
 
-    /**
-     * EN: Returns a view of items targeted for voiding by active Purgers.
-     * Includes currently stored matching items and items configured in Purger filters.
-     *
-     * ES: Devuelve la lista de ítems dirigidos a purga por los Purgers activos.
-     */
-    public List<View> getPurgedItemsView() {
+    public synchronized List<View> getPurgedItemsView() {
         Map<Material, List<View>> buckets = new EnumMap<>(Material.class);
         List<View> allStored = view();
 
@@ -489,8 +603,8 @@ public class NetworkStorage {
             for (var entry : network.nodes().entrySet()) {
                 if (entry.getValue() == DeviceType.MVN_PURGER) {
                     long pos = entry.getKey();
-                    int cx = com.chagui68.multiversenets.util.PosUtil.unpackX(pos) >> 4;
-                    int cz = com.chagui68.multiversenets.util.PosUtil.unpackZ(pos) >> 4;
+                    int cx = PosUtil.unpackX(pos) >> 4;
+                    int cz = PosUtil.unpackZ(pos) >> 4;
                     if (!network.world().isChunkLoaded(cx, cz)) {
                         continue;
                     }
@@ -500,8 +614,6 @@ public class NetworkStorage {
                         continue;
                     }
                     if (!blob.filterBlacklist) {
-                        // Misma prioridad que NetworkManager.filterPredicate: si hay plantillas
-                        // (filterItems) se usan SOLO ellas; filterMaterials solo cuando no las hay.
                         boolean hasItems = blob.filterItems != null && !blob.filterItems.isEmpty();
                         if (hasItems) {
                             for (ItemStack sample : blob.filterItems) {
@@ -552,7 +664,19 @@ public class NetworkStorage {
         return count;
     }
 
-    public boolean isEmpty() {
+    public synchronized boolean isEmpty() {
         return view().isEmpty();
+    }
+
+    private static void addToBuckets(Map<Material, List<View>> buckets, ItemStack sample, long amount) {
+        List<View> bucket = buckets.computeIfAbsent(sample.getType(), k -> new ArrayList<>());
+        for (int i = 0; i < bucket.size(); i++) {
+            View v = bucket.get(i);
+            if (StackUtils.itemsMatch(v.sample, sample)) {
+                bucket.set(i, new View(v.sample, v.amount + amount));
+                return;
+            }
+        }
+        bucket.add(new View(StackUtils.getAsQuantity(sample, 1), amount));
     }
 }

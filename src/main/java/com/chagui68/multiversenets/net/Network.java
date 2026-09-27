@@ -1,5 +1,6 @@
 package com.chagui68.multiversenets.net;
 
+import com.chagui68.multiversenets.compat.SlimefunBridge;
 import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
@@ -37,6 +38,7 @@ public class Network {
     private final long controllerPos;
     private final Map<Long, DeviceType> nodes = new HashMap<>();
     private final Map<DeviceType, Set<Long>> byType = new EnumMap<>(DeviceType.class);
+    private final Set<Long> sfBarrels = new HashSet<>();
     private final NetworkStorage storage = new NetworkStorage(this);
     private volatile long version = 0;
     private long lastScanMs = 0;
@@ -64,6 +66,10 @@ public class Network {
 
     public int size() {
         return nodes.size();
+    }
+
+    public Set<Long> slimefunBarrels() {
+        return sfBarrels;
     }
 
     public NetworkStorage storage() {
@@ -121,6 +127,7 @@ public class Network {
         Set<Long> visited = new HashSet<>();
         Deque<Long> queue = new ArrayDeque<>();
         List<String> errors = new ArrayList<>();
+        sfBarrels.clear();
 
         // No cargar chunks a la fuerza: si el controlador esta en uno sin cargar, la red se queda
         // como estaba y el proximo scan (o la carga del chunk) lo resuelve. Antes el BFS llamaba
@@ -169,6 +176,10 @@ public class Network {
                 }
                 DeviceType type = NodeStore.getType(block);
                 if (type == null) {
+                    if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isBarrel(block)) {
+                        sfBarrels.add(next);
+                        queue.add(next);
+                    }
                     continue;
                 }
                 if (type == DeviceType.MVN_CONTROLLER && next != controllerPos) {

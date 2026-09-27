@@ -421,4 +421,76 @@ crafting table (3×3 grid), and a brief **description** of its role within the n
 
 ---
 
+
+---
+
+## Network Router Antenna
+- **Recipe (3×3)**:
+
+  ```
+  · L ·
+  · C ·
+  · R ·
+  ```
+
+  > L = **Lightning Rod** · C = **Network Cable** · R = **Redstone Block**
+
+- **Result**: 1× Network Router
+- **Function**: Broadcasting antenna that amplifies the network signal across chunks and dimensions. With an active router, the Wireless Terminal gains global access across the world (without a router, access is restricted to 64 local blocks).
+
+---
+
+## CPU Virtual Cache Modules (L1 – Quantum)
+Internal multi-item storage installed directly into the **Network Controller** by right-clicking it with the module. Provides ultra-fast item memory without requiring external cell blocks.
+
+### L1 CPU Cache Module (2,048 items)
+- **Recipe (3×3)**:
+  ```
+  C R C
+  R C R
+  C R C
+  ```
+  > C = **Copper Ingot** · R = **Redstone Dust**
+- **Capacity**: 2,048 items
+
+### L2 CPU Cache Module (8,192 items)
+- **Recipe (3×3)**:
+  ```
+  G L G
+  L P L
+  G L G
+  ```
+  > G = **Gold Ingot** · L = **Lapis Lazuli** · P = **L1 CPU Cache Module**
+- **Capacity**: 8,192 items
+
+### L3 CPU Cache Module (32,768 items)
+- **Recipe (3×3)**:
+  ```
+  D A D
+  A P A
+  D A D
+  ```
+  > D = **Diamond** · A = **Amethyst Shard** · P = **L2 CPU Cache Module**
+- **Capacity**: 32,768 items
+
+### DRAM Memory Module (131,072 items)
+- **Recipe (3×3)**:
+  ```
+  N E N
+  E P E
+  N E N
+  ```
+  > N = **Netherite Ingot** · E = **Eye of Ender** · P = **L3 CPU Cache Module**
+- **Capacity**: 131,072 items
+
+### Quantum Cache Matrix (524,288 items)
+- **Recipe (3×3)**:
+  ```
+  N S N
+  S P S
+  N S N
+  ```
+  > N = **Netherite Block** · S = **Nether Star** · P = **DRAM Memory Module**
+- **Capacity**: 524,288 items
+
 This documentation is meant as a quick reference for both players and developers who want to understand what each item does and how to craft it. The capacities and speeds quoted are the `config.yml` defaults and can be tuned in that file.

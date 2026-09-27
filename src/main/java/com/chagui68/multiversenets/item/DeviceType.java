@@ -17,6 +17,19 @@ public enum DeviceType {
     MVN_TERMINAL(Material.BEACON, "Network Terminal", true, -1),
     /** Network item count monitor / Monitor de conteo de ítems de la red */
     MVN_MONITOR(Material.RESPAWN_ANCHOR, "Network Monitor", true, -1),
+    /** Network Router antenna / Antena de enrutador de red */
+    MVN_ROUTER(Material.LIGHTNING_ROD, "Network Router", true, -1),
+
+    /** L1 CPU Cache Module (2,048 items) / Módulo de Caché de CPU L1 */
+    MVN_CACHE_L1(Material.COPPER_INGOT, "L1 CPU Cache Module", false, -1),
+    /** L2 CPU Cache Module (8,192 items) / Módulo de Caché de CPU L2 */
+    MVN_CACHE_L2(Material.GOLD_INGOT, "L2 CPU Cache Module", false, -1),
+    /** L3 CPU Cache Module (32,768 items) / Módulo de Caché de CPU L3 */
+    MVN_CACHE_L3(Material.DIAMOND, "L3 CPU Cache Module", false, -1),
+    /** System DRAM Module (131,072 items) / Módulo de Memoria DRAM */
+    MVN_CACHE_DRAM(Material.NETHERITE_INGOT, "DRAM Memory Module", false, -1),
+    /** Quantum Cache Matrix (524,288 items) / Matriz de Caché Cuántica */
+    MVN_CACHE_QUANTUM(Material.NETHER_STAR, "Quantum Cache Matrix", false, -1),
     
     /*
      * Quantum Cells (Terracotta color-scaled by tier)
@@ -157,6 +170,35 @@ public enum DeviceType {
      */
     public boolean isDirectional() {
         return this == MVN_GRABBER_HT || this == MVN_PUSHER_HT;
+    }
+
+    /**
+     * @return true if device is a network router antenna / true si es antena router
+     */
+    public boolean isRouter() {
+        return this == MVN_ROUTER;
+    }
+
+    /**
+     * @return true if device is a CPU virtual cache module / true si es módulo de caché
+     */
+    public boolean isCacheModule() {
+        return this == MVN_CACHE_L1 || this == MVN_CACHE_L2 || this == MVN_CACHE_L3
+                || this == MVN_CACHE_DRAM || this == MVN_CACHE_QUANTUM;
+    }
+
+    /**
+     * @return Cache tier (1 to 5) or -1 if not a cache module / Nivel de caché (1 a 5) o -1
+     */
+    public int cacheTier() {
+        return switch (this) {
+            case MVN_CACHE_L1 -> 1;
+            case MVN_CACHE_L2 -> 2;
+            case MVN_CACHE_L3 -> 3;
+            case MVN_CACHE_DRAM -> 4;
+            case MVN_CACHE_QUANTUM -> 5;
+            default -> -1;
+        };
     }
 
     /**

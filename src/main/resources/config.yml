@@ -43,6 +43,8 @@ network:
   # [ES] Cantidad máxima de nodos conectados (máquinas + cables) permitidos por red.
   #      Protege al servidor contra bucles infinitos o sobrecargas de rendimiento.
   max-nodes: 16384
+  # [EN] Maximum network devices allowed per chunk to prevent saturation.
+  max-nodes-per-chunk: 64
 
   # [EN] Operation intervals (in ticks) for active network machines.
   # [ES] Intervalos de operación (en ticks) para las máquinas activas de la red.
@@ -128,3 +130,22 @@ cells:
   #      T5: 268,435,456 ítems (4,194,304 stacks)
   #      T6: 2,000,000,000 ítems (Almacenamiento masivo)
   capacities: [65536, 262144, 1048576, 16777216, 268435456, 2000000000]
+
+# -------------------------------------------------------------------------------------
+#  CPU Virtual Cache / Caché Virtual de CPU (Controller Storage)
+# -------------------------------------------------------------------------------------
+virtual-cache:
+  tier-1: 2048
+  tier-2: 8192
+  tier-3: 32768
+  tier-4: 131072
+  tier-5: 524288
+
+# -------------------------------------------------------------------------------------
+#  Wireless Terminal & Router / Terminal Inalámbrica y Enrutador
+# -------------------------------------------------------------------------------------
+wireless:
+  # Combat tag cooldown in seconds before wireless terminal can be accessed
+  combat-cooldown-seconds: 10
+  # Max range in blocks when network lacks a Network Router antenna
+  local-range-without-router: 64
