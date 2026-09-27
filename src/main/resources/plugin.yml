@@ -12,8 +12,7 @@ softdepend: [Slimefun]
 commands:
   mvnets:
     description: Main MultiverseNets command.
-    usage: /mvnets [help|info|devices|give|doctor|stats|reload]
-    aliases: [mvn]
+    usage: /mvnets [help|guide|info|devices|give|doctor|stats|reload]
     permission: multiversenets.use
 
 permissions:

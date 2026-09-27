@@ -33,7 +33,9 @@
 
 ### 📦 Quantum storage
 * **Cells T1–T6**: each cell stores a single item type up to its capacity (65k → 2,000M configurable).
+* **Quantum Fluid Cell & Network Fluid Storage**: Stores fluids (Water, Lava, Milk, Honey, Powder Snow) in quantum capacity (default 64,000 mB / 64 buckets). Liquid levels are aggregated into network fluid storage.
 * **Greedy Cell**: a smart buffer that claims its filtered item from the network and feeds it to adjacent containers (ideal for continuous lines).
+* **Network Terminal**: Redesigned Terminal GUI with a 3rd toggle button (slot 35) for fluid storage. Deposit fluid buckets/bottles or withdraw fluids using matching empty containers (Bucket for Water/Lava/Milk/Powder Snow; Glass Bottle for Honey).
 * The network's storage is the aggregate of all connected cells.
 * Atomic per-chunk persistence (Paper region data), anti-dupe in all flows.
 
@@ -41,18 +43,21 @@
 * **Importer (Grabber)**: extracts from adjacent containers into the network, with whitelist filter.
 * **Exporter (Pusher)**: inserts from the network into adjacent containers, with filter.
 * **HT (High-Throughput) variants**: fast versions ×8 (configurable) for massive factories.
+* **Liquid Pump**: Dark blue stained glass device that extracts liquid source blocks (strictly Water and Lava) from the block directly below (`BlockFace.DOWN`) into network fluid storage.
 * **Vacuum**: picks up ground items within a configurable radius, now with an optional whitelist filter.
 
 ### 🛠️ Auto-crafting
 * **Auto-Crafter**: accepts **Blueprints** (real 3×3 grid) and result-based recipes (legacy mode). Each blueprint is attempted once per cycle with **atomic extraction**: either there are ingredients for everything or nothing is touched.
+* **Request Terminal**: On-demand batch crafting console linked to auto-crafters across the network. Left-click crafts 1, right-click crafts 64, and shift+right-click prompts in chat to specify an exact custom quantity with strict numeric validation.
 * **Recipe Encoder**: builds the recipe in a persistent 3×3 template grid (click to fix slots, without spending items) and encodes a blank Blueprint with one click.
+* **Slimefun Recipe Encoder**: Dedicated encoder for Slimefun recipes (toggleable via `sf-encoder.enabled`).
+* **Network Quota Limiter**: Regulates maximum stock allowed in network storage for a specified target item.
 * **Blueprints**: reusable plans that carry the full recipe (grid + result) in their PDC; they are installed in an Auto-Crafter with a click and are not consumed.
 * **Crafting Grid**: manual crafting pulling from the network: the template grid is saved in the block, and each craft withdraws ingredients from the network transactionally.
 
 ### 🧰 Tools (brought over from NetworksV6)
 * **Configuration Wrench**: shift+click on a device with a filter **copies** its configuration; normal click **pastes** it onto another.
 * **Network Rake**: removes nodes instantly (250 uses by default, `rake.uses`); does not touch controllers or loaded cells.
-* **Network Crayon**: marks the controller and the network shows particles when its machines work.
 * Filters with **whitelist/blacklist mode** on any device with a filter (grabbers, pushers, vacuum, purger, greedy cell, receiver).
 
 
@@ -72,6 +77,7 @@
 
 | Command | Description | Permission |
 |---|---|---|
+| `/mvnets guide` | Receive an interactive guide book detailing all network mechanics | `multiversenets.use` |
 | `/mvnets devices` | List the device IDs | `multiversenets.use` |
 | `/mvnets give <id> [n]` | Give a device | `multiversenets.admin` |
 | `/mvnets doctor` | Rescan and diagnose networks | `multiversenets.admin` |
@@ -80,13 +86,11 @@
 | `/mvnets repair` | Force a rescan of the network of the block you are looking at | `multiversenets.admin` |
 | `/mvnets reload` | Reload the configuration | `multiversenets.admin` |
 
-Alias: `/mvn`
-
 ## 🎮 Quick start
 
 1. Place a **Controller**, surround the area with **Cables**, and connect **Cells**, **Grabbers/Pushers**, etc.
 2. Right-click the controller or a **Terminal** to open the Grid.
-3. In the terminal (the same conventions as the Networks grid): **left-click** takes 1 to the cursor, **right-click** a stack, **shift+click** sends to inventory; **shift+left-click** on your items inserts them into the network, or leave them in the **input slot** (right corner) and the network absorbs them. The magnifying glass/search label searches (right-click clears), the blue button changes the sort order, the arrows page.
+3. In the terminal (the same conventions as the Networks grid): **left-click** takes 1 to the cursor, **right-click** a stack, **shift+click** sends to inventory; **shift+left-click** on your items inserts them into the network, or leave them in the **input slot** (right corner) and the network absorbs them. The magnifying glass/search label searches (right-click clears), the blue button changes the sort order, the 3rd button toggles Fluid Storage, and the arrows page.
 4. Shift+click with a **Wireless Terminal** on the controller to bind it (then right-click in the air to open the network from a distance).
 5. **Encoder**: build the recipe in the template grid, put a blank **Blueprint** in the blue slot, and press *Encode*. That Blueprint is installed in an Auto-Crafter with a click on its list.
 6. **Receiver**: shift+click with the receiver item on a Transmitter, place it in another base and open it; give it a filter and it will also **bring items** from the transmitter's network.
@@ -99,7 +103,7 @@ Alias: `/mvn`
 |---|---|---|
 | Plugin name | `MultiverseNets` | `NetworksV6-Drake` |
 | Main class | `com.chagui68.multiversenets.…` | `io.github.sefiraat.networks.…` |
-| Command | `/mvnets` (alias `/mvn`) | `/networks` |
+| Command | `/mvnets` | `/networks` |
 | Permissions | `multiversenets.*` | `networks.*` |
 | Items | own, via PDC, with vanilla recipes | Slimefun's (`NTW_*`) |
 

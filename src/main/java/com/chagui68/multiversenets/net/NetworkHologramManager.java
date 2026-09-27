@@ -1,0 +1,138 @@
+package com.chagui68.multiversenets.net;
+
+import com.chagui68.multiversenets.MultiverseNets;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Location;
+import org.bukkit.NamespacedKey;
+import org.bukkit.World;
+import org.bukkit.entity.Display;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.TextDisplay;
+import org.bukkit.persistence.PersistentDataType;
+
+import javax.annotation.Nonnull;
+import java.text.NumberFormat;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * [EN] Native TextDisplay Floating Hologram Manager for Network Controllers.
+ * Lightweight, zero entity accumulation, displays live metrics & throughput without lag.
+ *
+ * [ES] Gestor de Hologramas Flotantes TextDisplay Nativos para Controladores de Red.
+ * Ligero, sin acumulación de entidades, muestra métricas en vivo y flujo en tiempo real sin lag.
+ */
+public final class NetworkHologramManager {
+
+    private static final Map<Long, UUID> HOLOGRAM_ENTITIES = new ConcurrentHashMap<>();
+    private static NamespacedKey HOLO_KEY;
+
+    private NetworkHologramManager() {}
+
+    public static void init(MultiverseNets plugin) {
+        HOLO_KEY = new NamespacedKey(plugin, "controller_hologram");
+    }
+
+    public static void updateHologram(@Nonnull Network net) {
+        if (HOLO_KEY == null) return;
+        World world = net.world();
+        long pos = net.controllerPos();
+        int cx = com.chagui68.multiversenets.util.PosUtil.unpackX(pos) >> 4;
+        int cz = com.chagui68.multiversenets.util.PosUtil.unpackZ(pos) >> 4;
+        if (world == null || !world.isChunkLoaded(cx, cz)) {
+            return;
+        }
+
+        Location controllerLoc = net.block(pos).getLocation();
+        UUID entityId = HOLOGRAM_ENTITIES.get(pos);
+        TextDisplay textDisplay = null;
+
+        if (entityId != null) {
+            Entity entity = world.getEntity(entityId);
+            if (entity instanceof TextDisplay td && entity.isValid()) {
+                textDisplay = td;
+            } else {
+                HOLOGRAM_ENTITIES.remove(pos);
+            }
+        }
+
+        if (textDisplay == null) {
+            Location spawnLoc = controllerLoc.clone().add(0.5, 1.45, 0.5);
+            // Preventive sweep of orphan TextDisplays
+            for (Entity nearby : world.getNearbyEntities(spawnLoc, 1.0, 1.0, 1.0)) {
+                if (nearby instanceof TextDisplay td && td.getPersistentDataContainer().has(HOLO_KEY, PersistentDataType.BYTE)) {
+                    nearby.remove();
+                }
+            }
+
+            textDisplay = world.spawn(spawnLoc, TextDisplay.class, td -> {
+                td.setBillboard(Display.Billboard.CENTER);
+                td.setDefaultBackground(true);
+                td.setSeeThrough(false);
+                td.setShadowed(true);
+                td.setPersistent(false);
+                td.getPersistentDataContainer().set(HOLO_KEY, PersistentDataType.BYTE, (byte) 1);
+            });
+            HOLOGRAM_ENTITIES.put(pos, textDisplay.getUniqueId());
+        }
+
+        double flowRate = net.throughput().getItemsPerSecond();
+        long totalTransferred = net.throughput().getTotalTransferredItems();
+        int nodeCount = net.size();
+        int maxNodes = com.chagui68.multiversenets.util.Settings.maxNodes();
+
+        Component text = Component.text("✦ MULTIVERSENETS ✦", NamedTextColor.GOLD, TextDecoration.BOLD)
+                .append(Component.newline())
+                .append(Component.text("Nodes: ", NamedTextColor.GRAY))
+                .append(Component.text(nodeCount + "/" + maxNodes, NamedTextColor.WHITE))
+                .append(Component.text(" | Flow: ", NamedTextColor.DARK_GRAY))
+                .append(Component.text(String.format(Locale.ROOT, "+%.1f items/s", flowRate), NamedTextColor.GREEN))
+                .append(Component.newline())
+                .append(Component.text("Routed: ", NamedTextColor.GRAY))
+                .append(Component.text(NumberFormat.getInstance().format(totalTransferred), NamedTextColor.YELLOW))
+                .append(Component.text(" | ", NamedTextColor.DARK_GRAY))
+                .append(Component.text(net.error == null || net.error.isBlank() ? "● Online" : "⚠ " + net.error,
+                        net.error == null || net.error.isBlank() ? NamedTextColor.AQUA : NamedTextColor.RED));
+
+        textDisplay.text(text);
+    }
+
+    public static void removeHologram(World world, long pos) {
+        UUID entityId = HOLOGRAM_ENTITIES.remove(pos);
+        if (entityId != null && world != null) {
+            Entity entity = world.getEntity(entityId);
+            if (entity != null) {
+                entity.remove();
+            }
+        }
+        if (world != null && HOLO_KEY != null) {
+            int x = com.chagui68.multiversenets.util.PosUtil.unpackX(pos);
+            int y = com.chagui68.multiversenets.util.PosUtil.unpackY(pos);
+            int z = com.chagui68.multiversenets.util.PosUtil.unpackZ(pos);
+            if (world.isChunkLoaded(x >> 4, z >> 4)) {
+                Location spawnLoc = new Location(world, x + 0.5, y + 1.45, z + 0.5);
+                for (Entity nearby : world.getNearbyEntities(spawnLoc, 1.0, 1.0, 1.0)) {
+                    if (nearby instanceof TextDisplay td && td.getPersistentDataContainer().has(HOLO_KEY, PersistentDataType.BYTE)) {
+                        nearby.remove();
+                    }
+                }
+            }
+        }
+    }
+
+    public static void clearAll(MultiverseNets plugin) {
+        for (Map.Entry<Long, UUID> entry : HOLOGRAM_ENTITIES.entrySet()) {
+            for (World world : plugin.getServer().getWorlds()) {
+                Entity entity = world.getEntity(entry.getValue());
+                if (entity != null) {
+                    entity.remove();
+                }
+            }
+        }
+        HOLOGRAM_ENTITIES.clear();
+    }
+}

@@ -176,7 +176,7 @@ blocks/items does not throw (`isMachine`, `getId`, `isSlimefunItem` and their Sp
 `extract`/`extraer` return null and `insert`/`insertar` return 0 safely.
 
 ### `ToolsTest`
-Tests the hand tools: **Configurator, Rake and Crayon** are not placeable, do not store and do not
+Tests the hand tools: **Configurator and Rake** are not placeable, do not store and do not
 filter; the **Receiver is filterable** (controlled wireless transport); and filters default to
 **whitelist** mode (`filterBlacklist = false`).
 

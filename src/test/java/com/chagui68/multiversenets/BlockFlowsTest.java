@@ -356,25 +356,6 @@ class BlockFlowsTest {
     }
 
     /**
-     * [EN] Crayon tool toggles visual beacon/particle indicators on the controller.
-     * [ES] El crayón conmuta las partículas indicadoras en el controlador.
-     */
-    @Test
-    void crayonTogglesControllerParticles() {
-        Block controller = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
-        ItemStack crayon = Items.create(DeviceType.MVN_CRAYON);
-        player.getInventory().setItemInMainHand(crayon);
-
-        assertFalse(NodeStore.get(controller).crayon);
-        server.getPluginManager().callEvent(new PlayerInteractEvent(player,
-                Action.RIGHT_CLICK_BLOCK, crayon, controller, BlockFace.NORTH, EquipmentSlot.HAND, null));
-        assertTrue(NodeStore.get(controller).crayon, "crayon enables particles");
-        server.getPluginManager().callEvent(new PlayerInteractEvent(player,
-                Action.RIGHT_CLICK_BLOCK, crayon, controller, BlockFace.NORTH, EquipmentSlot.HAND, null));
-        assertFalse(NodeStore.get(controller).crayon, "second click disables particles");
-    }
-
-    /**
      * [EN] Advanced grabber with targetFace set only extracts from the specified container face.
      * [ES] El grabber avanzado con targetFace configurado solo extrae de la cara indicada.
      */
@@ -540,5 +521,38 @@ class BlockFlowsTest {
 
         assertEquals(80, ironCount);
         assertEquals(15, goldCount);
+    }
+
+    /**
+     * [EN] Interacting with Slimefun Recipe Encoder opens its custom blueprint encoding menu.
+     */
+    @Test
+    void sfEncoderInteractingOpensMenu() {
+        Block encoder = place(5, 64, 5, DeviceType.MVN_SF_ENCODER);
+        PlayerInteractEvent event = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK, null, encoder, BlockFace.UP, EquipmentSlot.HAND);
+        server.getPluginManager().callEvent(event);
+        assertTrue(event.isCancelled(), "interaction with SF encoder must be handled and cancelled");
+        assertNotNull(player.getOpenInventory().getTopInventory(), "menu should be opened for player");
+        assertEquals(45, player.getOpenInventory().getTopInventory().getSize(), "SfEncoderMenu has 45 slots");
+    }
+
+    /**
+     * [EN] Shift + Right-Clicking a network device accesses the interface of the targeted adjacent block.
+     */
+    @Test
+    void shiftRightClickAccessesAdjacentChestInterface() {
+        Block chest = world.getBlockAt(10, 64, 11);
+        chest.setType(Material.CHEST);
+        Block grabber = place(10, 64, 10, DeviceType.MVN_GRABBER_HT);
+
+        NodeBlob blob = NodeStore.get(grabber);
+        blob.targetFace = "SOUTH";
+        NodeStore.put(grabber, blob);
+
+        player.setSneaking(true);
+        PlayerInteractEvent event = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK, null, grabber, BlockFace.NORTH, EquipmentSlot.HAND);
+        server.getPluginManager().callEvent(event);
+
+        assertTrue(event.isCancelled(), "shift+right click event should be cancelled when opening adjacent interface");
     }
 }

@@ -68,8 +68,11 @@ public class MultiverseNets extends JavaPlugin {
             }
         }, 100L);
 
+        com.chagui68.multiversenets.net.NetworkHologramManager.init(this);
         ticker = new NetworkTicker(this, networks);
         ticker.start();
+
+        new com.chagui68.multiversenets.net.NetworkActionBarTask(this).runTaskTimer(this, 10L, 10L);
 
         PluginCommand command = getCommand("mvnets");
         if (command != null) {
@@ -86,6 +89,7 @@ public class MultiverseNets extends JavaPlugin {
         if (ticker != null) {
             ticker.stop();
         }
+        com.chagui68.multiversenets.net.NetworkHologramManager.clearAll(this);
         if (networks != null) {
             networks.saveAll();
         }

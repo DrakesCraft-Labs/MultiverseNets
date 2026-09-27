@@ -197,14 +197,57 @@ public class NetworkStorage {
         }
     }
 
+    public synchronized long remainingQuota(ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return Long.MAX_VALUE;
+        }
+        long minAllowed = Long.MAX_VALUE;
+        boolean hasLimiter = false;
+        synchronized (network.nodes()) {
+            for (var entry : network.nodes().entrySet()) {
+                if (entry.getValue() == DeviceType.MVN_LIMITER) {
+                    long pos = entry.getKey();
+                    int cx = PosUtil.unpackX(pos) >> 4;
+                    int cz = PosUtil.unpackZ(pos) >> 4;
+                    if (!network.world().isChunkLoaded(cx, cz)) {
+                        continue;
+                    }
+                    Block b = network.block(pos);
+                    NodeBlob blob = NodeStore.get(b);
+                    if (blob == null || !blob.quotaActive || blob.quotaSample == null || blob.quotaLimit < 0) {
+                        continue;
+                    }
+                    if (StackUtils.itemsMatch(blob.quotaSample, item)) {
+                        hasLimiter = true;
+                        if (blob.quotaLimit < minAllowed) {
+                            minAllowed = blob.quotaLimit;
+                        }
+                    }
+                }
+            }
+        }
+        if (!hasLimiter) {
+            return Long.MAX_VALUE;
+        }
+        long currentTotal = count(i -> StackUtils.itemsMatch(i, item));
+        return Math.max(0, minAllowed - currentTotal);
+    }
+
     public synchronized int deposit(ItemStack item) {
         if (item == null || item.getType().isAir() || item.getAmount() <= 0) {
             return 0;
         }
+        long quotaHeadroom = remainingQuota(item);
+        if (quotaHeadroom <= 0) {
+            return item.getAmount();
+        }
+        long amountToDeposit = Math.min((long) item.getAmount(), quotaHeadroom);
+        long rejectedByQuota = item.getAmount() - amountToDeposit;
+
         List<CellState> states = load();
         VirtualCacheState vCache = loadVirtualCache();
         List<Block> sfBarrels = loadSfBarrels();
-        long remaining = item.getAmount();
+        long remaining = amountToDeposit;
 
         // 1. Greedy cells
         for (CellState state : states) {
@@ -297,7 +340,7 @@ public class NetworkStorage {
         }
 
         flush(states, vCache);
-        return (int) remaining;
+        return (int) (remaining + rejectedByQuota);
     }
 
     private static long pour(CellState state, ItemStack item, long remaining) {

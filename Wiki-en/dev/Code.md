@@ -162,11 +162,7 @@ Barrels) as a **single "vault"**. GUIs and the ticker interact with the network,
   6. **Receiver** (wireless bridge): only if the blob has `txWorld` and a **non-empty filter** (avoids accidental network merging); withdraws from the remote network and deposits into its own.
 - **`doVacuum`**: radius `vacuum.radius`; collects ground `Item` entities (no `pickupDelay`, filter-passing) into the network.
 - **`doCrafting`**: per Auto-Crafter, decodes each installed blueprint (`craft/Blueprints.decode`) and attempts to craft (see §10).
-- Particles: when `net.crayon()`, cyan particles spawn on each operation (the Network Crayon feature).
-
-## 9. Items and devices (`item/DeviceType` and `item/Items`)
-
-- `DeviceType` — enum of **30 devices**. Each constant carries `material`, `display`, `placeable` and `cellTier` (1–6). Derived properties: `isCell()` (tier > 0), `filterable()` (grabbers, pushers, vacuum, greedy cell, purger, receiver), `isImporter()`/`isExporter()`, `isDirectional()` (advanced HT). `parse(name)` accepts `MVN_…`, the unprefixed form and `wireless`.
+- `DeviceType` — enum of **40 devices and modules**. Each constant carries `material`, `display`, `placeable` and `cellTier` (1–6). Derived properties: `isCell()` (tier > 0), `filterable()` (grabbers, pushers, vacuum, greedy cell, purger, receiver), `isImporter()`/`isExporter()`, `isDirectional()` (advanced HT), `isRouter()`, `isCacheModule()`, `isFluidCell()`, `isLiquidPump()`, `isRequestTerminal()`. `parse(name)` accepts `MVN_…`, the unprefixed form and `wireless`.
 
 | Constant | Material | Display name | Placeable |
 | --- | --- | --- | --- |
@@ -174,6 +170,8 @@ Barrels) as a **single "vault"**. GUIs and the ticker interact with the network,
 | `MVN_CABLE` | GLASS | Network Cable | ✔ |
 | `MVN_TERMINAL` | BEACON | Network Terminal | ✔ |
 | `MVN_MONITOR` | RESPAWN_ANCHOR | Network Monitor | ✔ |
+| `MVN_ROUTER` | LIGHTNING_ROD | Network Router | ✔ |
+| `MVN_CACHE_L1`…`QUANTUM` | Various | CPU Cache Modules (L1–Quantum) | ✘ (hand) |
 | `MVN_CELL_T1`…`T6` | Terracotta per tier | Quantum Cell T1…T6 | ✔ |
 | `MVN_GREEDY_CELL` | SLIME_BLOCK | Greedy Cell | ✔ |
 | `MVN_INFINITY_BARREL` | BARREL | Infinity Barrel | ✔ |
@@ -181,9 +179,11 @@ Barrels) as a **single "vault"**. GUIs and the ticker interact with the network,
 | `MVN_PUSHER` / `MVN_PUSHER_HT` | TARGET / PISTON | Simple / Advanced Pusher | ✔ |
 | `MVN_VACUUM` | SPONGE | Network Vacuum | ✔ |
 | `MVN_PURGER` | MAGMA_BLOCK | Network Purger | ✔ |
+| `MVN_LIMITER` | TARGET | Network Quota Limiter | ✔ |
 | `MVN_PROBE` | SPYGLASS | Network Probe | ✘ (hand) |
 | `MVN_CRAFTER` | CRAFTING_TABLE | Auto-Crafter | ✔ |
 | `MVN_ENCODER` | SMITHING_TABLE | Recipe Encoder | ✔ |
+| `MVN_SF_ENCODER` | ENCHANTING_TABLE | Slimefun Recipe Encoder | ✔ |
 | `MVN_CRAFTING_GRID` | CARTOGRAPHY_TABLE | Network Crafting Grid | ✔ |
 | `MVN_QUANTUM_WORKBENCH` | BRAIN_CORAL_BLOCK | Quantum Workbench | ✔ |
 | `MVN_TRANSMITTER` / `MVN_RECEIVER` | CONDUIT / REDSTONE_LAMP | Wireless Transmitter / Receiver | ✔ |
@@ -191,7 +191,9 @@ Barrels) as a **single "vault"**. GUIs and the ticker interact with the network,
 | `MVN_BLUEPRINT` | BOOK | Blueprint | ✘ (hand) |
 | `MVN_CONFIGURATOR` | COMPARATOR | Configuration Wrench | ✘ (hand) |
 | `MVN_RAKE` | DEAD_BUSH | Network Rake | ✘ (hand) |
-| `MVN_CRAYON` | CYAN_DYE | Network Crayon | ✘ (hand) |
+| `MVN_FLUID_CELL` | PRISMARINE_BRICKS | Quantum Fluid Cell | ✔ |
+| `MVN_LIQUID_PUMP` | BLUE_STAINED_GLASS | Liquid Pump | ✔ |
+| `MVN_REQUEST_TERMINAL` | LECTERN | Request Terminal | ✔ |
 
 - `Items.create(type)` — builds the `ItemStack` with its display name and stamps `Keys.DEVICE_TYPE = type.name()` in the PDC. `Items.typeOf(item)` reads it back (distinguishes plugin items from vanilla ones).
 - `Items.capacityOf(type)` — declared capacity of a device (Barrel 2,000,000,000; cells from `Settings`).
@@ -256,11 +258,10 @@ Notable tools:
 - **Probe** (`probeNode`): reports the device, its network (or "NO NETWORK" if it cannot reach a controller) and any warnings from the last scan.
 - **Rake** (`useRake`): instantly removes a node (never a controller, never storage with cargo), spending a use and breaking when exhausted.
 - **Wrench** (`useWrench`): shift+click copies filters onto the item; normal click pastes them onto another filterable device.
-- **Crayon** (`useCrayon`): toggles `blob.crayon` on the controller (network particles).
 
 ## 13. Command `/mvnets` (`command/MvnetsCommand`)
 
-Subcommands: `help`, `info`, `reload`, `give <id> [n]`, `devices`, `doctor`, `stats`, `inspect`, `repair`. Admin-gated commands use **`multiversenets.admin`** (`reload`, `give`, `doctor`, `stats`, `inspect`, `repair`); `help`/`info`/`devices` are open. The `TabCompleter` completes subcommands and, for `give`, the device IDs (`type.id()`, lowercase without the `mvn_` prefix).
+Subcommands: `help`, `info`, `guide`, `reload`, `give <id> [n]`, `devices`, `doctor`, `stats`, `inspect`, `repair`. Admin-gated commands use **`multiversenets.admin`** (`reload`, `give`, `doctor`, `stats`, `inspect`, `repair`); `help`/`info`/`guide`/`devices` are open. The `TabCompleter` completes subcommands and, for `give`, the device IDs (`type.id()`, lowercase without the `mvn_` prefix).
 
 ## 14. Slimefun integration (`compat/SlimefunBridge`)
 

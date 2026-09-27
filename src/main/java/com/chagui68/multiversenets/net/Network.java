@@ -40,9 +40,10 @@ public class Network {
     private final Map<DeviceType, Set<Long>> byType = new EnumMap<>(DeviceType.class);
     private final Set<Long> sfBarrels = new HashSet<>();
     private final NetworkStorage storage = new NetworkStorage(this);
+    private final NetworkFluidStorage fluidStorage = new NetworkFluidStorage(this);
+    private final NetworkThroughputTracker throughput = new NetworkThroughputTracker();
     private volatile long version = 0;
     private long lastScanMs = 0;
-    private volatile boolean crayon;
     private volatile boolean dirty = true;
     public String error;
 
@@ -76,12 +77,16 @@ public class Network {
         return storage;
     }
 
-    public long versionSnapshot() {
-        return version;
+    public NetworkFluidStorage fluidStorage() {
+        return fluidStorage;
     }
 
-    public boolean crayon() {
-        return crayon;
+    public NetworkThroughputTracker throughput() {
+        return throughput;
+    }
+
+    public long versionSnapshot() {
+        return version;
     }
 
     public boolean isDirty() {
@@ -151,7 +156,6 @@ public class Network {
             storage.invalidate();
             return;
         }
-        this.crayon = ctrlBlob.crayon;
 
         found.put(controllerPos, DeviceType.MVN_CONTROLLER);
         visited.add(controllerPos);
@@ -171,14 +175,22 @@ public class Network {
                     continue;
                 }
                 Block block = block(next);
-                if (!NodeStore.chunkHasNodes(block.getChunk())) {
+                boolean chunkHasNodes = NodeStore.chunkHasNodes(block.getChunk());
+                if (!chunkHasNodes && !(Settings.compatSlimefun() && SlimefunBridge.isAvailable())) {
                     continue;
                 }
                 DeviceType type = NodeStore.getType(block);
                 if (type == null) {
-                    if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isBarrel(block)) {
-                        sfBarrels.add(next);
-                        queue.add(next);
+                    if (Settings.compatSlimefun() && SlimefunBridge.isAvailable()) {
+                        if (SlimefunBridge.isNetworkCable(block)) {
+                            found.put(next, DeviceType.MVN_CABLE);
+                            queue.add(next);
+                            continue;
+                        } else if (SlimefunBridge.isBarrel(block)) {
+                            sfBarrels.add(next);
+                            queue.add(next);
+                            continue;
+                        }
                     }
                     continue;
                 }

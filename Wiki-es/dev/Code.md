@@ -152,11 +152,7 @@ Vista agregada de todos los bloques de almacenamiento de la red (Quantum Cells, 
   6. **Receiver** (puente inalámbrico): solo si el blob tiene `txWorld` y **filtro no vacío** (evita fusiones accidentales de redes); retira de la red remota y deposita en la propia.
 - **`doVacuum`**: radio `vacuum.radius`; recoge entidades `Item` del suelo (sin `pickupDelay`, y que pasen el filtro) hacia la red.
 - **`doCrafting`**: por Auto-Crafter, decodifica cada blueprint instalado (`craft/Blueprints.decode`) e intenta craftear (ver §10).
-- Partículas: si `net.crayon()`, se emiten partículas cian en cada operación (función del Network Crayon).
-
-## 9. Ítems y dispositivos (`item/DeviceType` y `item/Items`)
-
-- `DeviceType` — enum de **30 dispositivos**. Cada constante tiene `material`, `display`, `placeable` y `cellTier` (1–6). Propiedades derivadas: `isCell()` (tier > 0), `filterable()` (grabbers, pushers, vacuum, greedy, purger, receiver), `isImporter()`/`isExporter()`, `isDirectional()` (avanzados HT). `parse(name)` acepta `MVN_…`, sin prefijo y `wireless`.
+- `DeviceType` — enum de **40 dispositivos y módulos**. Cada constante tiene `material`, `display`, `placeable` y `cellTier` (1–6). Propiedades derivadas: `isCell()` (tier > 0), `filterable()` (grabbers, pushers, vacuum, greedy, purger, receiver), `isImporter()`/`isExporter()`, `isDirectional()` (avanzados HT), `isRouter()`, `isCacheModule()`, `isFluidCell()`, `isLiquidPump()`, `isRequestTerminal()`. `parse(name)` acepta `MVN_…`, sin prefijo y `wireless`.
 
 | Constante | Material | Nombre visible | Colocable |
 | --- | --- | --- | --- |
@@ -164,6 +160,8 @@ Vista agregada de todos los bloques de almacenamiento de la red (Quantum Cells, 
 | `MVN_CABLE` | GLASS | Network Cable | ✔ |
 | `MVN_TERMINAL` | BEACON | Network Terminal | ✔ |
 | `MVN_MONITOR` | RESPAWN_ANCHOR | Network Monitor | ✔ |
+| `MVN_ROUTER` | LIGHTNING_ROD | Network Router | ✔ |
+| `MVN_CACHE_L1`…`QUANTUM` | Varios | Módulos de Caché CPU (L1–Quantum) | ✘ (mano) |
 | `MVN_CELL_T1`…`T6` | Terracota por nivel | Quantum Cell T1…T6 | ✔ |
 | `MVN_GREEDY_CELL` | SLIME_BLOCK | Greedy Cell | ✔ |
 | `MVN_INFINITY_BARREL` | BARREL | Infinity Barrel | ✔ |
@@ -171,9 +169,11 @@ Vista agregada de todos los bloques de almacenamiento de la red (Quantum Cells, 
 | `MVN_PUSHER` / `MVN_PUSHER_HT` | TARGET / PISTON | Simple / Advanced Pusher | ✔ |
 | `MVN_VACUUM` | SPONGE | Network Vacuum | ✔ |
 | `MVN_PURGER` | MAGMA_BLOCK | Network Purger | ✔ |
+| `MVN_LIMITER` | TARGET | Network Quota Limiter | ✔ |
 | `MVN_PROBE` | SPYGLASS | Network Probe | ✘ (mano) |
 | `MVN_CRAFTER` | CRAFTING_TABLE | Auto-Crafter | ✔ |
 | `MVN_ENCODER` | SMITHING_TABLE | Recipe Encoder | ✔ |
+| `MVN_SF_ENCODER` | ENCHANTING_TABLE | Slimefun Recipe Encoder | ✔ |
 | `MVN_CRAFTING_GRID` | CARTOGRAPHY_TABLE | Network Crafting Grid | ✔ |
 | `MVN_QUANTUM_WORKBENCH` | BRAIN_CORAL_BLOCK | Quantum Workbench | ✔ |
 | `MVN_TRANSMITTER` / `MVN_RECEIVER` | CONDUIT / REDSTONE_LAMP | Wireless Transmitter / Receiver | ✔ |
@@ -181,7 +181,9 @@ Vista agregada de todos los bloques de almacenamiento de la red (Quantum Cells, 
 | `MVN_BLUEPRINT` | BOOK | Blueprint | ✘ (mano) |
 | `MVN_CONFIGURATOR` | COMPARATOR | Configuration Wrench | ✘ (mano) |
 | `MVN_RAKE` | DEAD_BUSH | Network Rake | ✘ (mano) |
-| `MVN_CRAYON` | CYAN_DYE | Network Crayon | ✘ (mano) |
+| `MVN_FLUID_CELL` | PRISMARINE_BRICKS | Quantum Fluid Cell | ✔ |
+| `MVN_LIQUID_PUMP` | BLUE_STAINED_GLASS | Liquid Pump | ✔ |
+| `MVN_REQUEST_TERMINAL` | LECTERN | Request Terminal | ✔ |
 
 - `Items.create(type)` — construye el `ItemStack` con su nombre mostrado y graba `Keys.DEVICE_TYPE = type.name()` en el PDC. `Items.typeOf(item)` lo recupera (distingue ítems del plugin de items vanilla).
 - `Items.capacityOf(type)` — capacidad declarada de un dispositivo (Barril 2 000 000 000; celdas según `Settings`).
@@ -246,11 +248,10 @@ Herramientas destacadas:
 - **Probe** (`probeNode`): informa del dispositivo, de su red (o «NO NETWORK» si no llega al controlador) y de avisos del último escaneo.
 - **Rake** (`useRake`): elimina el nodo al instante (nunca un controlador y nunca almacenamiento con carga), gasta un uso y se rompe al acabarse.
 - **Wrench** (`useWrench`): shift+clic copia filtros al ítem; clic normal los pega en otro dispositivo filtrable.
-- **Crayon** (`useCrayon`): alterna `blob.crayon` del controlador (partículas de red).
 
 ## 13. Comando `/mvnets` (`command/MvnetsCommand`)
 
-Subcomandos: `help`, `info`, `reload`, `give <id> [n]`, `devices`, `doctor`, `stats`, `inspect`, `repair`. Los nocionales usan **`multiversenets.admin`** (`reload`, `give`, `doctor`, `stats`, `inspect`, `repair`); `help`/`info`/`devices` están abiertos. `TabCompleter` completa subcomandos y, para `give`, los IDs de dispositivos (`type.id()`, en minúsculas sin prefijo `mvn_`).
+Subcomandos: `help`, `info`, `guide`, `reload`, `give <id> [n]`, `devices`, `doctor`, `stats`, `inspect`, `repair`. Los comandos de administración usan **`multiversenets.admin`** (`reload`, `give`, `doctor`, `stats`, `inspect`, `repair`); `help`/`info`/`guide`/`devices` están abiertos. `TabCompleter` completa subcomandos y, para `give`, los IDs de dispositivos (`type.id()`, en minúsculas sin prefijo `mvn_`).
 
 ## 14. Integración con Slimefun (`compat/SlimefunBridge`)
 

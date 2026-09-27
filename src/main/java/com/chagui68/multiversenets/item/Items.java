@@ -44,31 +44,128 @@ public final class Items {
         meta.displayName(Component.text(type.display(), NamedTextColor.AQUA)
                 .decoration(TextDecoration.ITALIC, false));
         List<Component> lore = new ArrayList<>();
-        lore.add(Component.text("MultiverseNets", NamedTextColor.DARK_GRAY)
-                .decoration(TextDecoration.ITALIC, false));
-        if (type.isCell() || type == DeviceType.MVN_INFINITY_BARREL || type == DeviceType.MVN_GREEDY_CELL) {
-            lore.add(Component.text("Capacity: " + formatAmount(capacityOf(type)), NamedTextColor.GRAY)
-                    .decoration(TextDecoration.ITALIC, false));
+
+        switch (type) {
+            case MVN_CONTROLLER -> {
+                lore.add(Component.text("Central brain powering and coordinating the network.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Accepts CPU Cache modules to expand network throughput.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_CABLE -> {
+                lore.add(Component.text("Digital conduit connecting devices across the network.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_TERMINAL -> {
+                lore.add(Component.text("Interactive console to view, store, and withdraw items and liquids.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Includes search filtering, sorting, and fluid storage access.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_MONITOR -> {
+                lore.add(Component.text("Wall display showing real-time item stock in the network.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Right-click to select target item and display mode.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_ROUTER -> {
+                lore.add(Component.text("Antenna that broadcasts network signals across chunks and dimensions.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Enables global Wireless Terminal connectivity.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_CELL_T1, MVN_CELL_T2, MVN_CELL_T3, MVN_CELL_T4, MVN_CELL_T5, MVN_CELL_T6 -> {
+                lore.add(Component.text("High-capacity digital storage cell for a single item type.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Capacity: " + formatAmount(capacityOf(type)) + " items", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_GREEDY_CELL -> {
+                lore.add(Component.text("Dedicated buffer cell continuously pulling target items from network.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Capacity: " + formatAmount(capacityOf(type)) + " items", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_INFINITY_BARREL -> {
+                lore.add(Component.text("Deep-storage barrel with infinite capacity for a single item type.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Capacity: Unlimited", NamedTextColor.LIGHT_PURPLE).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_GRABBER -> {
+                lore.add(Component.text("Omnidirectional node importing items from adjacent containers.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_GRABBER_HT -> {
+                lore.add(Component.text("Directional high-speed importer with side and filter controls.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_PUSHER -> {
+                lore.add(Component.text("Omnidirectional node exporting items into adjacent containers.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_PUSHER_HT -> {
+                lore.add(Component.text("Directional high-speed exporter with side and filter controls.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_VACUUM -> {
+                lore.add(Component.text("Absorbs dropped item entities in the world into the network.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_PURGER -> {
+                lore.add(Component.text("Safely voids and deletes unwanted overflow items matching filter.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_LIMITER -> {
+                lore.add(Component.text("Regulates max storage stock for a target item in the network.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Stops incoming imports once ceiling limit is met.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_PROBE -> {
+                lore.add(Component.text("Diagnostic tool inspecting network throughput, nodes, and status.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_CRAFTER -> {
+                lore.add(Component.text("Automated crafting machine driven by installed recipe Blueprints.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_ENCODER -> {
+                lore.add(Component.text("Encodes standard crafting recipes onto blank Blueprints.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_SF_ENCODER -> {
+                lore.add(Component.text("Encodes Slimefun item recipes onto blank Blueprints.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_CRAFTING_GRID -> {
+                lore.add(Component.text("Interactive 3x3 crafting grid directly connected to network storage.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_QUANTUM_WORKBENCH -> {
+                lore.add(Component.text("Workbench for quantum item disassembly and energy synthesis.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_TRANSMITTER -> {
+                lore.add(Component.text("Transmits wireless cross-network bridge signal.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_RECEIVER -> {
+                lore.add(Component.text("Receives wireless bridge connection from a paired Transmitter.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_WIRELESS_TERMINAL -> {
+                lore.add(Component.text("Handheld device granting remote access to network storage.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Status: ", NamedTextColor.GRAY)
+                        .append(Component.text("Unbound", NamedTextColor.RED))
+                        .decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Shift+Right Click a Controller or Terminal to bind.", NamedTextColor.DARK_GRAY)
+                        .decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_BLUEPRINT -> {
+                lore.add(Component.text("Recipe pattern blueprint for Auto-Crafter machines.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_CONFIGURATOR -> {
+                lore.add(Component.text("Network wrench to rotate nodes, toggle faces, and check states.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_RAKE -> {
+                lore.add(Component.text("Instantly dismantles and recovers network nodes without damage.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_FLUID_CELL -> {
+                lore.add(Component.text("Digital storage tank for water, lava, milk, honey, and powder snow.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Capacity: " + formatAmount(Settings.fluidCellCapacity()) + " mB ("
+                        + (Settings.fluidCellCapacity() / 1000) + " Buckets)", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Right-click with a bucket to deposit/extract directly.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_LIQUID_PUMP -> {
+                lore.add(Component.text("Pumps water and lava sources directly from the block underneath.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Deposits pumped liquids directly into network fluid cells.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_REQUEST_TERMINAL -> {
+                lore.add(Component.text("On-demand crafting ordering console discovered across network.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Order custom quantities to player inventory or storage.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            default -> {
+                if (type.isCacheModule()) {
+                    lore.add(Component.text("Expands Controller memory capacity and network throughput.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                    lore.add(Component.text("Capacity: " + formatAmount(capacityOf(type)) + " items", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+                    lore.add(Component.text("Right-click Controller to install/upgrade.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+                }
+            }
         }
-        if (type.isCacheModule()) {
-            lore.add(Component.text("Tier: " + type.display(), NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("Capacity: " + formatAmount(capacityOf(type)) + " items", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("Right-click Controller to install/upgrade.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
-        }
-        if (type == DeviceType.MVN_ROUTER) {
-            lore.add(Component.text("Antenna that broadcasts network signal.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("Enables global wireless terminal access", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("across chunks and dimensions.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-        }
-        if (type == DeviceType.MVN_WIRELESS_TERMINAL) {
-            lore.add(Component.text("Status: ", NamedTextColor.GRAY)
-                    .append(Component.text("Unbound", NamedTextColor.RED))
-                    .decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("Shift+Right Click a Controller or Terminal", NamedTextColor.DARK_GRAY)
-                    .decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("to bind to a network.", NamedTextColor.DARK_GRAY)
-                    .decoration(TextDecoration.ITALIC, false));
-        }
+
+        // MultiverseNets distinction footer
+        lore.add(Component.empty());
+        lore.add(Component.text("▪ MultiverseNets", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
         meta.lore(lore);
         meta.getPersistentDataContainer().set(Keys.DEVICE_TYPE, PersistentDataType.STRING, type.name());
         item.setItemMeta(meta);
@@ -526,6 +623,14 @@ public final class Items {
             r.setIngredient('P', Material.PAPER);
             r.setIngredient('S', Material.SMITHING_TABLE);
         });
+        if (Settings.sfEncoderEnabled()) {
+            shaped(plugin, "sf_encoder", create(DeviceType.MVN_SF_ENCODER), r -> {
+                r.shape("EPE", "PBP", "EPE");
+                r.setIngredient('E', Material.ENDER_PEARL);
+                r.setIngredient('P', Material.PAPER);
+                r.setIngredient('B', Material.ENCHANTING_TABLE);
+            });
+        }
         shaped(plugin, "router", create(DeviceType.MVN_ROUTER), r -> {
             r.shape(" L ", " C ", " R ");
             r.setIngredient('L', Material.LIGHTNING_ROD);
@@ -583,11 +688,6 @@ public final class Items {
             r.setIngredient('D', Material.DEAD_BUSH);
             r.setIngredient('S', Material.STICK);
         });
-        shaped(plugin, "crayon", create(DeviceType.MVN_CRAYON), r -> {
-            r.shape("C", "S");
-            r.setIngredient('C', Material.CYAN_DYE);
-            r.setIngredient('S', Material.STICK);
-        });
         shaped(plugin, "quantum_workbench", create(DeviceType.MVN_QUANTUM_WORKBENCH), r -> {
             r.shape("DDD", "DCD", "DDD");
             r.setIngredient('D', Material.DIAMOND);
@@ -598,6 +698,32 @@ public final class Items {
             r.setIngredient('N', Material.NETHERITE_INGOT);
             r.setIngredient('D', Material.DIAMOND_BLOCK);
             r.setIngredient('B', Material.BARREL);
+        });
+        shaped(plugin, "limiter", create(DeviceType.MVN_LIMITER), r -> {
+            r.shape("RCR", "CTC", "RCR");
+            r.setIngredient('R', Material.REDSTONE);
+            r.setIngredient('C', Material.COMPARATOR);
+            r.setIngredient('T', Material.TARGET);
+        });
+        shaped(plugin, "fluid_cell", create(DeviceType.MVN_FLUID_CELL), r -> {
+            r.shape("GBG", "GLG", "GGG");
+            r.setIngredient('G', Material.GLASS);
+            r.setIngredient('B', Material.BUCKET);
+            r.setIngredient('L', Material.LAPIS_BLOCK);
+        });
+        shaped(plugin, "liquid_pump", create(DeviceType.MVN_LIQUID_PUMP), r -> {
+            r.shape(" G ", "PBP", " R ");
+            r.setIngredient('G', Material.BLUE_STAINED_GLASS);
+            r.setIngredient('P', Material.PISTON);
+            r.setIngredient('B', Material.BUCKET);
+            r.setIngredient('R', Material.REDSTONE);
+        });
+        shaped(plugin, "request_terminal", create(DeviceType.MVN_REQUEST_TERMINAL), r -> {
+            r.shape("GLG", "RCR", "GGG");
+            r.setIngredient('G', Material.GLASS);
+            r.setIngredient('L', Material.LECTERN);
+            r.setIngredient('C', Material.CRAFTING_TABLE);
+            r.setIngredient('R', Material.REDSTONE);
         });
         plugin.getLogger().info("Registered " + recipeCount() + " crafting recipes with Bukkit.");
     }

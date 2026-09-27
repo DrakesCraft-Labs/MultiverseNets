@@ -108,7 +108,7 @@ public final class Settings {
      * ES: Cantidad base de ítems transferidos por operación de tick.
      */
     public static int itemsPerOp() {
-        return cfg != null ? Math.max(1, cfg.getInt("transfer.items-per-op", 64)) : 64;
+        return cfg != null ? Math.max(1, cfg.getInt("transfer.items-per-op", 128)) : 128;
     }
 
     /**
@@ -221,6 +221,14 @@ public final class Settings {
     }
 
     /**
+     * EN: Returns true if the Slimefun Recipe Encoder machine is enabled in config.
+     * ES: Devuelve true si el Codificador de Recetas de Slimefun está habilitado en config.
+     */
+    public static boolean sfEncoderEnabled() {
+        return cfg == null || cfg.getBoolean("sf-encoder.enabled", true);
+    }
+
+    /**
      * EN: Returns true if debug logging mode is enabled.
  *
      * ES: Devuelve true si el modo de registro de depuración está activo.
@@ -236,5 +244,21 @@ public final class Settings {
      */
     public static int rakeUses() {
         return cfg != null ? Math.max(1, cfg.getInt("rake.uses", 250)) : 250;
+    }
+
+    /**
+     * EN: Storage capacity in millibuckets (mB) per Quantum Fluid Cell.
+     * ES: Capacidad de almacenamiento en mB por Celda Cuántica de Fluidos.
+     */
+    public static long fluidCellCapacity() {
+        return cfg != null ? Math.max(1000L, cfg.getLong("fluids.cell-capacity-mb", 64000L)) : 64000L;
+    }
+
+    /**
+     * EN: Pumping speed in millibuckets (mB) per operation for Liquid Pumps.
+     * ES: Velocidad de bombeo en mB por operación para las Bombas de Líquidos.
+     */
+    public static long fluidPumpRate() {
+        return cfg != null ? Math.max(1L, cfg.getLong("fluids.pump-rate-mb", 1000L)) : 1000L;
     }
 }

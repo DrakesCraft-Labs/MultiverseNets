@@ -27,7 +27,9 @@
 
 ### 📦 Almacenamiento cuántico
 * **Celdas T1–T6**: cada celda guarda un solo tipo de ítem hasta su capacidad (65k → 2.000M configurable).
+* **Quantum Fluid Cell y Almacenamiento de Fluidos**: Almacena líquidos (Agua, Lava, Leche, Miel, Nieve en polvo) con capacidad cuántica (por defecto 64,000 mB / 64 cubos). Los niveles se agregan al almacén de fluidos de la red.
 * **Greedy Cell**: búfer inteligente que reclama su ítem filtrado desde la red y lo alimenta a contenedores adyacentes (ideal para líneas continuas).
+* **Terminal de Red**: GUI rediseñada con un 3.er botón conmutador (ranura 35) para visualizar fluidos. Permite depositar cubos/botellas o retirar líquidos usando recipientes vacíos (Cubo para Agua/Lava/Leche/Nieve; Botella para Miel).
 * El almacenamiento de la red es el agregado de todas las celdas conectadas.
 * Persistencia atómica por chunk (region data de Paper), anti‑dupe en todos los flujos.
 
@@ -35,18 +37,21 @@
 * **Importador (Grabber)**: extrae de contenedores adyacentes hacia la red, con filtro whitelist.
 * **Exportador (Pusher)**: inserta desde la red hacia contenedores adyacentes, con filtro.
 * **Variantes HT (High‑Throughput)**: versiones rápidas x8 (configurable) para factorías masivas.
+* **Liquid Pump (Bomba de líquidos)**: Bloque de cristal tintado azul oscuro que extrae bloques fuente de líquido (estrictamente Agua y Lava) del bloque directamente inferior (`BlockFace.DOWN`) hacia el almacén de fluidos de la red.
 * **Aspirador (Vacuum)**: recoge ítems del suelo en radio configurable, ahora con filtro whitelist opcional.
 
 ### 🛠️ Autocrafteo
 * **Auto‑Crafteador**: acepta **Blueprints** (matriz 3×3 real) y recetas por resultado (modo antiguo). Cada blueprint se intenta una vez por ciclo con **extracción atómica**: o hay ingredientes para todo o no se toca nada.
+* **Request Terminal**: Consola de crafteo masivo bajo demanda conectada a los autocrafteadores de la red. Clic izquierdo craftea 1x, clic derecho 64x, y shift+clic derecho abre prompt de chat para definir cantidad numérica exacta con validación estricta.
 * **Recipe Encoder**: monta la receta en una matriz 3×3 de plantillas persistente (clic para fijar huecos, sin gastar ítems) y codifica un Blueprint en blanco con un clic.
+* **Slimefun Recipe Encoder**: Codificador exclusivo para recetas de Slimefun (configurable mediante `sf-encoder.enabled`).
+* **Network Quota Limiter**: Regula la cantidad máxima permitida en el almacén de la red para un ítem determinado.
 * **Blueprints**: planos reutilizables que llevan la receta completa (matriz + resultado) en su PDC; se instalan en un Auto‑Crafteador con un click y no se consumen.
 * **Crafting Grid**: crafteo manual tirando de la red: la matriz de plantillas se guarda en el bloque, y cada craft retira ingredientes de la red de forma transaccional.
 
 ### 🧰 Herramientas (traídas de NetworksV6)
 * **Configuration Wrench**: shift+clic sobre un dispositivo con filtro **copia** su configuración; clic normal la **pega** en otro.
 * **Network Rake**: retira nodos al instante (250 usos por defecto, `rake.uses`); no toca controladores ni celdas cargadas.
-* **Network Crayon**: marca el controlador y la red enseña partículas cuando sus máquinas trabajan.
 * Filtros con **modo whitelist/blacklist** en cualquier dispositivo con filtro (grabbers, pushers, vacuum, purgador, greedy cell, receptor).
 
 ### 🛡️ Fiabilidad
@@ -82,7 +87,6 @@ Cada dispositivo se fabrica en una mesa de crafteo 3×3 estándar. `·` marca el
 | Blueprint ×4 | <pre>P P P<br/>P B P<br/>P P P</pre> | P = Papel · B = Tinte azul |
 | Configuration Wrench | <pre>I · I<br/>· C ·<br/>· I ·</pre> | I = Lingote de hierro · C = Comparador |
 | Network Rake | <pre>D · D<br/>· S ·<br/>· S ·</pre> | D = Dead bush · S = Palo |
-| Network Crayon | <pre>C<br/>S</pre> | C = Tinte cian · S = Palo |
 | Network Purger | <pre>I L I<br/>L H L<br/>I L I</pre> | I = Lingote de hierro · L = Bloque de magma · H = Embudo |
 | Network Probe | <pre>· A ·<br/>A S A<br/>· A ·</pre> | A = Fragmento de amatista · S = Catalejo |
 | Quantum Workbench | <pre>D D D<br/>D C D<br/>D D D</pre> | D = Diamante · C = Mesa de crafteo |
@@ -93,12 +97,18 @@ Cada dispositivo se fabrica en una mesa de crafteo 3×3 estándar. `·` marca el
 | L3 CPU Cache | <pre>D A D<br/>A P A<br/>D A D</pre> | D = Diamante · A = Amatista · P = L2 CPU Cache |
 | DRAM Module | <pre>N E N<br/>E P E<br/>N E N</pre> | N = Lingote de netherita · E = Ojo de ender · P = L3 CPU Cache |
 | Quantum Cache Matrix | <pre>N S N<br/>S P S<br/>N S N</pre> | N = Bloque de netherita · S = Estrella del nether · P = DRAM Module |
+| Slimefun Recipe Encoder | <pre>E P E<br/>P B P<br/>E P E</pre> | E = Perla de ender · P = Papel · B = Mesa de encantamientos |
+| Network Quota Limiter | <pre>R C R<br/>C T C<br/>R C R</pre> | R = Redstone · C = Comparador · T = Diana |
+| Quantum Fluid Cell | <pre>G B G<br/>G L G<br/>G G G</pre> | G = Cristal · B = Cubo · L = Bloque de lapislázuli |
+| Liquid Pump | <pre>· G ·<br/>P B P<br/>· R ·</pre> | G = Cristal azul oscuro · P = Pistón · B = Cubo · R = Redstone |
+| Request Terminal | <pre>G L G<br/>R C R<br/>G G G</pre> | G = Cristal · L = Atril · C = Mesa de crafteo · R = Redstone |
 
 
 ## ⌨️ Comandos
 
 | Comando | Descripción | Permiso |
 |---|---|---|
+| `/mvnets guide` | Entrega un libro guía interactivo con todas las mecánicas de red | `multiversenets.use` |
 | `/mvnets devices` | Lista los IDs de dispositivos | `multiversenets.use` |
 | `/mvnets give <id> [n]` | Da un dispositivo | `multiversenets.admin` |
 | `/mvnets doctor` | Reescanea y diagnostica redes | `multiversenets.admin` |
@@ -106,8 +116,6 @@ Cada dispositivo se fabrica en una mesa de crafteo 3×3 estándar. `·` marca el
 | `/mvnets inspect` | Inspecciona el bloque mirado (tipo, red, contenido, filtro) | `multiversenets.admin` |
 | `/mvnets repair` | Fuerza el reescaneo de la red del bloque mirado | `multiversenets.admin` |
 | `/mvnets reload` | Recarga la configuración | `multiversenets.admin` |
-
-Alias: `/mvn`
 
 ## 📜 Licencia
 

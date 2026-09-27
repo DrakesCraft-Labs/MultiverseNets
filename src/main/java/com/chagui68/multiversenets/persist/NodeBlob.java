@@ -28,6 +28,8 @@ public class NodeBlob implements Serializable {
     public ItemStack cellSample;
     /** EN: Total quantity stored in cell / ES: Cantidad total almacenada en la celda. */
     public long cellAmount;
+    /** EN: Last synced physical container output buffer count / ES: Último conteo sincronizado del búfer de salida físico. */
+    public transient int lastSyncedOutAmount = -1;
     /** EN: Material names/IDs for filtering / ES: Nombres/IDs de materiales para filtro. */
     public List<String> filterMaterials = new ArrayList<>();
     /** EN: Item templates for exact meta/custom filtering / ES: Plantillas de ítems para filtro exacto. */
@@ -64,6 +66,20 @@ public class NodeBlob implements Serializable {
     public List<Long> virtualAmounts = new ArrayList<>();
     /** EN: Transit buffer holding items during backpressure / ES: Búfer de tránsito ante contrapresión. */
     public ItemStack transitBuffer;
+    /** EN: Target item sample for stock quota limit / ES: Muestra de ítem objetivo para el delimitador de cuota. */
+    public ItemStack quotaSample;
+    /** EN: Maximum stock quota allowed in the network / ES: Cuota máxima de stock permitida en la red. */
+    public long quotaLimit;
+    /** EN: Whether quota limiter is actively enforced / ES: Si el delimitador de cuota está activo. */
+    public boolean quotaActive = true;
+    /** EN: Fluid type name stored in fluid cell (e.g. WATER, LAVA, MILK, HONEY) / ES: Tipo de fluido en la celda. */
+    public String fluidType;
+    /** EN: Quantity of fluid stored in millibuckets (mB) / ES: Cantidad de fluido almacenada en mB. */
+    public long fluidAmount;
+    /** EN: Liquid pump mode (DRAIN or FILL) / ES: Modo de bomba de líquidos (DRAIN o FILL). */
+    public String pumpMode;
+    /** EN: Liquid pump fluid filter (e.g. WATER, LAVA, etc. or null for ANY) / ES: Filtro de fluido para bomba. */
+    public String pumpFluid;
 
     /**
      * EN: Returns the combined sum of all items stored in the Greedy Cell.

@@ -60,6 +60,8 @@ public enum DeviceType {
 
     /** Filtered item void/purger / Purgador y destructor de ítems filtrados */
     MVN_PURGER(Material.MAGMA_BLOCK, "Network Purger", true, -1),
+    /** Stock quota limiter / Delimitador de cuota de almacenamiento */
+    MVN_LIMITER(Material.TARGET, "Network Quota Limiter", true, -1),
 
     /** Diagnostic probe tool / Sonda de diagnóstico de red */
     MVN_PROBE(Material.SPYGLASS, "Network Probe", false, -1),
@@ -67,6 +69,8 @@ public enum DeviceType {
     MVN_CRAFTER(Material.CRAFTING_TABLE, "Auto-Crafter", true, -1),
     /** Recipe blueprint encoder / Codificador de planos de recetas */
     MVN_ENCODER(Material.SMITHING_TABLE, "Recipe Encoder", true, -1),
+    /** Slimefun recipe blueprint encoder / Codificador de planos de recetas de Slimefun */
+    MVN_SF_ENCODER(Material.ENCHANTING_TABLE, "Slimefun Recipe Encoder", true, -1),
     /** Interactive network crafting grid / Mesa de crafteo integrada con la red */
     MVN_CRAFTING_GRID(Material.CARTOGRAPHY_TABLE, "Network Crafting Grid", true, -1),
     /** Item disassembly and duplication workbench / Mesa de desensamblaje cuántico */
@@ -84,8 +88,12 @@ public enum DeviceType {
     MVN_CONFIGURATOR(Material.COMPARATOR, "Configuration Wrench", false, -1),
     /** Instant network pickup tool / Rastrillo de recolección instantánea de red */
     MVN_RAKE(Material.DEAD_BUSH, "Network Rake", false, -1),
-    /** Visual network coloring crayon / Crayón de coloreado visual de red */
-    MVN_CRAYON(Material.CYAN_DYE, "Network Crayon", false, -1);
+    /** Quantum fluid storage cell / Celda cuántica de almacenamiento de fluidos */
+    MVN_FLUID_CELL(Material.PRISMARINE_BRICKS, "Quantum Fluid Cell", true, -1),
+    /** Fluid pump node (drain liquids below) / Bomba de fluidos (drenar líquidos debajo) */
+    MVN_LIQUID_PUMP(Material.BLUE_STAINED_GLASS, "Liquid Pump", true, -1),
+    /** Crafting job requester and ordering terminal / Terminal de solicitud de crafteos */
+    MVN_REQUEST_TERMINAL(Material.LECTERN, "Request Terminal", true, -1);
 
     private final Material material;
     private final String display;
@@ -132,6 +140,27 @@ public enum DeviceType {
      */
     public boolean isBarrel() {
         return this == MVN_INFINITY_BARREL;
+    }
+
+    /**
+     * @return true if device is a fluid storage cell / true si es celda de fluidos
+     */
+    public boolean isFluidCell() {
+        return this == MVN_FLUID_CELL;
+    }
+
+    /**
+     * @return true if device is a liquid pump / true si es bomba de líquidos
+     */
+    public boolean isLiquidPump() {
+        return this == MVN_LIQUID_PUMP;
+    }
+
+    /**
+     * @return true if device is a crafting request terminal / true si es terminal de solicitud
+     */
+    public boolean isRequestTerminal() {
+        return this == MVN_REQUEST_TERMINAL;
     }
 
     /**

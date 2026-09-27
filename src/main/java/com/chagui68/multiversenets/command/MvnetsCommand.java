@@ -28,7 +28,7 @@ import java.util.Locale;
 public class MvnetsCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS =
-            List.of("help", "info", "reload", "give", "devices", "doctor", "stats", "inspect", "repair", "recipes");
+            List.of("help", "guide", "info", "reload", "give", "devices", "doctor", "stats", "inspect", "repair", "recipes");
 
     private final MultiverseNets plugin;
 
@@ -47,6 +47,7 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
         }
         switch (args[0].toLowerCase(Locale.ROOT)) {
             case "help" -> sendHelp(sender);
+            case "guide" -> guide(sender);
             case "info" -> sendInfo(sender);
             case "reload" -> reload(sender);
             case "give" -> give(sender, args);
@@ -71,6 +72,8 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage(Component.text("=== MultiverseNets ===", NamedTextColor.AQUA));
+        sender.sendMessage(Component.text("/mvnets guide", NamedTextColor.YELLOW)
+                .append(Component.text(" - Receive the official MultiverseNets Guide Book.", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/mvnets devices", NamedTextColor.YELLOW)
                 .append(Component.text(" - List of devices.", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/mvnets give <id> [n]", NamedTextColor.YELLOW)
@@ -87,6 +90,72 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
                 .append(Component.text(" - Reload configuration and crafting recipes.", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/mvnets recipes", NamedTextColor.YELLOW)
                 .append(Component.text(" - Synchronize and inspect all crafting recipes.", NamedTextColor.GRAY)));
+    }
+
+    private void guide(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Text.msg("Only players can receive the guide book.", NamedTextColor.RED));
+            return;
+        }
+
+        ItemStack book = new ItemStack(org.bukkit.Material.WRITTEN_BOOK);
+        org.bukkit.inventory.meta.BookMeta meta = (org.bukkit.inventory.meta.BookMeta) book.getItemMeta();
+        if (meta != null) {
+            meta.setTitle("MultiverseNets Guide");
+            meta.setAuthor("Chagui68");
+
+            // Page 1: Welcome & Overview
+            meta.addPage("§1§lMultiverseNets§r\n"
+                    + "§8Digital Logistics & Massive Storage§r\n\n"
+                    + "Welcome to MultiverseNets!\n\n"
+                    + "This plugin delivers high-performance digital item and fluid networking, deep quantum storage, and recipe automation — running natively on Paper with zero dependencies.");
+
+            // Page 2: Core Components
+            meta.addPage("§1§lCore Components§r\n\n"
+                    + "§9Controller:§0 Central brain of the network. Needs power/cables and accepts CPU Cache modules.\n\n"
+                    + "§9Cables:§0 Connects all network devices.\n\n"
+                    + "§9Terminal:§0 Central console to search, store, and withdraw items and liquids.");
+
+            // Page 3: Item Storage
+            meta.addPage("§1§lItem Storage§r\n\n"
+                    + "§9Quantum Cells (T1-T6):§0 Stores a single item type from 65K up to millions.\n\n"
+                    + "§9Infinity Barrel:§0 Infinite storage for a single item type.\n\n"
+                    + "§9Greedy Cell:§0 Continuously pulls target items from the net into its fast local buffer.");
+
+            // Page 4: Logistics & Movement
+            meta.addPage("§1§lLogistics & Flow§r\n\n"
+                    + "§9Grabbers:§0 Pulls items from adjacent inventories into the net.\n\n"
+                    + "§9Pushers:§0 Exports network items into target chests.\n\n"
+                    + "§9Vacuum:§0 Absorbs dropped items on the ground.\n\n"
+                    + "§9Quota Limiter:§0 Limits maximum network stock for items.");
+
+            // Page 5: Fluids System
+            meta.addPage("§1§lFluids System§r\n\n"
+                    + "§9Quantum Fluid Cell:§0 Digital tank storing up to 64,000+ mB of Water, Lava, Milk, Honey, or Powder Snow.\n\n"
+                    + "§9Liquid Pump:§0 Placed above Water or Lava to pump liquid sources directly from the block underneath into the net.\n\n"
+                    + "§9Terminal (3rd Button):§0 Withdraw network fluids using Buckets or Bottles!");
+
+            // Page 6: Crafting & Automation
+            meta.addPage("§1§lCrafting & Jobs§r\n\n"
+                    + "§9Auto-Crafter:§0 Automates crafting recipes installed on Blueprints.\n\n"
+                    + "§9Recipe Encoders:§0 Writes vanilla or Slimefun recipes onto Blueprints.\n\n"
+                    + "§9Request Terminal:§0 Order custom crafting quantities on-demand via chat or buttons directly from network crafters!");
+
+            // Page 7: Tools & Tips
+            meta.addPage("§1§lTools & Quick Tips§r\n\n"
+                    + "§9Network Probe:§0 Right-click nodes to view throughput, connections, and diagnostic logs.\n\n"
+                    + "§9Rake:§0 Instantly dismantles network nodes without damage.\n\n"
+                    + "§9Shift + Right Click:§0 Directly access containers through nodes.");
+
+            book.setItemMeta(meta);
+        }
+
+        var leftovers = player.getInventory().addItem(book);
+        for (ItemStack rem : leftovers.values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), rem);
+        }
+        player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_BOOK_PAGE_TURN, 1f, 1f);
+        player.sendMessage(Text.msg("You received the MultiverseNets Guide Book!", NamedTextColor.GREEN));
     }
 
     private void sendInfo(CommandSender sender) {

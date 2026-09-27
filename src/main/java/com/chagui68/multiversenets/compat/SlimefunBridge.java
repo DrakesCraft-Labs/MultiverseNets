@@ -1,11 +1,23 @@
 package com.chagui68.multiversenets.compat;
 
+import com.chagui68.multiversenets.item.DeviceType;
+import com.chagui68.multiversenets.item.Items;
+import com.chagui68.multiversenets.persist.NodeBlob;
+import com.chagui68.multiversenets.util.StackUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -35,7 +47,7 @@ import java.util.logging.Logger;
  * Las máquinas de Slimefun guardan su inventario en un {@code BlockMenu} separado. Este puente permite
  * transferir ítems respetando los slots de entrada/salida de cada máquina.
  *
- * Por reflexión: Mantiene el plugin autónomo (standalone). Si Slimefun no está instalado, queda inactivo.
+ * Por reflexión: Mantiene el plugin autónomo (standalone). Si Slimefun no está instalado, queda inerte.
  */
 public final class SlimefunBridge {
 
@@ -58,6 +70,7 @@ public final class SlimefunBridge {
     private static Method mCheckId;
     private static Method mGetPreset;
     private static Method mSlotsForTransport;
+    private static Method mSlotsForTransportSimple;
     private static Method mGetItemInSlot;
     private static Method mPushItem;
     private static Method mReplaceExistingItem;
@@ -68,12 +81,27 @@ public final class SlimefunBridge {
     private static Method mCheckItem;
     private static final int BARREL_DISPLAY_SLOT = 31;
 
+    // Advanced BlockMenu reflection hooks for Quantum Cell coexistence
+    private static Method mGetStorage;
+    private static Method mClearBlockInfo;
+    private static Field fInventories;
+    private static Class<?> cBlockMenu;
+    private static Class<?> cBlockMenuPreset;
+    private static Constructor<?> ctorBlockMenu;
+    private static Object cellPreset;
+    private static int[] cellPresetWithdrawSlots;
+    private static int[] cellPresetInsertSlots;
+
+    public record SlimefunRecipeDetails(ItemStack[] inputs, ItemStack output, String sfId, String recipeType) {}
+    private static final List<SlimefunRecipeDetails> SF_RECIPES = new ArrayList<>();
+    private static boolean recipesLoaded = false;
+
     private SlimefunBridge() {
     }
 
     /**
      * EN: Initializes the Slimefun reflection hooks. If Slimefun is missing, it stays dormant.
- *
+     *
      * ES: Inicializa los enlaces por reflexión con Slimefun. Si Slimefun no está instalado, queda inerte.
      *
      * @param log Logger instance for diagnostic notices / ES: Instancia del logger para mensajes.
@@ -90,6 +118,8 @@ public final class SlimefunBridge {
         for (String root : API_ROOTS) {
             if (tryHook(root)) {
                 available = true;
+                setupCellPreset();
+                loadSlimefunRecipes();
                 log.info("[Compat] Slimefun detected (" + root + "). Grabbers, pushers, and crafters can use machines.");
                 return;
             }
@@ -109,9 +139,28 @@ public final class SlimefunBridge {
             mGetPreset = dirtyMenu.getMethod("getPreset");
             mSlotsForTransport = preset.getMethod(
                     "getSlotsAccessedByItemTransport", dirtyMenu, flow, ItemStack.class);
+            try {
+                mSlotsForTransportSimple = preset.getMethod("getSlotsAccessedByItemTransport", flow);
+            } catch (NoSuchMethodException ignored) {}
             mGetItemInSlot = dirtyMenu.getMethod("getItemInSlot", int.class);
             mPushItem = dirtyMenu.getMethod("pushItem", ItemStack.class, int[].class);
             mReplaceExistingItem = dirtyMenu.getMethod("replaceExistingItem", int.class, ItemStack.class);
+
+            try {
+                mGetStorage = blockStorage.getMethod("getStorage", org.bukkit.World.class);
+            } catch (NoSuchMethodException ignored) {}
+            try {
+                mClearBlockInfo = blockStorage.getMethod("clearBlockInfo", org.bukkit.Location.class);
+            } catch (NoSuchMethodException ignored) {}
+            try {
+                fInventories = blockStorage.getDeclaredField("inventories");
+                fInventories.setAccessible(true);
+            } catch (Exception ignored) {}
+            try {
+                cBlockMenu = Class.forName(root + ".inventory.BlockMenu");
+                cBlockMenuPreset = Class.forName(root + ".inventory.BlockMenuPreset");
+                ctorBlockMenu = cBlockMenu.getConstructor(cBlockMenuPreset, org.bukkit.Location.class);
+            } catch (Exception ignored) {}
 
             Object[] values = flow.getEnumConstants();
             for (Object val : values) {
@@ -256,6 +305,18 @@ public final class SlimefunBridge {
      * @param stack The items to insert / ES: Ítems a insertar.
      * @return Number of items that did not fit (0 if all inserted) / ES: Cantidad que no cupo (0 si entró todo).
      */
+    /**
+     * EN: Returns true if the block is a Slimefun Networks bridge or cable.
+     * ES: Devuelve true si el bloque es un puente o cable del addon Networks de Slimefun.
+     */
+    public static boolean isNetworkCable(Block block) {
+        if (!available || block == null) return false;
+        String id = getId(block);
+        if (id == null) return false;
+        String upper = id.toUpperCase(java.util.Locale.ROOT);
+        return upper.contains("BRIDGE") || upper.contains("CABLE") || upper.equals("NTW_BRIDGE");
+    }
+
     /**
      * EN: Returns true if the block is a Slimefun Barrel or storage unit.
      * ES: Devuelve true si el bloque es un barril de Slimefun o unidad de almacenamiento.
@@ -449,6 +510,379 @@ public final class SlimefunBridge {
         } catch (ReflectiveOperationException | RuntimeException error) {
             logError(block, error);
             return stack.getAmount();
+        }
+    }
+
+    /**
+     * EN: Opens the Slimefun machine GUI for a player if the block is an active Slimefun machine.
+     * ES: Abre la GUI de la máquina de Slimefun para un jugador si el bloque es una máquina activa.
+     *
+     * @param block Target Slimefun machine block / Bloque de la máquina de Slimefun.
+     * @param player Target player / Jugador objetivo.
+     * @return true if successfully opened, false otherwise / true si se abrió con éxito, false en caso contrario.
+     */
+    public static boolean openSlimefunMenu(Block block, org.bukkit.entity.Player player) {
+        if (!available || block == null || player == null) return false;
+        try {
+            Object menu = menuOf(block);
+            if (menu == null) return false;
+
+            // Check permission / canOpen if available
+            try {
+                Method mCanOpen = menu.getClass().getMethod("canOpen", Block.class, org.bukkit.entity.Player.class);
+                Object allowed = mCanOpen.invoke(menu, block, player);
+                if (allowed instanceof Boolean b && !b) {
+                    return false;
+                }
+            } catch (NoSuchMethodException ignored) {}
+
+            try {
+                Method mOpen = menu.getClass().getMethod("open", org.bukkit.entity.Player[].class);
+                mOpen.invoke(menu, (Object) new org.bukkit.entity.Player[]{player});
+                return true;
+            } catch (NoSuchMethodException e) {
+                Method mOpen = menu.getClass().getMethod("open", org.bukkit.entity.Player.class);
+                mOpen.invoke(menu, player);
+                return true;
+            }
+        } catch (ReflectiveOperationException | RuntimeException error) {
+            return false;
+        }
+    }
+
+    // ----------------------------------------------------------------
+    // Slimefun Recipe Discovery & Auto-Crafting Support
+    // ----------------------------------------------------------------
+
+    private static void setupCellPreset() {
+        try {
+            Class<?> sfClass = null;
+            for (String prefix : new String[]{"com.github.drakescraft_labs.slimefun4", "io.github.thebusybiscuit.slimefun4"}) {
+                try {
+                    sfClass = Class.forName(prefix + ".implementation.Slimefun");
+                    break;
+                } catch (ClassNotFoundException ignored) {}
+            }
+            if (sfClass == null) return;
+            Method mRegistry = sfClass.getMethod("getRegistry");
+            Object registry = mRegistry.invoke(null);
+            Method mPresets = registry.getClass().getMethod("getMenuPresets");
+            Object mapObj = mPresets.invoke(registry);
+            if (mapObj instanceof Map<?, ?> map) {
+                for (Object p : map.values()) {
+                    if (p == null) continue;
+                    try {
+                        int[] withdraw = getPresetSlots(p, flowWithdraw);
+                        int[] insert = getPresetSlots(p, flowInsert);
+                        if (withdraw != null && withdraw.length > 0 && insert != null && insert.length > 0) {
+                            cellPreset = p;
+                            cellPresetWithdrawSlots = withdraw;
+                            cellPresetInsertSlots = insert;
+                            break;
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static int[] getPresetSlots(Object preset, Object flow) {
+        if (preset == null || flow == null) return new int[0];
+        try {
+            if (mSlotsForTransportSimple != null) {
+                Object res = mSlotsForTransportSimple.invoke(preset, flow);
+                if (res instanceof int[] arr && arr.length > 0) return arr;
+            }
+        } catch (Exception ignored) {}
+        try {
+            if (mSlotsForTransport != null) {
+                Object res = mSlotsForTransport.invoke(preset, null, flow, null);
+                if (res instanceof int[] arr && arr.length > 0) return arr;
+            }
+        } catch (Exception ignored) {}
+        return new int[0];
+    }
+
+    /**
+     * EN: Caches all 3x3 recipes from enabled Slimefun items in the registry.
+     * ES: Cachea todas las recetas 3x3 de ítems habilitados de Slimefun en el registro.
+     */
+    public static synchronized void loadSlimefunRecipes() {
+        if (!available) return;
+        SF_RECIPES.clear();
+        try {
+            Class<?> sfClass = null;
+            for (String prefix : new String[]{"com.github.drakescraft_labs.slimefun4", "io.github.thebusybiscuit.slimefun4"}) {
+                try {
+                    sfClass = Class.forName(prefix + ".implementation.Slimefun");
+                    break;
+                } catch (ClassNotFoundException ignored) {}
+            }
+            if (sfClass == null) return;
+
+            Method mGetRegistry = sfClass.getMethod("getRegistry");
+            Object registry = mGetRegistry.invoke(null);
+            Method mGetEnabled = registry.getClass().getMethod("getEnabledSlimefunItems");
+            Object itemsObj = mGetEnabled.invoke(registry);
+
+            if (itemsObj instanceof Iterable<?> iterable) {
+                for (Object item : iterable) {
+                    if (item == null) continue;
+                    Class<?> itemClass = item.getClass();
+
+                    Method mGetId = itemClass.getMethod("getId");
+                    String id = (String) mGetId.invoke(item);
+                    if (id == null || id.toUpperCase(Locale.ROOT).contains("BACKPACK")) {
+                        continue;
+                    }
+
+                    Method mGetRecipe = itemClass.getMethod("getRecipe");
+                    ItemStack[] recipe = (ItemStack[]) mGetRecipe.invoke(item);
+                    if (recipe == null || recipe.length != 9) {
+                        continue;
+                    }
+
+                    Method mGetRecipeOutput = itemClass.getMethod("getRecipeOutput");
+                    ItemStack output = (ItemStack) mGetRecipeOutput.invoke(item);
+                    if (output == null || output.getType().isAir()) {
+                        continue;
+                    }
+
+                    String typeName = "Slimefun Recipe";
+                    try {
+                        Method mGetRecipeType = itemClass.getMethod("getRecipeType");
+                        Object recipeType = mGetRecipeType.invoke(item);
+                        if (recipeType != null) {
+                            try {
+                                Method mToItem = recipeType.getClass().getMethod("toItem");
+                                ItemStack rtItem = (ItemStack) mToItem.invoke(recipeType);
+                                if (rtItem != null && rtItem.hasItemMeta() && rtItem.getItemMeta().hasDisplayName()) {
+                                    typeName = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                                            .serialize(rtItem.getItemMeta().displayName());
+                                }
+                            } catch (Exception ignored) {
+                                typeName = recipeType.toString();
+                            }
+                        }
+                    } catch (Exception ignored) {}
+
+                    ItemStack[] inputs = new ItemStack[9];
+                    for (int i = 0; i < 9; i++) {
+                        inputs[i] = recipe[i] != null ? recipe[i].clone() : null;
+                    }
+                    SF_RECIPES.add(new SlimefunRecipeDetails(inputs, output.clone(), id, typeName));
+                }
+            }
+            recipesLoaded = true;
+        } catch (Throwable t) {
+            Logger.getLogger("MultiverseNets").log(Level.WARNING, "Failed to load Slimefun recipes", t);
+        }
+    }
+
+    /**
+     * EN: Returns unmodifiable list of all discovered Slimefun 3x3 recipes.
+     * ES: Devuelve lista inmodificable de todas las recetas 3x3 de Slimefun.
+     */
+    public static List<SlimefunRecipeDetails> getSlimefunRecipes() {
+        if (!recipesLoaded && available) loadSlimefunRecipes();
+        return Collections.unmodifiableList(SF_RECIPES);
+    }
+
+    /**
+     * EN: Matches a 3x3 matrix against cached Slimefun recipes, returning recipe details if found.
+     * ES: Compara una matriz 3x3 con las recetas de Slimefun, devolviendo los detalles si coincide.
+     */
+    public static SlimefunRecipeDetails findSlimefunRecipeDetails(ItemStack[] matrix) {
+        if (!available || matrix == null || matrix.length != 9) return null;
+        if (!recipesLoaded) loadSlimefunRecipes();
+        for (SlimefunRecipeDetails details : SF_RECIPES) {
+            if (matchesSlimefunMatrix(matrix, details.inputs())) {
+                return details;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * EN: Resolves the crafted output ItemStack for a 3x3 Slimefun recipe pattern.
+     * ES: Resuelve el ItemStack de salida para un patrón de receta 3x3 de Slimefun.
+     */
+    public static ItemStack findSlimefunRecipe(ItemStack[] matrix) {
+        SlimefunRecipeDetails details = findSlimefunRecipeDetails(matrix);
+        return details != null ? details.output().clone() : null;
+    }
+
+    private static boolean matchesSlimefunMatrix(ItemStack[] a, ItemStack[] b) {
+        if (a == null || b == null || a.length != 9 || b.length != 9) return false;
+        for (int i = 0; i < 9; i++) {
+            if (!StackUtils.itemsMatch(a[i], b[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // ----------------------------------------------------------------
+    // Quantum Cell Coexistence with Slimefun Grabbers & Pushers
+    // ----------------------------------------------------------------
+
+    /**
+     * EN: Synchronizes a Quantum Cell with both the physical container tile entity and Slimefun's BlockMenu.
+     * Allows Slimefun NetworkGrabbers and NetworkPushers to seamlessly extract from and deposit into Quantum Cells.
+     *
+     * ES: Sincroniza una Celda Cuántica con el inventario físico del contenedor y el BlockMenu de Slimefun.
+     * Permite que los Grabbers y Pushers de Slimefun extraigan y depositen ítems sin problemas en Celdas Cuánticas.
+     */
+    public static void syncCell(Block block, NodeBlob blob) {
+        if (block == null || blob == null) return;
+        DeviceType type = DeviceType.parse(blob.typeName);
+        if (type == null || !type.isCell()) return;
+
+        // 1. Sync physical tile entity (Dispenser container)
+        // Works for NetworkVanillaGrabber, NetworkVanillaPusher, Cargo Nodes, Hoppers, etc.
+        if (block.getState() instanceof org.bukkit.block.Container container) {
+            Inventory inv = container.getInventory();
+            long cap = Items.capacityOf(type);
+
+            // Read any incoming items from slots 1..8
+            for (int i = 1; i < inv.getSize(); i++) {
+                ItemStack in = inv.getItem(i);
+                if (in != null && !in.getType().isAir()) {
+                    if (blob.cellSample == null) {
+                        blob.cellSample = StackUtils.getAsQuantity(in, 1);
+                    }
+                    if (StackUtils.itemsMatch(in, blob.cellSample)) {
+                        long space = cap - blob.cellAmount;
+                        if (space > 0) {
+                            int take = (int) Math.min(space, in.getAmount());
+                            blob.cellAmount += take;
+                            in.setAmount(in.getAmount() - take);
+                            inv.setItem(i, in.getAmount() > 0 ? in : null);
+                        }
+                    }
+                }
+            }
+
+            // Slot 0 is the withdrawal buffer
+            ItemStack currentOut = inv.getItem(0);
+            int lastExpected = blob.lastSyncedOutAmount;
+            if (lastExpected > 0) {
+                if (currentOut == null || currentOut.getType().isAir()) {
+                    // Entire buffer was extracted
+                    blob.cellAmount = Math.max(0, blob.cellAmount - lastExpected);
+                } else if (StackUtils.itemsMatch(currentOut, blob.cellSample)) {
+                    if (currentOut.getAmount() < lastExpected) {
+                        int extracted = lastExpected - currentOut.getAmount();
+                        blob.cellAmount = Math.max(0, blob.cellAmount - extracted);
+                    } else if (currentOut.getAmount() > lastExpected) {
+                        int deposited = currentOut.getAmount() - lastExpected;
+                        blob.cellAmount += deposited;
+                    }
+                }
+            }
+
+            // Replenish slot 0 buffer
+            if (blob.cellSample != null && blob.cellAmount > 0) {
+                int maxStack = blob.cellSample.getMaxStackSize();
+                int fill = (int) Math.min(blob.cellAmount, maxStack);
+                ItemStack out = StackUtils.getAsQuantity(blob.cellSample, fill);
+                inv.setItem(0, out);
+                blob.lastSyncedOutAmount = fill;
+            } else {
+                inv.setItem(0, null);
+                blob.lastSyncedOutAmount = 0;
+            }
+        }
+
+        // 2. Sync Slimefun BlockMenu (for Slimefun's NetworkGrabber and NetworkPusher)
+        if (available && cellPreset != null) {
+            syncSlimefunBlockMenu(block, blob, type);
+        }
+    }
+
+    private static void syncSlimefunBlockMenu(Block block, NodeBlob blob, DeviceType type) {
+        try {
+            if (mGetStorage == null || fInventories == null || ctorBlockMenu == null) return;
+            Object storage = mGetStorage.invoke(null, block.getWorld());
+            if (storage == null) return;
+            @SuppressWarnings("unchecked")
+            Map<org.bukkit.Location, Object> invs = (Map<org.bukkit.Location, Object>) fInventories.get(storage);
+            if (invs == null) return;
+
+            Object menu = invs.get(block.getLocation());
+            if (menu == null) {
+                menu = ctorBlockMenu.newInstance(cellPreset, block.getLocation());
+                invs.put(block.getLocation(), menu);
+            }
+
+            long cap = Items.capacityOf(type);
+
+            // Read items pushed into Slimefun insert slots
+            if (cellPresetInsertSlots != null) {
+                for (int slot : cellPresetInsertSlots) {
+                    Object raw = mGetItemInSlot.invoke(menu, slot);
+                    if (raw instanceof ItemStack in && !in.getType().isAir()) {
+                        if (blob.cellSample == null) {
+                            blob.cellSample = StackUtils.getAsQuantity(in, 1);
+                        }
+                        if (StackUtils.itemsMatch(in, blob.cellSample)) {
+                            long space = cap - blob.cellAmount;
+                            if (space > 0) {
+                                int take = (int) Math.min(space, in.getAmount());
+                                blob.cellAmount += take;
+                                in.setAmount(in.getAmount() - take);
+                                mReplaceExistingItem.invoke(menu, slot, in.getAmount() > 0 ? in : null);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Sync Slimefun withdrawal slot (use first withdraw slot)
+            if (cellPresetWithdrawSlots != null && cellPresetWithdrawSlots.length > 0) {
+                int outSlot = cellPresetWithdrawSlots[0];
+                Object raw = mGetItemInSlot.invoke(menu, outSlot);
+                ItemStack current = raw instanceof ItemStack s && !s.getType().isAir() ? s : null;
+
+                if (current != null && StackUtils.itemsMatch(current, blob.cellSample)) {
+                    int present = current.getAmount();
+                    int maxStack = blob.cellSample.getMaxStackSize();
+                    int target = (int) Math.min(blob.cellAmount, maxStack);
+                    if (present < target) {
+                        current.setAmount(target);
+                        mReplaceExistingItem.invoke(menu, outSlot, current);
+                    }
+                } else if (current == null && blob.cellSample != null && blob.cellAmount > 0) {
+                    int maxStack = blob.cellSample.getMaxStackSize();
+                    int target = (int) Math.min(blob.cellAmount, maxStack);
+                    ItemStack out = StackUtils.getAsQuantity(blob.cellSample, target);
+                    mReplaceExistingItem.invoke(menu, outSlot, out);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /**
+     * EN: Cleans up registered BlockMenu and block info when a Quantum Cell is broken.
+     * ES: Limpia el BlockMenu y la información de bloque registrados al romper una Celda Cuántica.
+     */
+    public static void unregisterCell(Block block) {
+        if (!available || block == null) return;
+        try {
+            if (mGetStorage != null && fInventories != null) {
+                Object storage = mGetStorage.invoke(null, block.getWorld());
+                if (storage != null) {
+                    Map<?, ?> invs = (Map<?, ?>) fInventories.get(storage);
+                    if (invs != null) {
+                        invs.remove(block.getLocation());
+                    }
+                }
+            }
+            if (mClearBlockInfo != null) {
+                mClearBlockInfo.invoke(null, block.getLocation());
+            }
+        } catch (Throwable ignored) {
         }
     }
 

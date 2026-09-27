@@ -50,6 +50,9 @@ public class NetworkTicker {
     private final NetworkManager manager;
     private BukkitTask task;
 
+    // Adaptive backoff: counts consecutive empty/idle cycles per node to skip redundant container lookups
+    private final java.util.Map<Long, Integer> backoffCycles = new java.util.concurrent.ConcurrentHashMap<>();
+
     // Cada familia cuenta sus ticks restantes; al llegar a 0 se ejecuta y se rearma.
     private int scanIn;
     private int transferIn;
@@ -89,6 +92,7 @@ public class NetworkTicker {
             if (craftIn <= 0) {
                 doCrafting(net);
             }
+            NetworkHologramManager.updateHologram(net);
         }
         if (scanIn <= 0) {
             scanIn = Settings.scanIntervalTicks();
@@ -114,19 +118,32 @@ public class NetworkTicker {
         net.forEach(DeviceType.MVN_GREEDY_CELL, (pos, type) -> greedyTick(net, pos));
         net.forEach(DeviceType.MVN_PURGER, (pos, type) -> purgeOnce(net, pos, base));
         net.forEach(DeviceType.MVN_RECEIVER, (pos, type) -> bridgeOnce(net, pos, base));
+        net.forEach(DeviceType.MVN_LIQUID_PUMP, (pos, type) -> pumpTick(net, pos));
+        for (DeviceType cellType : List.of(DeviceType.MVN_CELL_T1, DeviceType.MVN_CELL_T2, DeviceType.MVN_CELL_T3,
+                DeviceType.MVN_CELL_T4, DeviceType.MVN_CELL_T5, DeviceType.MVN_CELL_T6)) {
+            net.forEach(cellType, (pos, type) -> cellTick(net, pos));
+        }
+    }
+
+    private void cellTick(Network net, long pos) {
+        Block block = net.block(pos);
+        if (block == null) return;
+        NodeBlob blob = blobOf(net, pos);
+        if (blob == null) return;
+        long beforeAmount = blob.cellAmount;
+        ItemStack beforeSample = blob.cellSample;
+        int beforeOut = blob.lastSyncedOutAmount;
+
+        SlimefunBridge.syncCell(block, blob);
+
+        if (blob.cellAmount != beforeAmount || !StackUtils.itemsMatch(blob.cellSample, beforeSample)
+                || blob.lastSyncedOutAmount != beforeOut) {
+            NodeStore.put(block, blob);
+        }
     }
 
     private NodeBlob blobOf(Network net, long pos) {
         return NodeStore.get(net.block(pos));
-    }
-
-    private void spark(Network net, long pos) {
-        if (!net.crayon()) {
-            return;
-        }
-        Location at = net.block(pos).getLocation().add(0.5, 0.6, 0.5);
-        at.getWorld().spawnParticle(Particle.DUST, at, 4, 0.25, 0.25, 0.25, 0,
-                new Particle.DustOptions(Color.AQUA, 0.8f));
     }
 
     private BlockFace[] facesFor(NodeBlob blob) {
@@ -210,8 +227,15 @@ public class NetworkTicker {
                 return; // Wait until buffer clears before grabbing more
             }
         }
+        int backoff = backoffCycles.getOrDefault(pos, 0);
+        if (backoff > 0 && (backoff % 3 != 0)) {
+            backoffCycles.put(pos, backoff + 1);
+            return;
+        }
+
         Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
         Block self = net.block(pos);
+        boolean foundAny = false;
         for (BlockFace face : facesFor(blob)) {
             Block target = self.getRelative(face);
             Material mat = target.getType();
@@ -220,6 +244,9 @@ public class NetworkTicker {
             if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
                 ItemStack extracted = SlimefunBridge.extract(target, pred, rate);
                 if (extracted != null) {
+                    foundAny = true;
+                    backoffCycles.remove(pos);
+                    int moved = extracted.getAmount();
                     int leftover = net.storage().deposit(extracted);
                     if (leftover > 0) {
                         extracted.setAmount(leftover);
@@ -230,10 +257,13 @@ public class NetworkTicker {
                                 unrouted.setAmount(unhoused);
                                 blob.transitBuffer = unrouted;
                                 NodeStore.put(self, blob);
+                                moved -= unhoused;
                             }
                         }
                     }
-                    spark(net, pos);
+                    if (moved > 0) {
+                        net.throughput().recordFlow(pos, moved);
+                    }
                     return;
                 }
                 continue;
@@ -247,6 +277,9 @@ public class NetworkTicker {
                     // Inventario vacio para este filtro: se mira la siguiente cara.
                     continue;
                 }
+                foundAny = true;
+                backoffCycles.remove(pos);
+                int moved = extracted.getAmount();
                 int leftover = net.storage().deposit(extracted);
                 if (leftover > 0) {
                     extracted.setAmount(leftover);
@@ -257,12 +290,18 @@ public class NetworkTicker {
                             unrouted.setAmount(sinCasa);
                             blob.transitBuffer = unrouted;
                             NodeStore.put(self, blob);
+                            moved -= sinCasa;
                         }
                     }
                 }
-                spark(net, pos);
+                if (moved > 0) {
+                    net.throughput().recordFlow(pos, moved);
+                }
                 return;
             }
+        }
+        if (!foundAny) {
+            backoffCycles.put(pos, Math.min(30, backoff + 1));
         }
     }
 
@@ -276,11 +315,20 @@ public class NetworkTicker {
         if (blob == null) {
             return;
         }
+
+        int backoff = backoffCycles.getOrDefault(pos, 0);
+        if (backoff > 0 && (backoff % 3 != 0)) {
+            backoffCycles.put(pos, backoff + 1);
+            return;
+        }
+
         Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
         ItemStack stack = net.storage().withdraw(pred, rate);
         if (stack == null) {
+            backoffCycles.put(pos, Math.min(30, backoff + 1));
             return;
         }
+        int initialAmount = stack.getAmount();
         Block self = net.block(pos);
         for (BlockFace face : facesFor(blob)) {
             Block target = self.getRelative(face);
@@ -291,9 +339,6 @@ public class NetworkTicker {
                 int before = stack.getAmount();
                 int unhoused = SlimefunBridge.insert(target, stack);
                 stack.setAmount(Math.max(0, Math.min(unhoused, before)));
-                if (stack.getAmount() < before) {
-                    spark(net, pos);
-                }
                 if (stack.getAmount() <= 0) {
                     break;
                 }
@@ -303,15 +348,19 @@ public class NetworkTicker {
             // 2. Vanilla container fallback
             if (isPotentialContainer(mat) && target.getState() instanceof InventoryHolder holder) {
                 int leftover = NetworkManager.insertInto(holder.getInventory(), stack);
-                if (leftover < stack.getAmount()) {
-                    spark(net, pos);
-                }
                 stack.setAmount(leftover);
                 if (leftover <= 0) {
                     break;
                 }
                 continue;
             }
+        }
+        int delivered = initialAmount - stack.getAmount();
+        if (delivered > 0) {
+            backoffCycles.remove(pos);
+            net.throughput().recordFlow(pos, delivered);
+        } else {
+            backoffCycles.put(pos, Math.min(30, backoff + 1));
         }
         if (stack.getAmount() > 0) {
             net.storage().deposit(stack);
@@ -338,7 +387,6 @@ public class NetworkTicker {
         if (purged == null) {
             return;
         }
-        spark(net, pos);
         if (Settings.debug()) {
             plugin.getLogger().info("[Purger] Discarded " + purged.getAmount() + "x "
                     + purged.getType() + " at " + PosUtil.unpackX(pos) + ","
@@ -371,7 +419,6 @@ public class NetworkTicker {
                 ItemStack got = net.storage().withdraw(pred, want, pos);
                 if (got != null && got.getAmount() > 0) {
                     blob.addGreedyItem(got, got.getAmount());
-                    spark(net, pos);
                 }
             }
         }
@@ -417,7 +464,6 @@ public class NetworkTicker {
                 if (roundMoved > 0) {
                     blob.removeGreedyItem(i, roundMoved);
                     movedTotal += roundMoved;
-                    spark(net, pos);
                     if (roundMoved >= amount) {
                         i--;
                     }
@@ -474,8 +520,6 @@ public class NetworkTicker {
         if (leftover > 0) {
             stack.setAmount(leftover);
             remote.storage().deposit(stack);
-        } else {
-            spark(net, pos);
         }
     }
 
@@ -508,11 +552,9 @@ public class NetworkTicker {
                 int leftover = net.storage().deposit(stack);
                 if (leftover <= 0) {
                     item.remove();
-                    spark(net, pos);
                 } else if (leftover < stack.getAmount()) {
                     stack.setAmount(leftover);
                     item.setItemStack(stack);
-                    spark(net, pos);
                 }
             }
         });
@@ -529,23 +571,54 @@ public class NetworkTicker {
             if (blob == null) {
                 return;
             }
-            boolean worked = false;
             for (String b64 : new ArrayList<>(blob.blueprintData)) {
                 RecipeData data = Blueprints.decode(b64);
                 if (data == null) {
                     continue;
                 }
-                if (CraftingSupport.tryCraftBlueprint(net, data)) {
-                    worked = true;
-                }
+                CraftingSupport.tryCraftBlueprint(net, data);
             }
             if (!blob.recipes.isEmpty()) {
-                worked |= CraftingSupport.tryCraftAll(net, blob);
-            }
-            if (worked) {
-                spark(net, pos);
+                CraftingSupport.tryCraftAll(net, blob);
             }
         });
+    }
+
+    /**
+     * EN: Executes fluid pumping operations (DRAIN from world/cauldrons or FILL to cauldrons/containers).
+     * ES: Ejecuta operaciones de bombeo de fluidos (drenar o llenar).
+     */
+    /**
+     * Ticks a Liquid Pump node.
+     * Extracts water or lava source blocks directly from the block underneath the pump.
+     */
+    private void pumpTick(Network net, long pos) {
+        Block pumpBlock = net.block(pos);
+        if (pumpBlock == null) return;
+        NodeBlob blob = blobOf(net, pos);
+        if (blob == null) return;
+
+        Block target = pumpBlock.getRelative(BlockFace.DOWN);
+        if (target == null) return;
+
+        String filter = blob.pumpFluid != null ? blob.pumpFluid.toUpperCase(java.util.Locale.ROOT) : null;
+
+        // 1. Water source
+        if (target.getType() == Material.WATER && (filter == null || "ANY".equals(filter) || "WATER".equals(filter))) {
+            if (target.getBlockData() instanceof org.bukkit.block.data.Levelled l && l.getLevel() == 0) {
+                if (net.fluidStorage().deposit("WATER", 1000) == 0) {
+                    target.setType(Material.AIR);
+                }
+            }
+        }
+        // 2. Lava source
+        else if (target.getType() == Material.LAVA && (filter == null || "ANY".equals(filter) || "LAVA".equals(filter))) {
+            if (target.getBlockData() instanceof org.bukkit.block.data.Levelled l && l.getLevel() == 0) {
+                if (net.fluidStorage().deposit("LAVA", 1000) == 0) {
+                    target.setType(Material.AIR);
+                }
+            }
+        }
     }
 
     /**

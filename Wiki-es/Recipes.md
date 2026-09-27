@@ -406,21 +406,6 @@ verías en la mesa de crafteo (cuadrícula 3×3) y una breve **descripción** de
 
 ---
 
-## Network Crayon
-- **Receta (3×3)**:
-
-  ```
-  C
-  S
-  ```
-
-  > C = **Tinte cian** · S = **Palo**
-
-- **Resultado**: 1× Network Crayon
-- **Función**: Marca el controlador; la red muestra partículas alrededor de los bloques activos, facilitando la visualización de la topología.
-
----
-
 
 ---
 
@@ -492,5 +477,70 @@ Almacenamiento interno multi-ítem instalado directamente sobre el **Network Con
   ```
   > N = **Bloque de netherite** · S = **Estrella del nether** · P = **DRAM Memory Module**
 - **Capacidad**: 524,288 ítems
+
+---
+
+## Slimefun Recipe Encoder
+- **Receta (3×3)**:
+  ```
+  E P E
+  P B P
+  E P E
+  ```
+  > E = **Perla de ender** · P = **Papel** · B = **Mesa de encantamientos**
+- **Resultado**: 1× Slimefun Recipe Encoder
+- **Función**: Codificador dedicado para recetas de Slimefun. Permite codificar planos con recetas de Slimefun que los Auto-Crafters pueden craftear. Ajustable en config: `sf-encoder.enabled`.
+
+---
+
+## Network Quota Limiter
+- **Receta (3×3)**:
+  ```
+  R C R
+  C T C
+  R C R
+  ```
+  > R = **Redstone** · C = **Comparador** · T = **Diana (Target)**
+- **Resultado**: 1× Network Quota Limiter
+- **Función**: Regula el stock máximo permitido en la red para un ítem objetivo. Una vez alcanzado el límite, los importadores rechazan nuevos ítems de ese tipo.
+
+---
+
+## Quantum Fluid Cell
+- **Receta (3×3)**:
+  ```
+  G B G
+  G L G
+  G G G
+  ```
+  > G = **Cristal** · B = **Cubo** · L = **Bloque de lapislázuli**
+- **Resultado**: 1× Quantum Fluid Cell
+- **Función**: Contenedor de líquidos de alta capacidad (por defecto 64,000 mB / 64 Cubos). Almacena Agua, Lava, Leche, Miel y Nieve en polvo. Clic derecho directo con cubos/botellas para depositar o extraer, o abrir GUI para revisar el nivel de llenado.
+
+---
+
+## Liquid Pump
+- **Receta (3×3)**:
+  ```
+  · G ·
+  P B P
+  · R ·
+  ```
+  > G = **Cristal tintado azul oscuro** · P = **Pistón** · B = **Cubo** · R = **Redstone**
+- **Resultado**: 1× Liquid Pump
+- **Función**: Extrae automáticamente bloques fuente de líquidos (estrictamente Agua y Lava) del bloque directamente inferior a la bomba (`BlockFace.DOWN`) hacia el almacenamiento cuántico de fluidos de la red.
+
+---
+
+## Request Terminal
+- **Receta (3×3)**:
+  ```
+  G L G
+  R C R
+  G G G
+  ```
+  > G = **Cristal** · L = **Atril (Lectern)** · C = **Mesa de crafteo** · R = **Redstone**
+- **Resultado**: 1× Request Terminal
+- **Función**: Consola de solicitud de crafteos bajo demanda. Descubre todas las recetas configuradas en Auto-Crafters de la red, muestra materias primas necesarias vs disponibles en almacén y permite ordenar lotes entregados directamente al inventario o a la red. Clic izquierdo elabora 1x, Clic derecho elabora 64x (1 stack), y Shift + Clic Derecho abre un diálogo interactivo en el chat para solicitar una cantidad numérica exacta personalizada (cancelándose automáticamente si no se introduce un número o si este es $\le 0$).
 
 Esta documentación está pensada para servir como referencia rápida tanto a jugadores como a desarrolladores que quieran entender el funcionamiento de cada ítem y cómo fabricarlos. Las capacidades y velocidades citadas corresponden a los valores por defecto de `config.yml` y pueden ajustarse en ese archivo.

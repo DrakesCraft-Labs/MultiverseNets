@@ -406,21 +406,6 @@ crafting table (3×3 grid), and a brief **description** of its role within the n
 
 ---
 
-## Network Crayon
-- **Recipe (3×3)**:
-
-  ```
-  C
-  S
-  ```
-
-  > C = **Cyan Dye** · S = **Stick**
-
-- **Result**: 1× Network Crayon
-- **Function**: Marks the controller; the network shows particles around active blocks, making the topology easy to visualize.
-
----
-
 
 ---
 
@@ -492,5 +477,70 @@ Internal multi-item storage installed directly into the **Network Controller** b
   ```
   > N = **Netherite Block** · S = **Nether Star** · P = **DRAM Memory Module**
 - **Capacity**: 524,288 items
+
+---
+
+## Slimefun Recipe Encoder
+- **Recipe (3×3)**:
+  ```
+  E P E
+  P B P
+  E P E
+  ```
+  > E = **Ender Pearl** · P = **Paper** · B = **Enchanting Table**
+- **Result**: 1× Slimefun Recipe Encoder
+- **Function**: Dedicated encoder for Slimefun item recipes. Allows encoding blueprints with custom Slimefun recipes that Auto-Crafters can craft. Config toggle: `sf-encoder.enabled`.
+
+---
+
+## Network Quota Limiter
+- **Recipe (3×3)**:
+  ```
+  R C R
+  C T C
+  R C R
+  ```
+  > R = **Redstone** · C = **Comparator** · T = **Target**
+- **Result**: 1× Network Quota Limiter
+- **Function**: Regulates max stock allowed in network storage for a specified target item. Once quota ceiling is met, importers will refuse further items of that type.
+
+---
+
+## Quantum Fluid Cell
+- **Recipe (3×3)**:
+  ```
+  G B G
+  G L G
+  G G G
+  ```
+  > G = **Glass** · B = **Bucket** · L = **Lapis Block**
+- **Result**: 1× Quantum Fluid Cell
+- **Function**: High-capacity liquid container (default 64,000 mB / 64 Buckets). Stores Water, Lava, Milk, Honey, and Powder Snow. Right-click directly with buckets/bottles to deposit or extract, or open GUI to inspect volume levels.
+
+---
+
+## Liquid Pump
+- **Recipe (3×3)**:
+  ```
+  · G ·
+  P B P
+  · R ·
+  ```
+  > G = **Blue Stained Glass** · P = **Piston** · B = **Bucket** · R = **Redstone**
+- **Result**: 1× Liquid Pump
+- **Function**: Automatically extracts liquid source blocks (strictly Water and Lava) from the block directly below the pump (`BlockFace.DOWN`) into the network's quantum fluid storage.
+
+---
+
+## Request Terminal
+- **Recipe (3×3)**:
+  ```
+  G L G
+  R C R
+  G G G
+  ```
+  > G = **Glass** · L = **Lectern** · C = **Crafting Table** · R = **Redstone**
+- **Result**: 1× Request Terminal
+- **Function**: On-demand crafting console. Discovers all recipes configured in connected Auto-Crafters across the network, displays required raw materials vs on-hand storage, and allows players to order batch crafting jobs delivered directly to inventory or network storage. Left click crafts 1x, Right click crafts 64x, and Shift + Right Click opens an interactive chat prompt allowing the player to specify a custom numeric batch amount (canceling automatically on non-numeric inputs or values $\le 0$).
 
 This documentation is meant as a quick reference for both players and developers who want to understand what each item does and how to craft it. The capacities and speeds quoted are the `config.yml` defaults and can be tuned in that file.

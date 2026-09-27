@@ -64,19 +64,66 @@ public class ChatPrompts implements Listener {
         event.setCancelled(true);
         String text = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
         Player p = player;
-        var plugin = com.chagui68.multiversenets.MultiverseNets.instance();
-        plugin.getServer().getScheduler().runTask(plugin, () -> {
+        Runnable task = () -> {
             if ("cancel".equalsIgnoreCase(text)) {
                 p.sendMessage(com.chagui68.multiversenets.util.Text.msg("Cancelled.", net.kyori.adventure.text.format.NamedTextColor.GRAY));
                 return;
             }
             callback.accept(text);
-        });
+        };
+        var plugin = com.chagui68.multiversenets.MultiverseNets.instance();
+        if (org.bukkit.Bukkit.isPrimaryThread()) {
+            task.run();
+        } else {
+            plugin.getServer().getScheduler().runTask(plugin, task);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onLegacyChat(org.bukkit.event.player.AsyncPlayerChatEvent event) {
+        Player player = event.getPlayer();
+        Consumer<String> callback = PENDING.remove(player.getUniqueId());
+        if (callback == null) {
+            return;
+        }
+        event.setCancelled(true);
+        String text = event.getMessage().trim();
+        Player p = player;
+        var plugin = com.chagui68.multiversenets.MultiverseNets.instance();
+        Runnable task = () -> {
+            if ("cancel".equalsIgnoreCase(text)) {
+                p.sendMessage(com.chagui68.multiversenets.util.Text.msg("Cancelled.", net.kyori.adventure.text.format.NamedTextColor.GRAY));
+                return;
+            }
+            callback.accept(text);
+        };
+        if (org.bukkit.Bukkit.isPrimaryThread()) {
+            task.run();
+        } else {
+            plugin.getServer().getScheduler().runTask(plugin, task);
+        }
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         PENDING.remove(event.getPlayer().getUniqueId());
+    }
+
+    /**
+     * Directly processes player input (useful for testing and commands).
+     */
+    public static void submitInput(Player player, String text) {
+        Consumer<String> callback = PENDING.remove(player.getUniqueId());
+        if (callback != null) {
+            callback.accept(text);
+        }
+    }
+
+    /**
+     * Clears all pending chat prompts.
+     */
+    public static void clearAll() {
+        PENDING.clear();
     }
 
     /**

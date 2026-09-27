@@ -41,8 +41,9 @@ class RecipeTest {
                 "cell_t4", "cell_t5", "cell_t6", "grabber", "pusher", "vacuum",
                 "purger", "probe", "crafter", "wireless_terminal", "monitor",
                 "transmitter", "receiver", "greedy_cell", "grabber_ht", "pusher_ht",
-                "encoder", "crafting_grid", "blueprint", "configurator", "rake",
-                "crayon", "quantum_workbench", "infinity_barrel"
+                "encoder", "sf_encoder", "crafting_grid", "blueprint", "configurator", "rake",
+                "quantum_workbench", "infinity_barrel", "limiter",
+                "fluid_cell", "liquid_pump", "request_terminal"
         };
         for (String key : keys) {
             NamespacedKey nk = new NamespacedKey(plugin, key);

@@ -30,6 +30,13 @@ compat:
   #      y prefieres que cada red gestione únicamente sus propios contenedores.
   slimefun: true
 
+# [EN] Slimefun Recipe Encoder settings.
+# [ES] Ajustes del Codificador de Recetas de Slimefun.
+sf-encoder:
+  # [EN] Enable or disable the Slimefun Recipe Encoder machine.
+  # [ES] Habilita o deshabilita la máquina de codificación de recetas de Slimefun.
+  enabled: true
+
 # -------------------------------------------------------------------------------------
 #  Network Topology & Timing / Topología y Tiempos de Red
 # -------------------------------------------------------------------------------------
@@ -65,9 +72,9 @@ network:
 transfer:
   # [EN] Base amount of items moved per operation by standard Grabbers and Pushers.
   # [ES] Cantidad base de ítems transferidos por operación en Grabbers y Pushers normales.
-  items-per-op: 64
+  items-per-op: 128
 
-  # [EN] Speed multiplier for High-Throughput (HT) Grabbers and Pushers (e.g. 64 * 8 = 512).
+  # [EN] Speed multiplier for High-Throughput (HT) Grabbers and Pushers (e.g. 128 * 8 = 1024).
   # [ES] Multiplicador de velocidad para Grabbers y Pushers de alto rendimiento (HT).
   ht-multiplier: 8
 
@@ -109,6 +116,16 @@ rake:
   # [EN] Maximum durability uses for a freshly crafted Network Rake.
   # [ES] Usos de durabilidad máxima para un Network Rake recién crafteado.
   uses: 250
+
+# [EN] Fluid Logistics & Storage settings.
+# [ES] Ajustes de Logística y Almacenamiento de Fluidos.
+fluids:
+  # [EN] Storage capacity in millibuckets (mB) per Quantum Fluid Cell (64,000 mB = 64 Buckets).
+  # [ES] Capacidad de almacenamiento en mB por Celda Cuántica de Fluidos (64,000 mB = 64 Cubos).
+  cell-capacity-mb: 64000
+  # [EN] Pumping speed in millibuckets (mB) per operation for Liquid Pumps (1,000 mB = 1 Bucket).
+  # [ES] Velocidad de bombeo en mB por operación para las Bombas de Líquidos (1,000 mB = 1 Cubo).
+  pump-rate-mb: 1000
 
 # -------------------------------------------------------------------------------------
 #  Quantum Storage Cells / Celdas Cuánticas de Almacenamiento

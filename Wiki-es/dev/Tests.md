@@ -142,7 +142,7 @@ Prueba `Settings` con inyección por reflexión de configuraciones simuladas:
 Sin Slimefun presente: el puente informa `isAvailable()`/`disponible()` = false; consultar bloques/ítems null no lanza (`isMachine`, `getId`, `isSlimefunItem` y sus alias en español); `extract`/`extraer` devuelven null y `insert`/`insertar` devuelven 0 de forma segura.
 
 ### `ToolsTest`
-Prueba las herramientas de mano: **Configurador, Rastrillo y Crayón** no son colocables, no almacenan y no filtran; el **Receptor es filtrable** (transporte inalámbrico controlado); y los filtros por defecto usan modo **whitelist** (`filterBlacklist = false`).
+Prueba las herramientas de mano: **Configurador y Rastrillo** no son colocables, no almacenan y no filtran; el **Receptor es filtrable** (transporte inalámbrico controlado); y los filtros por defecto usan modo **whitelist** (`filterBlacklist = false`).
 
 ---
 

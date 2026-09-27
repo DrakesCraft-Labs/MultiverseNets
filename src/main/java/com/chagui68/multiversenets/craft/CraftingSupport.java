@@ -1,5 +1,6 @@
 package com.chagui68.multiversenets.craft;
 
+import com.chagui68.multiversenets.compat.SlimefunBridge;
 import com.chagui68.multiversenets.net.Network;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.util.StackUtils;
@@ -155,11 +156,19 @@ public final class CraftingSupport {
         if (data == null || Blueprints.isEmpty(data.inputs) || data.output == null) {
             return false;
         }
+        ItemStack result = null;
         Recipe recipe = Blueprints.resolve(data.inputs, net.world());
-        if (!Blueprints.matchesOutput(recipe, data.output)) {
+        if (Blueprints.matchesOutput(recipe, data.output)) {
+            result = recipe.getResult().clone();
+        } else if (SlimefunBridge.isAvailable()) {
+            ItemStack sfResult = SlimefunBridge.findSlimefunRecipe(data.inputs);
+            if (sfResult != null && StackUtils.itemsMatch(sfResult, data.output)) {
+                result = sfResult.clone();
+            }
+        }
+        if (result == null) {
             return false;
         }
-        ItemStack result = recipe.getResult().clone();
 
         record Need(ItemStack sample, int amount) {
         }

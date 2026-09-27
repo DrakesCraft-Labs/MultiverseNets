@@ -1,6 +1,7 @@
 package com.chagui68.multiversenets.listen;
 
 import com.chagui68.multiversenets.MultiverseNets;
+import com.chagui68.multiversenets.compat.SlimefunBridge;
 import com.chagui68.multiversenets.gui.BarrelMenu;
 import com.chagui68.multiversenets.gui.CellMenu;
 import com.chagui68.multiversenets.gui.CrafterMenu;
@@ -8,9 +9,16 @@ import com.chagui68.multiversenets.gui.CraftingGridMenu;
 import com.chagui68.multiversenets.gui.EncoderMenu;
 import com.chagui68.multiversenets.gui.FilterMenu;
 import com.chagui68.multiversenets.gui.GreedyMenu;
+import com.chagui68.multiversenets.gui.FluidCellMenu;
+import com.chagui68.multiversenets.gui.LiquidPumpMenu;
 import com.chagui68.multiversenets.gui.MonitorMenu;
+import com.chagui68.multiversenets.gui.QuotaLimiterMenu;
 import com.chagui68.multiversenets.gui.QuantumWorkbenchMenu;
+import com.chagui68.multiversenets.gui.RequestTerminalMenu;
+import com.chagui68.multiversenets.gui.SfEncoderMenu;
 import com.chagui68.multiversenets.gui.TerminalMenu;
+import org.bukkit.block.BlockFace;
+import java.util.Locale;
 import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.item.Items;
 import com.chagui68.multiversenets.net.Network;
@@ -139,12 +147,22 @@ public class BlockListener implements Listener {
             return;
         }
         event.setDropItems(false);
+        if (type.isCell()) {
+            if (block.getState() instanceof org.bukkit.block.Container container) {
+                container.getInventory().clear();
+            }
+            if (Settings.compatSlimefun() && SlimefunBridge.isAvailable()) {
+                SlimefunBridge.unregisterCell(block);
+            }
+        }
         if (event.getPlayer().getGameMode() != org.bukkit.GameMode.CREATIVE) {
             block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), createDropItem(type, blob));
         }
 
         NodeStore.remove(block);
         if (type == DeviceType.MVN_CONTROLLER) {
+            long pos = PosUtil.pack(block.getX(), block.getY(), block.getZ());
+            com.chagui68.multiversenets.net.NetworkHologramManager.removeHologram(block.getWorld(), pos);
             manager.removeController(block);
         } else {
             manager.invalidateNear(block);
@@ -193,6 +211,15 @@ public class BlockListener implements Listener {
                 lore.add(Component.text("Virtual Cargo: " + Items.formatAmount(blob.totalVirtualAmount()) + " items ("
                         + (blob.virtualSamples != null ? blob.virtualSamples.size() : 0) + " types)", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
             }
+        } else if (type == DeviceType.MVN_LIMITER && blob.quotaSample != null) {
+            lore.add(Component.text("Target: " + blob.quotaSample.getType().name(), NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("Limit: " + Items.formatAmount(blob.quotaLimit) + (blob.quotaActive ? " (Active)" : " (Disabled)"), NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
+        } else if (type == DeviceType.MVN_FLUID_CELL && blob.fluidType != null && blob.fluidAmount > 0) {
+            lore.add(Component.text("Fluid: " + blob.fluidType + " (" + Items.formatAmount(blob.fluidAmount) + " mB / "
+                    + (blob.fluidAmount / 1000) + " Buckets)", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
+        } else if (type == DeviceType.MVN_LIQUID_PUMP && blob.pumpMode != null) {
+            lore.add(Component.text("Mode: " + blob.pumpMode + (blob.pumpFluid != null ? " (" + blob.pumpFluid + ")" : ""),
+                    NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
         }
         meta.lore(lore);
         item.setItemMeta(meta);
@@ -215,7 +242,11 @@ public class BlockListener implements Listener {
                 && blob.recipes.isEmpty()
                 && blob.blueprintData.isEmpty()
                 && matrixEmpty
-                && blob.txWorld == null;
+                && blob.quotaSample == null
+                && blob.quotaLimit <= 0
+                && blob.txWorld == null
+                && (blob.fluidType == null || blob.fluidAmount <= 0)
+                && blob.pumpMode == null;
     }
 
     /**
@@ -253,6 +284,13 @@ public class BlockListener implements Listener {
         actual.virtualSamples = loaded.virtualSamples != null ? new ArrayList<>(loaded.virtualSamples) : new ArrayList<>();
         actual.virtualAmounts = loaded.virtualAmounts != null ? new ArrayList<>(loaded.virtualAmounts) : new ArrayList<>();
         actual.transitBuffer = loaded.transitBuffer;
+        actual.quotaSample = loaded.quotaSample;
+        actual.quotaLimit = loaded.quotaLimit;
+        actual.quotaActive = loaded.quotaActive;
+        actual.fluidType = loaded.fluidType;
+        actual.fluidAmount = loaded.fluidAmount;
+        actual.pumpMode = loaded.pumpMode;
+        actual.pumpFluid = loaded.pumpFluid;
         if (loaded.txWorld != null) {
             actual.txWorld = loaded.txWorld;
             actual.txX = loaded.txX;
@@ -307,14 +345,16 @@ public class BlockListener implements Listener {
             useWrench(event, block, blob);
             return;
         }
-        if (heldType == DeviceType.MVN_CRAYON) {
-            useCrayon(event, block, blob);
-            return;
-        }
 
         if (blob == null) {
             if (heldType == DeviceType.MVN_WIRELESS_TERMINAL && !event.getPlayer().isSneaking()) {
                 useWirelessInAir(event);
+                return;
+            }
+            if (event.getPlayer().isSneaking() && (held == null || held.getType().isAir() || !held.getType().isBlock())) {
+                if (tryAccessBlockInterface(event.getPlayer(), block, event.getBlockFace(), null, null)) {
+                    event.setCancelled(true);
+                }
             }
             return;
         }
@@ -347,7 +387,11 @@ public class BlockListener implements Listener {
             return;
         }
 
+        // Shift+Right click to access connected/adjacent block interface
         if (player.isSneaking()) {
+            if (tryAccessBlockInterface(player, block, event.getBlockFace(), blob, type)) {
+                event.setCancelled(true);
+            }
             return;
         }
 
@@ -355,76 +399,329 @@ public class BlockListener implements Listener {
             return;
         }
 
+        if (type == DeviceType.MVN_CONTROLLER && heldType != null && heldType.isCacheModule()) {
+            event.setCancelled(true);
+            installCacheModule(player, block, blob, heldType, held);
+            return;
+        }
+
+        if (type == DeviceType.MVN_FLUID_CELL && held != null && !player.isSneaking()) {
+            if (handleFluidCellQuickInteract(player, block, blob, held)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+
+        if (openDeviceMenu(player, block, blob, type)) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * EN: Attempts to open the interface of an adjacent/target block when shift+right-clicking.
+     * Respects configured device direction (for Grabbers/Pushers) or clicked face direction.
+     * Supports MultiverseNets menus, Slimefun BlockMenus, and Vanilla containers/workbenches.
+     * If the target has no interface, it is silently ignored.
+     *
+     * ES: Intenta abrir la interfaz de un bloque adyacente u objetivo al hacer shift + clic derecho.
+     * Respeta la dirección configurada (en Grabbers/Pushers) o la cara clicada.
+     * Soporta menús de MultiverseNets, BlockMenus de Slimefun y contenedores/mesas vanilla.
+     * Si no tiene interfaz, se ignora silenciosamente.
+     */
+    private boolean tryAccessBlockInterface(Player player, Block clickedBlock, BlockFace clickedFace, NodeBlob blob, DeviceType type) {
+        List<Block> candidates = new ArrayList<>();
+
+        // 1. Directional nodes (Grabbers, Pushers): prioritize configured target direction
+        if (blob != null && blob.targetFace != null && !blob.targetFace.equalsIgnoreCase("ALL")) {
+            try {
+                BlockFace single = BlockFace.valueOf(blob.targetFace.toUpperCase(Locale.ROOT));
+                candidates.add(clickedBlock.getRelative(single));
+            } catch (IllegalArgumentException ignored) {}
+        }
+
+        // 2. Clicked face direction (the adjacent block in that direction)
+        if (clickedFace != null) {
+            candidates.add(clickedBlock.getRelative(clickedFace));
+            candidates.add(clickedBlock.getRelative(clickedFace.getOppositeFace()));
+        }
+
+        for (Block candidate : candidates) {
+            if (candidate == null || candidate.equals(clickedBlock)) {
+                continue;
+            }
+            if (!canAccessIslandNetwork(player, candidate.getLocation())) {
+                continue;
+            }
+
+            // A. Check MultiverseNets device
+            NodeBlob candidateBlob = NodeStore.get(candidate);
+            if (candidateBlob != null) {
+                DeviceType candType = DeviceType.parse(candidateBlob.typeName);
+                if (candType != null && openDeviceMenu(player, candidate, candidateBlob, candType)) {
+                    return true;
+                }
+            }
+
+            // B. Check Slimefun machine BlockMenu
+            if (Settings.compatSlimefun() && SlimefunBridge.isAvailable()) {
+                if (SlimefunBridge.openSlimefunMenu(candidate, player)) {
+                    return true;
+                }
+            }
+
+            // C. Check Vanilla Container or interactive block
+            if (openVanillaInterface(candidate, player)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean openVanillaInterface(Block block, Player player) {
+        if (block == null || player == null) {
+            return false;
+        }
+        // Vanilla Containers
+        if (block.getState() instanceof org.bukkit.block.Container container) {
+            player.openInventory(container.getInventory());
+            return true;
+        }
+        // Vanilla Interactive blocks
+        Material mat = block.getType();
+        Location loc = block.getLocation();
+        switch (mat) {
+            case CRAFTING_TABLE -> {
+                player.openWorkbench(loc, true);
+                return true;
+            }
+            case ENCHANTING_TABLE -> {
+                player.openEnchanting(loc, true);
+                return true;
+            }
+            case ANVIL, CHIPPED_ANVIL, DAMAGED_ANVIL -> {
+                player.openAnvil(loc, true);
+                return true;
+            }
+            case SMITHING_TABLE -> {
+                player.openSmithingTable(loc, true);
+                return true;
+            }
+            case GRINDSTONE -> {
+                player.openGrindstone(loc, true);
+                return true;
+            }
+            case STONECUTTER -> {
+                player.openStonecutter(loc, true);
+                return true;
+            }
+            case LOOM -> {
+                player.openLoom(loc, true);
+                return true;
+            }
+            case CARTOGRAPHY_TABLE -> {
+                player.openCartographyTable(loc, true);
+                return true;
+            }
+            case ENDER_CHEST -> {
+                player.openInventory(player.getEnderChest());
+                return true;
+            }
+            default -> {
+                return false;
+            }
+        }
+    }
+
+    private boolean openDeviceMenu(Player player, Block block, NodeBlob blob, DeviceType type) {
         switch (type) {
             case MVN_CONTROLLER -> {
-                event.setCancelled(true);
-                if (heldType != null && heldType.isCacheModule()) {
-                    installCacheModule(player, block, blob, heldType, held);
-                    return;
-                }
                 Network net = manager.networkAt(block);
                 if (net == null) {
                     player.sendMessage(Text.msg("This controller is not active.", NamedTextColor.RED));
-                    return;
+                    return true;
                 }
                 new ControllerMenu(plugin, player, net, block).openMenu();
+                return true;
             }
             case MVN_TERMINAL, MVN_TRANSMITTER -> {
-                event.setCancelled(true);
                 openTerminal(player, block);
+                return true;
             }
             case MVN_MONITOR -> {
-                event.setCancelled(true);
                 Network net = manager.networkAt(block);
                 if (net == null) {
                     player.sendMessage(Text.msg("This monitor is not part of a network.", NamedTextColor.RED));
-                    return;
+                    return true;
                 }
                 new MonitorMenu(plugin, player, net, block).openMenu();
+                return true;
             }
             case MVN_RECEIVER -> {
-                event.setCancelled(true);
                 openReceiver(player, block);
+                return true;
             }
             case MVN_CELL_T1, MVN_CELL_T2, MVN_CELL_T3, MVN_CELL_T4, MVN_CELL_T5, MVN_CELL_T6 -> {
-                event.setCancelled(true);
                 new CellMenu(plugin, player, block, type).openMenu();
+                return true;
             }
             case MVN_GREEDY_CELL -> {
-                event.setCancelled(true);
                 new GreedyMenu(plugin, player, block).openMenu();
+                return true;
             }
             case MVN_INFINITY_BARREL -> {
-                event.setCancelled(true);
                 new BarrelMenu(plugin, player, block).openMenu();
+                return true;
             }
             case MVN_QUANTUM_WORKBENCH -> {
-                event.setCancelled(true);
                 new QuantumWorkbenchMenu(plugin, player, block).openMenu();
+                return true;
+            }
+            case MVN_LIMITER -> {
+                new QuotaLimiterMenu(plugin, player, block).openMenu();
+                return true;
             }
             case MVN_ENCODER -> {
-                event.setCancelled(true);
                 new EncoderMenu(plugin, player, block).openMenu();
+                return true;
+            }
+            case MVN_SF_ENCODER -> {
+                if (!Settings.sfEncoderEnabled()) {
+                    player.sendMessage(Text.msg("Slimefun Recipe Encoder is disabled on this server.", NamedTextColor.RED));
+                    return true;
+                }
+                new SfEncoderMenu(plugin, player, block).openMenu();
+                return true;
             }
             case MVN_CRAFTER -> {
-                event.setCancelled(true);
                 new CrafterMenu(plugin, player, block).openMenu();
+                return true;
             }
             case MVN_CRAFTING_GRID -> {
-                event.setCancelled(true);
                 Network net = manager.networkAt(block);
                 if (net == null) {
                     player.sendMessage(Text.msg("This grid is not part of a network.", NamedTextColor.RED));
-                    return;
+                    return true;
                 }
                 new CraftingGridMenu(plugin, player, net, block).openMenu();
+                return true;
+            }
+            case MVN_FLUID_CELL -> {
+                new FluidCellMenu(plugin, player, block).openMenu();
+                return true;
+            }
+            case MVN_LIQUID_PUMP -> {
+                new LiquidPumpMenu(plugin, player, block).openMenu();
+                return true;
+            }
+            case MVN_REQUEST_TERMINAL -> {
+                Network net = manager.networkAt(block);
+                if (net == null) {
+                    player.sendMessage(Text.msg("This request terminal is not connected to a network.", NamedTextColor.RED));
+                    return true;
+                }
+                new RequestTerminalMenu(plugin, player, net, block).openMenu();
+                return true;
             }
             default -> {
                 if (type.filterable()) {
-                    event.setCancelled(true);
                     new FilterMenu(plugin, player, block, type).openMenu();
+                    return true;
                 }
+                return false;
             }
+        }
+    }
+
+    private boolean handleFluidCellQuickInteract(Player player, Block block, NodeBlob blob, ItemStack held) {
+        Material mat = held.getType();
+        long capacity = Settings.fluidCellCapacity();
+
+        // 1. Filled containers -> Deposit
+        String depositingFluid = null;
+        int mbPerItem = 1000;
+        Material returnMat = Material.BUCKET;
+
+        if (mat == Material.WATER_BUCKET) {
+            depositingFluid = "WATER";
+        } else if (mat == Material.LAVA_BUCKET) {
+            depositingFluid = "LAVA";
+        } else if (mat == Material.MILK_BUCKET) {
+            depositingFluid = "MILK";
+        } else if (mat == Material.POWDER_SNOW_BUCKET) {
+            depositingFluid = "POWDER_SNOW";
+        } else if (mat == Material.HONEY_BOTTLE) {
+            depositingFluid = "HONEY";
+            mbPerItem = 250;
+            returnMat = Material.GLASS_BOTTLE;
+        }
+
+        if (depositingFluid != null) {
+            if (blob.fluidType != null && !blob.fluidType.equalsIgnoreCase(depositingFluid) && blob.fluidAmount > 0) {
+                player.sendMessage(Text.msg("Fluid cell already contains " + blob.fluidType + "!", NamedTextColor.RED));
+                return true;
+            }
+            if (blob.fluidAmount + mbPerItem > capacity) {
+                player.sendMessage(Text.msg("Fluid cell is full!", NamedTextColor.RED));
+                return true;
+            }
+            blob.fluidType = depositingFluid;
+            blob.fluidAmount += mbPerItem;
+            NodeStore.put(block, blob);
+
+            held.setAmount(held.getAmount() - 1);
+            ItemStack ret = new ItemStack(returnMat);
+            if (held.getAmount() <= 0) {
+                player.getInventory().setItemInMainHand(ret);
+            } else {
+                giveOrDrop(player, ret);
+            }
+            player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_BUCKET_EMPTY, 1f, 1f);
+            player.sendActionBar(Component.text("Fluid Deposited: " + depositingFluid + " (" + Items.formatAmount(blob.fluidAmount) + " mB)", NamedTextColor.AQUA));
+            return true;
+        }
+
+        // 2. Empty bucket -> Extract
+        if (mat == Material.BUCKET) {
+            if (blob.fluidAmount < 1000 || blob.fluidType == null) {
+                return false;
+            }
+            Material filledBucket = switch (blob.fluidType.toUpperCase(java.util.Locale.ROOT)) {
+                case "WATER" -> Material.WATER_BUCKET;
+                case "LAVA" -> Material.LAVA_BUCKET;
+                case "MILK" -> Material.MILK_BUCKET;
+                case "POWDER_SNOW" -> Material.POWDER_SNOW_BUCKET;
+                default -> null;
+            };
+            if (filledBucket == null) {
+                return false;
+            }
+            blob.fluidAmount -= 1000;
+            String takenFluid = blob.fluidType;
+            if (blob.fluidAmount <= 0) {
+                blob.fluidAmount = 0;
+                blob.fluidType = null;
+            }
+            NodeStore.put(block, blob);
+
+            held.setAmount(held.getAmount() - 1);
+            ItemStack ret = new ItemStack(filledBucket);
+            if (held.getAmount() <= 0) {
+                player.getInventory().setItemInMainHand(ret);
+            } else {
+                giveOrDrop(player, ret);
+            }
+            player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_BUCKET_FILL, 1f, 1f);
+            player.sendActionBar(Component.text("Fluid Extracted: " + takenFluid + " (" + Items.formatAmount(blob.fluidAmount) + " mB remaining)", NamedTextColor.GREEN));
+            return true;
+        }
+
+        return false;
+    }
+
+    private void giveOrDrop(Player player, ItemStack item) {
+        var leftover = player.getInventory().addItem(item);
+        for (ItemStack drop : leftover.values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), drop);
         }
     }
 
@@ -505,29 +802,6 @@ public class BlockListener implements Listener {
         blob.filterBlacklist = "bl".equals(mode);
         NodeStore.put(block, blob);
         player.sendMessage(Text.msg("Configuration applied.", NamedTextColor.GREEN));
-    }
-
-    /**
-     * Handles Network Crayon: toggles working particle effects on the network controller.
- *
-     * Gestiona el Crayón de Red: alterna los efectos visuales de partículas en el controlador.
-     */
-    private void useCrayon(PlayerInteractEvent event, Block block, NodeBlob blob) {
-        event.setCancelled(true);
-        Player player = event.getPlayer();
-        if (blob == null) {
-            return;
-        }
-        DeviceType type = DeviceType.parse(blob.typeName);
-        if (type != DeviceType.MVN_CONTROLLER) {
-            player.sendMessage(Text.msg("The crayon only works on a Network Controller.", NamedTextColor.RED));
-            return;
-        }
-        blob.crayon = !blob.crayon;
-        NodeStore.put(block, blob);
-        manager.invalidateNear(block);
-        player.sendMessage(Text.msg(blob.crayon
-                ? "Network particles enabled." : "Network particles disabled.", NamedTextColor.GREEN));
     }
 
     // ------------------------------------------------------------------ Menus & Connections / Menús y Conexiones

@@ -7,8 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [EN] Tests hand-held tools (Configurator/Wrench, Rake, Crayon) and receiver filtering behavior.
- * [ES] Pruebas para herramientas de mano (Configurador/Llave, Rastrillo, Crayón) y filtrado del receptor.
+ * [EN] Tests hand-held tools (Configurator/Wrench, Rake) and receiver filtering behavior.
+ * [ES] Pruebas para herramientas de mano (Configurador/Llave, Rastrillo) y filtrado del receptor.
  */
 class ToolsTest {
 
@@ -18,7 +18,7 @@ class ToolsTest {
      */
     @Test
     void toolsAreHandHeldAndNotPlaceable() {
-        for (DeviceType tool : new DeviceType[]{DeviceType.MVN_CONFIGURATOR, DeviceType.MVN_RAKE, DeviceType.MVN_CRAYON}) {
+        for (DeviceType tool : new DeviceType[]{DeviceType.MVN_CONFIGURATOR, DeviceType.MVN_RAKE}) {
             assertFalse(tool.placeable(), tool + " is a hand tool, not a block");
             assertFalse(tool.isCell(), tool + " does not store");
             assertFalse(tool.filterable(), tool + " does not filter");

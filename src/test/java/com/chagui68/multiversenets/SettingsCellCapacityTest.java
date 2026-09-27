@@ -154,7 +154,7 @@ class SettingsCellCapacityTest {
         assertEquals(5, Settings.transferIntervalTicks());
         assertEquals(10, Settings.vacuumIntervalTicks());
         assertEquals(20, Settings.craftIntervalTicks());
-        assertEquals(64, Settings.itemsPerOp());
+        assertEquals(128, Settings.itemsPerOp());
         assertEquals(8, Settings.htMultiplier());
         assertEquals(262144L, Settings.greedyCapacity());
         assertEquals(2_000_000_000L, Settings.barrelCapacity());
