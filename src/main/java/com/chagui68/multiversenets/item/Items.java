@@ -154,6 +154,10 @@ public final class Items {
                 lore.add(Component.text("On-demand crafting ordering console discovered across network.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
                 lore.add(Component.text("Order custom quantities to player inventory or storage.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
             }
+            case MVN_REQUEST_CRAFTER -> {
+                lore.add(Component.text("On-demand crafting unit managed via the Request Terminal.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Holds blueprints for batch crafting jobs (does not auto-craft).", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            }
             default -> {
                 if (type.isCacheModule()) {
                     lore.add(Component.text("Expands Controller memory capacity and network throughput.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
@@ -724,6 +728,13 @@ public final class Items {
             r.setIngredient('L', Material.LECTERN);
             r.setIngredient('C', Material.CRAFTING_TABLE);
             r.setIngredient('R', Material.REDSTONE);
+        });
+        shaped(plugin, "request_crafter", create(DeviceType.MVN_REQUEST_CRAFTER), r -> {
+            r.shape("RCR", "ILI", "RCR");
+            r.setIngredient('R', Material.REDSTONE);
+            r.setIngredient('C', Material.CRAFTING_TABLE);
+            r.setIngredient('I', Material.IRON_INGOT);
+            r.setIngredient('L', Material.LECTERN);
         });
         plugin.getLogger().info("Registered " + recipeCount() + " crafting recipes with Bukkit.");
     }

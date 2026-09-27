@@ -541,6 +541,21 @@ Almacenamiento interno multi-ítem instalado directamente sobre el **Network Con
   ```
   > G = **Cristal** · L = **Atril (Lectern)** · C = **Mesa de crafteo** · R = **Redstone**
 - **Resultado**: 1× Request Terminal
-- **Función**: Consola de solicitud de crafteos bajo demanda. Descubre todas las recetas configuradas en Auto-Crafters de la red, muestra materias primas necesarias vs disponibles en almacén y permite ordenar lotes entregados directamente al inventario o a la red. Clic izquierdo elabora 1x, Clic derecho elabora 64x (1 stack), y Shift + Clic Derecho abre un diálogo interactivo en el chat para solicitar una cantidad numérica exacta personalizada (cancelándose automáticamente si no se introduce un número o si este es $\le 0$).
+- **Función**: Consola de solicitud de crafteos bajo demanda. Descubre todas las recetas configuradas en Crafters de la red, muestra materias primas necesarias vs disponibles en almacén y permite ordenar lotes entregados directamente al inventario o a la red. Clic izquierdo elabora 1x, Clic derecho elabora 64x (1 stack), y Shift + Clic Derecho abre un diálogo interactivo en el chat para solicitar una cantidad numérica exacta personalizada (cancelándose automáticamente si no se introduce un número o si este es $\le 0$).
+
+---
+
+## Request Crafter
+- **Receta (3×3)**:
+  ```
+  R C R
+  I L I
+  R C R
+  ```
+  > R = **Redstone** · C = **Mesa de crafteo** · I = **Lingote de Hierro** · L = **Atril (Lectern)**
+- **Resultado**: 1× Request Crafter
+- **Función**: Unidad de ejecución de crafteo bajo demanda controlada exclusivamente desde la Request Terminal. Almacena planos (blueprints) codificados para órdenes de crafteo personalizadas sin elaborarlos de forma automática en los ciclos periódicos de la red.
+
+---
 
 Esta documentación está pensada para servir como referencia rápida tanto a jugadores como a desarrolladores que quieran entender el funcionamiento de cada ítem y cómo fabricarlos. Las capacidades y velocidades citadas corresponden a los valores por defecto de `config.yml` y pueden ajustarse en ese archivo.

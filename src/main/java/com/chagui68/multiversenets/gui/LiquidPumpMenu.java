@@ -30,16 +30,8 @@ import java.util.Set;
  */
 public class LiquidPumpMenu extends MenuHolder {
 
-    public static final int MODE_SLOT = 10;
-    public static final int FLUID_FILTER_SLOT = 13;
-    public static final int DIRECTION_SLOT = 16;
-    public static final int INFO_SLOT = 22;
-
-    private static final int[] BG_SLOTS = {
-            0, 1, 2, 3, 4, 5, 6, 7, 8,
-            9, 11, 12, 14, 15, 17,
-            18, 19, 20, 21, 23, 24, 25, 26
-    };
+    public static final int FLUID_FILTER_SLOT = 12;
+    public static final int INFO_SLOT = 14;
 
     private static final String[] FLUID_CHOICES = {
             "ANY", "WATER", "LAVA"
@@ -74,24 +66,13 @@ public class LiquidPumpMenu extends MenuHolder {
         NodeBlob blob = blob();
 
         ItemStack bg = panel(Material.GRAY_STAINED_GLASS_PANE, " ");
-        for (int s : BG_SLOTS) {
-            inv.setItem(s, bg);
+        for (int s = 0; s < 27; s++) {
+            if (s != FLUID_FILTER_SLOT && s != INFO_SLOT) {
+                inv.setItem(s, bg);
+            }
         }
 
-        // 1. Pump Mode Button (Fixed to DRAIN below)
-        ItemStack modeItem = new ItemStack(Material.HOPPER);
-        var metaMode = modeItem.getItemMeta();
-        metaMode.displayName(Component.text("Pump Mode: DRAIN (Extract Below)", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
-        metaMode.lore(List.of(
-                Component.text("Drains liquid sources directly from the block below.", NamedTextColor.GRAY)
-                        .decoration(TextDecoration.ITALIC, false),
-                Component.text("Only accepts Water and Lava source blocks.", NamedTextColor.DARK_AQUA)
-                        .decoration(TextDecoration.ITALIC, false)
-        ));
-        modeItem.setItemMeta(metaMode);
-        inv.setItem(MODE_SLOT, modeItem);
-
-        // 2. Fluid Type Filter Button (ANY / WATER / LAVA)
+        // 1. Fluid Type Filter Button (ANY / WATER / LAVA)
         String currentFluid = blob.pumpFluid != null ? blob.pumpFluid.toUpperCase(java.util.Locale.ROOT) : "ANY";
         Material filterMat = switch (currentFluid) {
             case "WATER" -> Material.WATER_BUCKET;
@@ -109,19 +90,7 @@ public class LiquidPumpMenu extends MenuHolder {
         filterItem.setItemMeta(metaFilter);
         inv.setItem(FLUID_FILTER_SLOT, filterItem);
 
-        // 3. Direction Button (Fixed to DOWN)
-        ItemStack dirItem = new ItemStack(Material.COMPASS);
-        var metaDir = dirItem.getItemMeta();
-        metaDir.displayName(Component.text("Target Side: DOWN (Below)", NamedTextColor.YELLOW)
-                .decoration(TextDecoration.ITALIC, false));
-        metaDir.lore(List.of(
-                Component.text("Pumps exclusively from the block directly underneath.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                Component.text("Position pump directly above Water or Lava.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false)
-        ));
-        dirItem.setItemMeta(metaDir);
-        inv.setItem(DIRECTION_SLOT, dirItem);
-
-        // 4. Network Fluid Summary Info
+        // 2. Network Fluid Summary Info
         Network net = plugin.networks().networkAt(block);
         ItemStack infoItem = new ItemStack(Material.PRISMARINE_CRYSTALS);
         var metaInfo = infoItem.getItemMeta();
@@ -153,12 +122,6 @@ public class LiquidPumpMenu extends MenuHolder {
         int raw = event.getRawSlot();
         NodeBlob blob = blob();
 
-        if (raw == MODE_SLOT) {
-            player.sendMessage(Text.msg("Pump mode is fixed to DRAIN (Extract Below).", NamedTextColor.YELLOW));
-            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1.2f);
-            return;
-        }
-
         if (raw == FLUID_FILTER_SLOT) {
             String current = blob.pumpFluid != null ? blob.pumpFluid.toUpperCase(java.util.Locale.ROOT) : "ANY";
             int idx = 0;
@@ -173,12 +136,6 @@ public class LiquidPumpMenu extends MenuHolder {
             player.sendMessage(Text.msg("Fluid filter set to: " + (blob.pumpFluid == null ? "ANY" : blob.pumpFluid), NamedTextColor.GREEN));
             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1.2f);
             refresh();
-            return;
-        }
-
-        if (raw == DIRECTION_SLOT) {
-            player.sendMessage(Text.msg("Pumping direction is fixed to DOWN (Block Below).", NamedTextColor.YELLOW));
-            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1f, 1.2f);
         }
     }
 

@@ -90,7 +90,7 @@
 
 1. Place a **Controller**, surround the area with **Cables**, and connect **Cells**, **Grabbers/Pushers**, etc.
 2. Right-click the controller or a **Terminal** to open the Grid.
-3. In the terminal (the same conventions as the Networks grid): **left-click** takes 1 to the cursor, **right-click** a stack, **shift+click** sends to inventory; **shift+left-click** on your items inserts them into the network, or leave them in the **input slot** (right corner) and the network absorbs them. The magnifying glass/search label searches (right-click clears), the blue button changes the sort order, the 3rd button toggles Fluid Storage, and the arrows page.
+3. In the terminal (the same conventions as the Networks grid): **left-click** takes 1 to the cursor, **right-click** a stack, **shift+click** sends to inventory; **shift+left-click** on your items inserts them into the network, or leave them in the **input slot** (right corner) and the network absorbs them. The magnifying glass/search label searches (right-click clears), the blue button changes the sort order, the **Network Fluids Storage** button opens digital liquid storage, and the arrows page.
 4. Shift+click with a **Wireless Terminal** on the controller to bind it (then right-click in the air to open the network from a distance).
 5. **Encoder**: build the recipe in the template grid, put a blank **Blueprint** in the blue slot, and press *Encode*. That Blueprint is installed in an Auto-Crafter with a click on its list.
 6. **Receiver**: shift+click with the receiver item on a Transmitter, place it in another base and open it; give it a filter and it will also **bring items** from the transmitter's network.

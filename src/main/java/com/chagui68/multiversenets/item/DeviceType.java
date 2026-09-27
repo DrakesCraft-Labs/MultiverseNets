@@ -93,7 +93,9 @@ public enum DeviceType {
     /** Fluid pump node (drain liquids below) / Bomba de fluidos (drenar líquidos debajo) */
     MVN_LIQUID_PUMP(Material.BLUE_STAINED_GLASS, "Liquid Pump", true, -1),
     /** Crafting job requester and ordering terminal / Terminal de solicitud de crafteos */
-    MVN_REQUEST_TERMINAL(Material.LECTERN, "Request Terminal", true, -1);
+    MVN_REQUEST_TERMINAL(Material.LECTERN, "Request Terminal", true, -1),
+    /** On-demand crafting chamber managed via Request Terminal / Cámara de crafteo bajo demanda */
+    MVN_REQUEST_CRAFTER(Material.FLETCHING_TABLE, "Request Crafter", true, -1);
 
     private final Material material;
     private final String display;
@@ -161,6 +163,13 @@ public enum DeviceType {
      */
     public boolean isRequestTerminal() {
         return this == MVN_REQUEST_TERMINAL;
+    }
+
+    /**
+     * @return true if device is an on-demand request crafter / true si es crafteador bajo demanda
+     */
+    public boolean isRequestCrafter() {
+        return this == MVN_REQUEST_CRAFTER;
     }
 
     /**

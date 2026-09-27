@@ -121,11 +121,21 @@ public class TerminalMenu extends MenuHolder {
 
     private void drawFluids(ItemStack background) {
         java.util.Map<String, Long> allFluids = new java.util.LinkedHashMap<>(network.fluidStorage().getFluids());
-        for (String std : List.of("WATER", "LAVA", "MILK", "HONEY", "POWDER_SNOW")) {
-            allFluids.putIfAbsent(std, 0L);
+        List<java.util.Map.Entry<String, Long>> list = new ArrayList<>();
+        for (var entry : allFluids.entrySet()) {
+            if (entry.getValue() != null && entry.getValue() > 0) {
+                list.add(entry);
+            }
         }
 
-        List<java.util.Map.Entry<String, Long>> list = new ArrayList<>(allFluids.entrySet());
+        if (list.isEmpty()) {
+            for (int slot : DISPLAY_SLOTS) {
+                inv.setItem(slot, background);
+            }
+            inv.setItem(DISPLAY_SLOTS[22], panel(Material.GRAY_STAINED_GLASS_PANE, "No liquids currently stored"));
+            return;
+        }
+
         int pages = Math.max(1, (list.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         if (page >= pages) {
             page = pages - 1;
@@ -354,12 +364,12 @@ public class TerminalMenu extends MenuHolder {
         if (meta != null) {
             long totalMb = network.fluidStorage().getTotalAmountMb();
             int types = network.fluidStorage().getFluids().size();
-            meta.displayName(Component.text(showFluids ? "3rd Button: Network Fluids [ACTIVE]" : "3rd Button: Network Fluids Storage",
+            meta.displayName(Component.text(showFluids ? "Network Fluids Storage [ACTIVE]" : "Network Fluids Storage",
                     showFluids ? NamedTextColor.GREEN : NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
             meta.lore(List.of(
                     Component.text(showFluids
                             ? "Currently viewing all liquids stored in the network."
-                            : "Click to view and withdraw network liquids.", NamedTextColor.GRAY)
+                            : "Click to view liquids stored in the network.", NamedTextColor.GRAY)
                             .decoration(TextDecoration.ITALIC, false),
                     Component.text("Stored liquids: " + types + " types", NamedTextColor.YELLOW)
                             .decoration(TextDecoration.ITALIC, false),
@@ -401,12 +411,8 @@ public class TerminalMenu extends MenuHolder {
             meta.lore(List.of(
                     Component.text("Stored: " + Items.formatAmount(amountMb) + " mB (" + units + " " + unitName + ")", NamedTextColor.WHITE)
                             .decoration(TextDecoration.ITALIC, false),
-                    Component.text("Required Container: " + reqContainer, NamedTextColor.GOLD)
-                            .decoration(TextDecoration.ITALIC, false),
                     Component.empty(),
-                    Component.text("Left Click: Withdraw 1 " + ("HONEY".equalsIgnoreCase(fluidType) ? "Bottle" : "Bucket"), NamedTextColor.YELLOW)
-                            .decoration(TextDecoration.ITALIC, false),
-                    Component.text("Shift + Left Click: Fill All in Inventory", NamedTextColor.GREEN)
+                    Component.text("Left Click: Withdraw 1 (" + reqContainer + ")", NamedTextColor.GRAY)
                             .decoration(TextDecoration.ITALIC, false),
                     Component.empty(),
                     Component.text("▪ MultiverseNets", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false)

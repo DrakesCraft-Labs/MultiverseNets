@@ -97,73 +97,76 @@ public class RequestTerminalMenu extends MenuHolder {
 
     private void scanCraftables() {
         options.clear();
-        network.forEach(DeviceType.MVN_CRAFTER, (pos, type) -> {
-            int cx = PosUtil.unpackX(pos) >> 4;
-            int cz = PosUtil.unpackZ(pos) >> 4;
-            if (!network.world().isChunkLoaded(cx, cz)) {
-                return;
-            }
-            Block crafterBlock = network.block(pos);
-            if (crafterBlock == null) {
-                return;
-            }
-            NodeBlob blob = NodeStore.get(crafterBlock);
-            if (blob == null) {
-                return;
-            }
+        network.forEach(DeviceType.MVN_CRAFTER, (pos, type) -> scanCrafter(pos));
+        network.forEach(DeviceType.MVN_REQUEST_CRAFTER, (pos, type) -> scanCrafter(pos));
+    }
 
-            // 1. Blueprints
-            for (String b64 : blob.blueprintData) {
-                RecipeData data = Blueprints.decode(b64);
-                if (data == null || data.output == null) {
+    private void scanCrafter(long pos) {
+        int cx = PosUtil.unpackX(pos) >> 4;
+        int cz = PosUtil.unpackZ(pos) >> 4;
+        if (!network.world().isChunkLoaded(cx, cz)) {
+            return;
+        }
+        Block crafterBlock = network.block(pos);
+        if (crafterBlock == null) {
+            return;
+        }
+        NodeBlob blob = NodeStore.get(crafterBlock);
+        if (blob == null) {
+            return;
+        }
+
+        // 1. Blueprints
+        for (String b64 : blob.blueprintData) {
+            RecipeData data = Blueprints.decode(b64);
+            if (data == null || data.output == null) {
+                continue;
+            }
+            List<IngredientNeed> needs = new ArrayList<>();
+            for (ItemStack in : data.inputs) {
+                if (in == null || in.getType().isAir()) {
                     continue;
                 }
-                List<IngredientNeed> needs = new ArrayList<>();
-                for (ItemStack in : data.inputs) {
-                    if (in == null || in.getType().isAir()) {
-                        continue;
-                    }
-                    boolean merged = false;
-                    for (int i = 0; i < needs.size(); i++) {
-                        IngredientNeed n = needs.get(i);
-                        if (StackUtils.itemsMatch(n.sample(), in)) {
-                            needs.set(i, new IngredientNeed(n.sample(), n.amount() + 1));
-                            merged = true;
-                            break;
-                        }
-                    }
-                    if (!merged) {
-                        needs.add(new IngredientNeed(StackUtils.getAsQuantity(in, 1), 1));
+                boolean merged = false;
+                for (int i = 0; i < needs.size(); i++) {
+                    IngredientNeed n = needs.get(i);
+                    if (StackUtils.itemsMatch(n.sample(), in)) {
+                        needs.set(i, new IngredientNeed(n.sample(), n.amount() + 1));
+                        merged = true;
+                        break;
                     }
                 }
-                String name = Blueprints.readableName(data.output);
-                options.add(new CraftableOption(data.output.clone(), name, data, null, needs, pos));
+                if (!merged) {
+                    needs.add(new IngredientNeed(StackUtils.getAsQuantity(in, 1), 1));
+                }
             }
+            String name = Blueprints.readableName(data.output);
+            options.add(new CraftableOption(data.output.clone(), name, data, null, needs, pos));
+        }
 
-            // 2. Legacy / Vanilla registered recipes
-            for (String key : blob.recipes) {
-                Recipe rec = CraftingSupport.find(key);
-                if (rec == null) {
-                    continue;
-                }
-                var reqs = CraftingSupport.requirements(rec);
-                List<IngredientNeed> needs = new ArrayList<>();
-                for (var r : reqs) {
-                    RecipeChoice choice = r.getKey();
-                    ItemStack sample = null;
-                    if (choice instanceof RecipeChoice.MaterialChoice mc && !mc.getChoices().isEmpty()) {
-                        sample = new ItemStack(mc.getChoices().get(0));
-                    } else if (choice instanceof RecipeChoice.ExactChoice ec && !ec.getChoices().isEmpty()) {
-                        sample = ec.getChoices().get(0).clone();
-                    }
-                    if (sample != null) {
-                        needs.add(new IngredientNeed(sample, r.getValue()));
-                    }
-                }
-                String name = Blueprints.readableName(rec.getResult());
-                options.add(new CraftableOption(rec.getResult().clone(), name, null, rec, needs, pos));
+        // 2. Legacy / Vanilla registered recipes
+        for (String key : blob.recipes) {
+            Recipe rec = CraftingSupport.find(key);
+            if (rec == null) {
+                continue;
             }
-        });
+            var reqs = CraftingSupport.requirements(rec);
+            List<IngredientNeed> needs = new ArrayList<>();
+            for (var r : reqs) {
+                RecipeChoice choice = r.getKey();
+                ItemStack sample = null;
+                if (choice instanceof RecipeChoice.MaterialChoice mc && !mc.getChoices().isEmpty()) {
+                    sample = new ItemStack(mc.getChoices().get(0));
+                } else if (choice instanceof RecipeChoice.ExactChoice ec && !ec.getChoices().isEmpty()) {
+                    sample = ec.getChoices().get(0).clone();
+                }
+                if (sample != null) {
+                    needs.add(new IngredientNeed(sample, r.getValue()));
+                }
+            }
+            String name = Blueprints.readableName(rec.getResult());
+            options.add(new CraftableOption(rec.getResult().clone(), name, null, rec, needs, pos));
+        }
     }
 
     @Override

@@ -102,6 +102,7 @@ Cada dispositivo se fabrica en una mesa de crafteo 3×3 estándar. `·` marca el
 | Quantum Fluid Cell | <pre>G B G<br/>G L G<br/>G G G</pre> | G = Cristal · B = Cubo · L = Bloque de lapislázuli |
 | Liquid Pump | <pre>· G ·<br/>P B P<br/>· R ·</pre> | G = Cristal azul oscuro · P = Pistón · B = Cubo · R = Redstone |
 | Request Terminal | <pre>G L G<br/>R C R<br/>G G G</pre> | G = Cristal · L = Atril · C = Mesa de crafteo · R = Redstone |
+| Request Crafter | <pre>R C R<br/>I L I<br/>R C R</pre> | R = Redstone · C = Mesa de crafteo · I = Lingote de hierro · L = Atril |
 
 
 ## ⌨️ Comandos

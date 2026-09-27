@@ -72,8 +72,6 @@ public class MultiverseNets extends JavaPlugin {
         ticker = new NetworkTicker(this, networks);
         ticker.start();
 
-        new com.chagui68.multiversenets.net.NetworkActionBarTask(this).runTaskTimer(this, 10L, 10L);
-
         PluginCommand command = getCommand("mvnets");
         if (command != null) {
             MvnetsCommand executor = new MvnetsCommand(this);

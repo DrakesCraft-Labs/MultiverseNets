@@ -71,4 +71,12 @@ class DeviceTypeTest {
         assertEquals("Simple Pusher", DeviceType.MVN_PUSHER.display());
         assertEquals("Advanced Pusher", DeviceType.MVN_PUSHER_HT.display());
     }
+
+    @Test
+    void testRequestCrafterProperties() {
+        assertTrue(DeviceType.MVN_REQUEST_CRAFTER.isRequestCrafter());
+        assertFalse(DeviceType.MVN_CRAFTER.isRequestCrafter());
+        assertTrue(DeviceType.MVN_REQUEST_CRAFTER.placeable());
+        assertEquals("Request Crafter", DeviceType.MVN_REQUEST_CRAFTER.display());
+    }
 }

@@ -541,6 +541,21 @@ Internal multi-item storage installed directly into the **Network Controller** b
   ```
   > G = **Glass** · L = **Lectern** · C = **Crafting Table** · R = **Redstone**
 - **Result**: 1× Request Terminal
-- **Function**: On-demand crafting console. Discovers all recipes configured in connected Auto-Crafters across the network, displays required raw materials vs on-hand storage, and allows players to order batch crafting jobs delivered directly to inventory or network storage. Left click crafts 1x, Right click crafts 64x, and Shift + Right Click opens an interactive chat prompt allowing the player to specify a custom numeric batch amount (canceling automatically on non-numeric inputs or values $\le 0$).
+- **Function**: On-demand crafting console. Discovers all recipes configured in connected Crafters across the network, displays required raw materials vs on-hand storage, and allows players to order batch crafting jobs delivered directly to inventory or network storage. Left click crafts 1x, Right click crafts 64x, and Shift + Right Click opens an interactive chat prompt allowing the player to specify a custom numeric batch amount (canceling automatically on non-numeric inputs or values $\le 0$).
+
+---
+
+## Request Crafter
+- **Recipe (3×3)**:
+  ```
+  R C R
+  I L I
+  R C R
+  ```
+  > R = **Redstone** · C = **Crafting Table** · I = **Iron Ingot** · L = **Lectern**
+- **Result**: 1× Request Crafter
+- **Function**: On-demand crafting execution unit managed exclusively via the Request Terminal. Holds encoded blueprints for custom crafting jobs without automatically crafting them on recurring network cycles.
+
+---
 
 This documentation is meant as a quick reference for both players and developers who want to understand what each item does and how to craft it. The capacities and speeds quoted are the `config.yml` defaults and can be tuned in that file.

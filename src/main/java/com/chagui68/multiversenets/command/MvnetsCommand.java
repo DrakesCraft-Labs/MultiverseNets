@@ -106,46 +106,207 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
 
             // Page 1: Welcome & Overview
             meta.addPage("§1§lMultiverseNets§r\n"
-                    + "§8Digital Logistics & Massive Storage§r\n\n"
+                    + "§8Digital Logistics Guide§r\n\n"
                     + "Welcome to MultiverseNets!\n\n"
-                    + "This plugin delivers high-performance digital item and fluid networking, deep quantum storage, and recipe automation — running natively on Paper with zero dependencies.");
+                    + "High-performance digital item & fluid networking, deep quantum storage, and recipe automation.\n\n"
+                    + "Everything is crafted in a standard Crafting Table.\n\n"
+                    + "§8Flip pages for all crafting recipes!§0");
 
             // Page 2: Core Components
-            meta.addPage("§1§lCore Components§r\n\n"
-                    + "§9Controller:§0 Central brain of the network. Needs power/cables and accepts CPU Cache modules.\n\n"
-                    + "§9Cables:§0 Connects all network devices.\n\n"
-                    + "§9Terminal:§0 Central console to search, store, and withdraw items and liquids.");
+            meta.addPage("§1§lCore System§r\n\n"
+                    + "§9Controller:§0 Brain of the network. Connect cables to it. Accepts CPU Caches.\n\n"
+                    + "§9Cables:§0 Connects all network devices together.\n\n"
+                    + "§9Terminal:§0 Search & manage items. Includes the §1Network Fluids Storage§0 button for liquid tanks!");
 
-            // Page 3: Item Storage
-            meta.addPage("§1§lItem Storage§r\n\n"
-                    + "§9Quantum Cells (T1-T6):§0 Stores a single item type from 65K up to millions.\n\n"
-                    + "§9Infinity Barrel:§0 Infinite storage for a single item type.\n\n"
-                    + "§9Greedy Cell:§0 Continuously pulls target items from the net into its fast local buffer.");
+            // Page 3: Controller Recipe
+            meta.addPage("§1§lController§r\n"
+                    + "§8Central Network Brain§r\n\n"
+                    + "§9Recipe:§0\n"
+                    + "[IronBlk] [IronBlk] [IronBlk]\n"
+                    + "[IronBlk] [Nether*] [IronBlk]\n"
+                    + "[IronBlk] [IronBlk] [IronBlk]\n\n"
+                    + "§8• 8x Iron Block\n"
+                    + "• 1x Nether Star§0");
 
-            // Page 4: Logistics & Movement
-            meta.addPage("§1§lLogistics & Flow§r\n\n"
-                    + "§9Grabbers:§0 Pulls items from adjacent inventories into the net.\n\n"
-                    + "§9Pushers:§0 Exports network items into target chests.\n\n"
-                    + "§9Vacuum:§0 Absorbs dropped items on the ground.\n\n"
-                    + "§9Quota Limiter:§0 Limits maximum network stock for items.");
+            // Page 4: Cables & Terminal Recipe
+            meta.addPage("§1§lCables & Terminal§r\n\n"
+                    + "§9Cable (x16):§0\n"
+                    + "[Glass] [Glass] [Glass]\n"
+                    + "[Glass] [Redst] [Glass]\n"
+                    + "[Glass] [Glass] [Glass]\n\n"
+                    + "§9Terminal:§0\n"
+                    + "[Glass] [E-Pearl] [Glass]\n"
+                    + "[E-Pearl] [Beacon] [E-Pearl]\n"
+                    + "[Glass] [E-Pearl] [Glass]");
 
-            // Page 5: Fluids System
+            // Page 5: Quantum Cells Recipe
+            meta.addPage("§1§lQuantum Cells§r\n\n"
+                    + "§9Cell Tier 1 (65K):§0\n"
+                    + "[Glass] [Glass] [Glass]\n"
+                    + "[Glass] [Diamd] [Glass]\n"
+                    + "[Glass] [Glass] [Glass]\n\n"
+                    + "§9Tiers 2 to 6:§0\n"
+                    + "Surround the previous tier cell with 8 Diamonds in the Crafting Table!");
+
+            // Page 6: Greedy Cell & Infinity Barrel
+            meta.addPage("§1§lSpecial Storage§r\n\n"
+                    + "§9Greedy Cell:§0\n"
+                    + "[Gold] [Hopper] [Gold]\n"
+                    + "[Hopper] [Slime] [Hopper]\n"
+                    + "[Gold] [Hopper] [Gold]\n\n"
+                    + "§9Infinity Barrel:§0\n"
+                    + "[Netherite] [DiaBlk] [Netherite]\n"
+                    + "[DiaBlk] [Barrel] [DiaBlk]\n"
+                    + "[Netherite] [DiaBlk] [Netherite]");
+
+            // Page 7: Fluids System
             meta.addPage("§1§lFluids System§r\n\n"
-                    + "§9Quantum Fluid Cell:§0 Digital tank storing up to 64,000+ mB of Water, Lava, Milk, Honey, or Powder Snow.\n\n"
-                    + "§9Liquid Pump:§0 Placed above Water or Lava to pump liquid sources directly from the block underneath into the net.\n\n"
-                    + "§9Terminal (3rd Button):§0 Withdraw network fluids using Buckets or Bottles!");
+                    + "§9Quantum Fluid Cell:§0\n"
+                    + "[Glass] [Bucket] [Glass]\n"
+                    + "[Glass] [LapisBlk] [Glass]\n"
+                    + "[Glass] [Glass] [Glass]\n\n"
+                    + "§9Liquid Pump:§0\n"
+                    + "[Air] [BlueGlass] [Air]\n"
+                    + "[Piston] [Bucket] [Piston]\n"
+                    + "[Air] [Redstone] [Air]\n"
+                    + "§8Pumps Water/Lava directly below it into the net!§0");
 
-            // Page 6: Crafting & Automation
-            meta.addPage("§1§lCrafting & Jobs§r\n\n"
-                    + "§9Auto-Crafter:§0 Automates crafting recipes installed on Blueprints.\n\n"
-                    + "§9Recipe Encoders:§0 Writes vanilla or Slimefun recipes onto Blueprints.\n\n"
-                    + "§9Request Terminal:§0 Order custom crafting quantities on-demand via chat or buttons directly from network crafters!");
+            // Page 8: Grabbers
+            meta.addPage("§1§lImport Grabbers§r\n\n"
+                    + "§9Standard Grabber:§0\n"
+                    + "[Iron] [Observ] [Iron]\n"
+                    + "[Observ] [RedBlk] [Observ]\n"
+                    + "[Iron] [Observ] [Iron]\n\n"
+                    + "§9Grabber HT:§0\n"
+                    + "[Observ] [StickyPist] [Observ]\n"
+                    + "§8Single row recipe. Moves up to 128 items!§0");
 
-            // Page 7: Tools & Tips
-            meta.addPage("§1§lTools & Quick Tips§r\n\n"
-                    + "§9Network Probe:§0 Right-click nodes to view throughput, connections, and diagnostic logs.\n\n"
-                    + "§9Rake:§0 Instantly dismantles network nodes without damage.\n\n"
-                    + "§9Shift + Right Click:§0 Directly access containers through nodes.");
+            // Page 9: Pushers
+            meta.addPage("§1§lExport Pushers§r\n\n"
+                    + "§9Standard Pusher:§0\n"
+                    + "[Iron] [Droppr] [Iron]\n"
+                    + "[Droppr] [RedBlk] [Droppr]\n"
+                    + "[Iron] [Droppr] [Iron]\n\n"
+                    + "§9Pusher HT:§0\n"
+                    + "[Droppr] [Piston] [Droppr]\n"
+                    + "§8Single row recipe. Exports up to 128 items!§0");
+
+            // Page 10: Vacuum & Purger
+            meta.addPage("§1§lCleanup Devices§r\n\n"
+                    + "§9Vacuum:§0\n"
+                    + "[String] [Redst] [String]\n"
+                    + "[Redst] [Hopper] [Redst]\n"
+                    + "[String] [Redst] [String]\n\n"
+                    + "§9Purger (Incinerator):§0\n"
+                    + "[Iron] [Magma] [Iron]\n"
+                    + "[Magma] [Hopper] [Magma]\n"
+                    + "[Iron] [Magma] [Iron]");
+
+            // Page 11: Limiter & Router
+            meta.addPage("§1§lLogistics Control§r\n\n"
+                    + "§9Quota Limiter:§0\n"
+                    + "[Redst] [Compar] [Redst]\n"
+                    + "[Compar] [Target] [Compar]\n"
+                    + "[Redst] [Compar] [Redst]\n\n"
+                    + "§9Subnet Router:§0\n"
+                    + "[Air] [LightningRod] [Air]\n"
+                    + "[Air] [Cable] [Air]\n"
+                    + "[Air] [RedstoneBlock] [Air]");
+
+            // Page 12: Crafters
+            meta.addPage("§1§lCrafters§r\n\n"
+                    + "§9Auto-Crafter:§0\n"
+                    + "[Redst] [CraftTbl] [Redst]\n"
+                    + "[Iron] [Target] [Iron]\n"
+                    + "[Redst] [CraftTbl] [Redst]\n\n"
+                    + "§9Request Crafter:§0\n"
+                    + "[Redst] [CraftTbl] [Redst]\n"
+                    + "[Iron] [Lectern] [Iron]\n"
+                    + "[Redst] [CraftTbl] [Redst]\n"
+                    + "§8Only crafts when ordered!§0");
+
+            // Page 13: Request Terminal & Blueprint
+            meta.addPage("§1§lJob Ordering§r\n\n"
+                    + "§9Request Terminal:§0\n"
+                    + "[Glass] [Lectern] [Glass]\n"
+                    + "[Redst] [CraftTbl] [Redst]\n"
+                    + "[Glass] [Glass] [Glass]\n\n"
+                    + "§9Blank Blueprint (x4):§0\n"
+                    + "[Paper] [Paper] [Paper]\n"
+                    + "[Paper] [BlueDye] [Paper]\n"
+                    + "[Paper] [Paper] [Paper]");
+
+            // Page 14: Recipe Encoders
+            meta.addPage("§1§lRecipe Encoders§r\n\n"
+                    + "§9Vanilla Encoder:§0\n"
+                    + "[InkSac] [Paper] [InkSac]\n"
+                    + "[Paper] [Smithing] [Paper]\n"
+                    + "[InkSac] [Paper] [InkSac]\n\n"
+                    + "§9Slimefun Encoder:§0\n"
+                    + "[E-Pearl] [Paper] [E-Pearl]\n"
+                    + "[Paper] [EnchantT] [Paper]\n"
+                    + "[E-Pearl] [Paper] [E-Pearl]");
+
+            // Page 15: Workbenches
+            meta.addPage("§1§lWorkbenches§r\n\n"
+                    + "§9Crafting Grid:§0\n"
+                    + "[CraftTbl] [Redst] [CraftTbl]\n"
+                    + "[Redst] [Cartography] [Redst]\n"
+                    + "[CraftTbl] [Redst] [CraftTbl]\n\n"
+                    + "§9Quantum Workbench:§0\n"
+                    + "[Diamd] [Diamd] [Diamd]\n"
+                    + "[Diamd] [CraftTbl] [Diamd]\n"
+                    + "[Diamd] [Diamd] [Diamd]");
+
+            // Page 16: Monitor & Wireless Terminal
+            meta.addPage("§1§lMonitor & Wireless§r\n\n"
+                    + "§9Network Monitor:§0\n"
+                    + "Surround 1x Comparator with 8x Glass Panes.\n\n"
+                    + "§9Wireless Terminal:§0\n"
+                    + "[Air] [E-Pearl] [Air]\n"
+                    + "[E-Pearl] [Nether*] [E-Pearl]\n"
+                    + "[Air] [Compass] [Air]\n"
+                    + "§8Shift+Right click Controller to bind!§0");
+
+            // Page 17: Transmitter & Receiver
+            meta.addPage("§1§lCross-Chunk Links§r\n\n"
+                    + "§9Transmitter:§0\n"
+                    + "[Iron] [RedBlk] [Iron]\n"
+                    + "[RedBlk] [Conduit] [RedBlk]\n"
+                    + "[Iron] [RedBlk] [Iron]\n\n"
+                    + "§9Receiver:§0\n"
+                    + "[Iron] [E-Pearl] [Iron]\n"
+                    + "[E-Pearl] [RedLamp] [E-Pearl]\n"
+                    + "[Iron] [E-Pearl] [Iron]");
+
+            // Page 18: CPU Caches
+            meta.addPage("§1§lCPU Cache Modules§r\n\n"
+                    + "§9Cache L1:§0 Copper & Redstone.\n\n"
+                    + "§9Cache L2:§0 Gold & Lapis around L1.\n\n"
+                    + "§9Cache L3:§0 Diamond & Amethyst around L2.\n\n"
+                    + "§9Cache DRAM:§0 Netherite & Eye of Ender around L3.\n\n"
+                    + "§9Quantum Cache:§0 Netherite Block & Nether Star around DRAM.\n\n"
+                    + "§8Right-click Controller to install!§0");
+
+            // Page 19: Tools
+            meta.addPage("§1§lNetwork Tools§r\n\n"
+                    + "§9Network Probe:§0\n"
+                    + "Amethyst shards surrounding Spyglass.\n\n"
+                    + "§9Network Rake:§0\n"
+                    + "[DeadBush] [Air] [DeadBush]\n"
+                    + "[Air] [Stick] [Air]\n"
+                    + "[Air] [Stick] [Air]\n\n"
+                    + "§9Configurator:§0\n"
+                    + "Iron Ingots & Comparator.");
+
+            // Page 20: Controls & Tips
+            meta.addPage("§1§lTips & Interactions§r\n\n"
+                    + "§9Shift + Right Click:§0\n"
+                    + "Access containers and machines through any network node (supports Vanilla & Slimefun)!\n\n"
+                    + "§9Network Fluids:§0\n"
+                    + "In Terminal, click Network Fluids Storage to inspect and withdraw liquids using buckets/bottles.\n\n"
+                    + "§9Request Terminal:§0\n"
+                    + "Shift+Right Click to type custom amount in chat!");
 
             book.setItemMeta(meta);
         }

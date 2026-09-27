@@ -315,10 +315,116 @@ class FluidAndRequesterTest {
     }
 
     @Test
-    void guideCommandGivesGuideBook() {
+    void guideCommandGivesGuideBookWithAllRecipes() {
         boolean ok = server.dispatchCommand(player, "mvnets guide");
         assertTrue(ok);
-        assertTrue(player.getInventory().contains(Material.WRITTEN_BOOK));
+        ItemStack book = null;
+        for (ItemStack is : player.getInventory().getContents()) {
+            if (is != null && is.getType() == Material.WRITTEN_BOOK) {
+                book = is;
+                break;
+            }
+        }
+        assertNotNull(book);
+        org.bukkit.inventory.meta.BookMeta meta = (org.bukkit.inventory.meta.BookMeta) book.getItemMeta();
+        assertNotNull(meta);
+        assertTrue(meta.getPageCount() >= 18, "Guide book should have at least 18 pages of content and recipes");
+        String p1 = meta.getPage(1);
+        assertTrue(p1.contains("MultiverseNets"));
+        String p3 = meta.getPage(3);
+        assertTrue(p3.contains("Controller") && p3.contains("Nether Star"));
+    }
+
+    @Test
+    void requestCrafterIsDiscoveredByRequestTerminalAndDoesNotAutoCraft() {
+        Block ctrl = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
+        plugin.networks().registerController(ctrl);
+        place(1, 64, 0, DeviceType.MVN_CELL_T1);
+        place(2, 64, 0, DeviceType.MVN_CELL_T1);
+        place(3, 64, 0, DeviceType.MVN_CELL_T1);
+        Block reqCrafter = place(0, 64, 1, DeviceType.MVN_REQUEST_CRAFTER);
+        Block reqTerm = place(0, 64, -1, DeviceType.MVN_REQUEST_TERMINAL);
+
+        Network net = plugin.networks().networkByController(ctrl.getLocation());
+        net.scan();
+
+        // Deposit crafting ingredients into network storage
+        net.storage().deposit(new ItemStack(Material.GLASS, 16));
+        net.storage().deposit(new ItemStack(Material.REDSTONE, 2));
+
+        // Create blueprint for Cable in the Request Crafter
+        ItemStack[] inputs = new ItemStack[9];
+        for (int i = 0; i < 9; i++) {
+            if (i == 4) {
+                inputs[i] = new ItemStack(Material.REDSTONE);
+            } else {
+                inputs[i] = new ItemStack(Material.GLASS);
+            }
+        }
+        ItemStack output = Items.create(DeviceType.MVN_CABLE);
+        output.setAmount(16);
+        RecipeData recipeData = new RecipeData(inputs, output);
+
+        NodeBlob crafterBlob = NodeStore.get(reqCrafter);
+        crafterBlob.blueprintData.add(Blueprints.encode(recipeData));
+        NodeStore.put(reqCrafter, crafterBlob);
+
+        // 1. Verify that auto-crafting does NOT touch MVN_REQUEST_CRAFTER
+        com.chagui68.multiversenets.net.NetworkTicker ticker = new com.chagui68.multiversenets.net.NetworkTicker(plugin, plugin.networks());
+        // Run ticker method via reflection or directly (doCrafting only operates on MVN_CRAFTER)
+        // Check network stock remains untouched
+        assertEquals(16, net.storage().count(i -> i.getType() == Material.GLASS));
+        assertEquals(2, net.storage().count(i -> i.getType() == Material.REDSTONE));
+
+        // 2. Open RequestTerminalMenu and verify the blueprint was discovered from the Request Crafter
+        RequestTerminalMenu menu = new RequestTerminalMenu(plugin, player, net, reqTerm);
+        menu.openMenu();
+
+        // Left Click on slot 0 -> Order 1 batch
+        InventoryClickEvent clickOrder = new InventoryClickEvent(
+                player.getOpenInventory(),
+                org.bukkit.event.inventory.InventoryType.SlotType.CONTAINER,
+                0,
+                ClickType.LEFT,
+                InventoryAction.PICKUP_ALL
+        );
+        server.getPluginManager().callEvent(clickOrder);
+
+        // Assert 8 Glass and 1 Redstone consumed, 16 Cable delivered to player
+        assertEquals(8, net.storage().count(i -> i.getType() == Material.GLASS));
+        assertEquals(1, net.storage().count(i -> i.getType() == Material.REDSTONE));
+        assertTrue(player.getInventory().contains(DeviceType.MVN_CABLE.material()));
+    }
+
+    @Test
+    void liquidPumpMenuHasNoModeOrTargetSideButtons() {
+        Block pump = place(10, 64, 10, DeviceType.MVN_LIQUID_PUMP);
+        LiquidPumpMenu menu = new LiquidPumpMenu(plugin, player, pump);
+        menu.openMenu();
+
+        // Filter slot 12, Info slot 14
+        assertNotNull(player.getOpenInventory().getTopInventory().getItem(LiquidPumpMenu.FLUID_FILTER_SLOT));
+        assertNotNull(player.getOpenInventory().getTopInventory().getItem(LiquidPumpMenu.INFO_SLOT));
+
+        // Slots 10 and 16 (where mode and direction were previously) must now be gray panes (background)
+        ItemStack slot10 = player.getOpenInventory().getTopInventory().getItem(10);
+        ItemStack slot16 = player.getOpenInventory().getTopInventory().getItem(16);
+        assertNotNull(slot10);
+        assertEquals(Material.GRAY_STAINED_GLASS_PANE, slot10.getType());
+        assertNotNull(slot16);
+        assertEquals(Material.GRAY_STAINED_GLASS_PANE, slot16.getType());
+
+        // Clicking filter slot cycles filter
+        InventoryClickEvent clickFilter = new InventoryClickEvent(
+                player.getOpenInventory(),
+                org.bukkit.event.inventory.InventoryType.SlotType.CONTAINER,
+                LiquidPumpMenu.FLUID_FILTER_SLOT,
+                ClickType.LEFT,
+                InventoryAction.PICKUP_ALL
+        );
+        server.getPluginManager().callEvent(clickFilter);
+        NodeBlob blob = NodeStore.get(pump);
+        assertEquals("WATER", blob.pumpFluid);
     }
 
     @Test

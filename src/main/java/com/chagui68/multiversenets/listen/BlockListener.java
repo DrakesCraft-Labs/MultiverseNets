@@ -592,7 +592,7 @@ public class BlockListener implements Listener {
                 new SfEncoderMenu(plugin, player, block).openMenu();
                 return true;
             }
-            case MVN_CRAFTER -> {
+            case MVN_CRAFTER, MVN_REQUEST_CRAFTER -> {
                 new CrafterMenu(plugin, player, block).openMenu();
                 return true;
             }
