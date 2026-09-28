@@ -370,4 +370,38 @@ class GreedyCellTest {
         assertEquals(Material.GOLD_INGOT, restored.greedySamples.get(1).getType());
         assertEquals(256, restored.greedyAmounts.get(1));
     }
+
+    @Test
+    void openGreedyCellAcceptsDepositWhenNoOtherStorage() {
+        Block controller = world.getBlockAt(20, 64, 20);
+        controller.setType(Material.LODESTONE);
+        NodeStore.put(controller, NodeBlob.create(DeviceType.MVN_CONTROLLER.name()));
+        plugin.networks().registerController(controller);
+
+        Block greedy = world.getBlockAt(21, 64, 20);
+        greedy.setType(Material.SLIME_BLOCK);
+        NodeBlob greedyBlob = NodeBlob.create(DeviceType.MVN_GREEDY_CELL.name());
+        NodeStore.put(greedy, greedyBlob);
+
+        Network net = plugin.networks().networkAt(controller);
+        assertNotNull(net);
+        net.scan();
+
+        // Deposit 100 Diamonds into network with only an empty Greedy Cell
+        int leftover = net.storage().deposit(new ItemStack(Material.DIAMOND, 100));
+        assertEquals(0, leftover, "Open greedy cell should accept deposit when no other storage exists");
+
+        assertEquals(100, net.storage().getGreedyStoredAmount(new ItemStack(Material.DIAMOND)));
+        assertEquals(100, net.storage().count(item -> item.getType() == Material.DIAMOND));
+
+        // Automated withdraw from pushers (includeGreedy = false) should NOT withdraw from greedy cell
+        ItemStack pusherWithdraw = net.storage().withdraw(item -> item.getType() == Material.DIAMOND, 50, -1L, false);
+        assertNull(pusherWithdraw, "Automated withdraw (pusher/purger) must not drain greedy cell");
+
+        // Player withdraw (includeGreedy = true) should withdraw
+        ItemStack playerWithdraw = net.storage().withdraw(item -> item.getType() == Material.DIAMOND, 50);
+        assertNotNull(playerWithdraw);
+        assertEquals(50, playerWithdraw.getAmount());
+        assertEquals(50, net.storage().getGreedyStoredAmount(new ItemStack(Material.DIAMOND)));
+    }
 }

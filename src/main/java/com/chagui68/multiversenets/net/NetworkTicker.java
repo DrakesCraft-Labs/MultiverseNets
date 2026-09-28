@@ -130,11 +130,16 @@ public class NetworkTicker {
     }
 
     private BlockFace[] facesFor(NodeBlob blob) {
-        if (blob != null && blob.targetFace != null && !blob.targetFace.equalsIgnoreCase("ALL")) {
-            try {
-                BlockFace single = BlockFace.valueOf(blob.targetFace.toUpperCase(java.util.Locale.ROOT));
-                return new BlockFace[]{single};
-            } catch (IllegalArgumentException ignored) {
+        if (blob != null && blob.targetFace != null) {
+            if ("NONE".equalsIgnoreCase(blob.targetFace)) {
+                return new BlockFace[0];
+            }
+            if (!blob.targetFace.equalsIgnoreCase("ALL")) {
+                try {
+                    BlockFace single = BlockFace.valueOf(blob.targetFace.toUpperCase(java.util.Locale.ROOT));
+                    return new BlockFace[]{single};
+                } catch (IllegalArgumentException ignored) {
+                }
             }
         }
         return FACES;
@@ -306,7 +311,7 @@ public class NetworkTicker {
         }
 
         Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
-        ItemStack stack = net.storage().withdraw(pred, rate);
+        ItemStack stack = net.storage().withdraw(pred, rate, -1L, false);
         if (stack == null) {
             backoffCycles.put(pos, Math.min(30, backoff + 1));
             return;
@@ -346,7 +351,11 @@ public class NetworkTicker {
             backoffCycles.put(pos, Math.min(30, backoff + 1));
         }
         if (stack.getAmount() > 0) {
-            net.storage().deposit(stack);
+            int leftover = net.storage().deposit(stack);
+            if (leftover > 0) {
+                stack.setAmount(leftover);
+                dropAt(self, stack);
+            }
         }
     }
 
@@ -366,7 +375,7 @@ public class NetworkTicker {
             return;
         }
         Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
-        ItemStack purged = net.storage().withdraw(pred, rate);
+        ItemStack purged = net.storage().withdraw(pred, rate, -1L, false);
         if (purged == null) {
             return;
         }
@@ -379,7 +388,7 @@ public class NetworkTicker {
 
     /**
      * EN: Ticks a Greedy Cell: claims its configured item from the network and distributes it to adjacent containers.
- *
+     *
      * ES: Procesa una Greedy Cell: solicita su ítem a la red hasta llenarse y lo sirve a contenedores vecinos.
      */
     private void greedyTick(Network net, long pos) {
@@ -390,6 +399,7 @@ public class NetworkTicker {
         }
         long cap = Settings.greedyCapacity();
         long currentTotal = blob.totalGreedyAmount();
+        boolean changed = false;
 
         // 1. Suction: pull matching items from network into greedy storage up to shared cap
         if (currentTotal < cap) {
@@ -399,14 +409,15 @@ public class NetworkTicker {
                 Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
                 long space = cap - currentTotal;
                 int want = (int) Math.min(space, (long) Settings.itemsPerOp() * 4);
-                ItemStack got = net.storage().withdraw(pred, want, pos);
+                ItemStack got = net.storage().withdraw(pred, want, pos, false);
                 if (got != null && got.getAmount() > 0) {
                     blob.addGreedyItem(got, got.getAmount());
+                    changed = true;
                 }
             }
         }
 
-        // 2. Distribution: push stored items into adjacent containers
+        // 2. Distribution: push stored items into adjacent containers (NOT other network nodes!)
         if (blob.totalGreedyAmount() > 0 && blob.greedySamples != null && !blob.greedySamples.isEmpty()) {
             int maxTake = (int) Math.min(blob.totalGreedyAmount(), Settings.itemsPerOp() * 2L);
             int movedTotal = 0;
@@ -420,6 +431,10 @@ public class NetworkTicker {
                 int roundMoved = 0;
                 for (BlockFace face : facesFor(blob)) {
                     Block target = block.getRelative(face);
+                    // Critical: Do NOT dump into other network nodes (e.g. Infinity Barrel, Crafter, etc.)
+                    if (NodeStore.hasNode(target)) {
+                        continue;
+                    }
                     Material targetMat = target.getType();
                     if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
                         ItemStack out = sample.clone();
@@ -438,6 +453,9 @@ public class NetworkTicker {
                         if (moved > 0) {
                             roundMoved += moved;
                             want = leftover;
+                            if (target.getState() instanceof org.bukkit.block.TileState ts) {
+                                ts.update();
+                            }
                         }
                     }
                     if (want <= 0) {
@@ -447,6 +465,7 @@ public class NetworkTicker {
                 if (roundMoved > 0) {
                     blob.removeGreedyItem(i, roundMoved);
                     movedTotal += roundMoved;
+                    changed = true;
                     if (roundMoved >= amount) {
                         i--;
                     }
@@ -454,7 +473,9 @@ public class NetworkTicker {
             }
         }
 
-        NodeStore.put(block, blob);
+        if (changed) {
+            NodeStore.put(block, blob);
+        }
     }
 
     /**

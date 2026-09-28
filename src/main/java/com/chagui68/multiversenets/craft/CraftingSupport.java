@@ -204,7 +204,15 @@ public final class CraftingSupport {
                 if (got != null) {
                     taken.add(got);
                 }
-                net.storage().depositAll(taken);
+                int unreturned = net.storage().depositAll(taken);
+                if (unreturned > 0) {
+                    for (ItemStack s : taken) {
+                        if (s != null && s.getAmount() > 0) {
+                            net.block(net.controllerPos()).getWorld().dropItemNaturally(
+                                    net.block(net.controllerPos()).getLocation().add(0.5, 1.0, 0.5), s);
+                        }
+                    }
+                }
                 return false;
             }
             taken.add(got);
@@ -212,7 +220,15 @@ public final class CraftingSupport {
 
         int leftover = net.storage().deposit(result);
         if (leftover > 0) {
-            net.storage().depositAll(taken);
+            int unreturned = net.storage().depositAll(taken);
+            if (unreturned > 0) {
+                for (ItemStack s : taken) {
+                    if (s != null && s.getAmount() > 0) {
+                        net.block(net.controllerPos()).getWorld().dropItemNaturally(
+                                net.block(net.controllerPos()).getLocation().add(0.5, 1.0, 0.5), s);
+                    }
+                }
+            }
             return false;
         }
         return true;

@@ -44,7 +44,7 @@ public class GreedyMenu extends MenuHolder {
     private static final int DIRECTION_SLOT = 50;
     private static final int INFO_SLOT = 53;
 
-    private static final String[] FACES_CYCLE = {"ALL", "NORTH", "EAST", "SOUTH", "WEST", "UP", "DOWN"};
+    private static final String[] FACES_CYCLE = {"ALL", "NORTH", "EAST", "SOUTH", "WEST", "UP", "DOWN", "NONE"};
 
     private final Block block;
     private int page = 0;

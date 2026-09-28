@@ -339,6 +339,23 @@ public class NetworkStorage {
             }
         }
 
+        // 8. Open Greedy cells (fallback when greedy cell has no filter configured: acts as shared general storage)
+        if (remaining > 0) {
+            for (CellState state : states) {
+                if (!state.greedy) continue;
+                boolean hasFilter = (state.blob.filterMaterials != null && !state.blob.filterMaterials.isEmpty())
+                        || (state.blob.filterItems != null && !state.blob.filterItems.isEmpty());
+                if (hasFilter) continue; // Filtered greedy cells were handled in step 1
+                long space = state.capacity - state.blob.totalGreedyAmount();
+                if (space <= 0) continue;
+                long take = Math.min(space, remaining);
+                state.blob.addGreedyItem(item, take);
+                state.dirty = true;
+                remaining -= take;
+                if (remaining <= 0) break;
+            }
+        }
+
         flush(states, vCache);
         return (int) (remaining + rejectedByQuota);
     }
@@ -363,10 +380,14 @@ public class NetworkStorage {
     }
 
     public synchronized ItemStack withdraw(Predicate<ItemStack> matcher, int want) {
-        return withdraw(matcher, want, -1L);
+        return withdraw(matcher, want, -1L, true);
     }
 
     public synchronized ItemStack withdraw(Predicate<ItemStack> matcher, int want, long excludePos) {
+        return withdraw(matcher, want, excludePos, true);
+    }
+
+    public synchronized ItemStack withdraw(Predicate<ItemStack> matcher, int want, long excludePos, boolean includeGreedy) {
         if (want <= 0) {
             return null;
         }
@@ -442,7 +463,7 @@ public class NetworkStorage {
         }
 
         // Pass 3: Greedy cells (output buffer sink)
-        if (got < want) {
+        if (includeGreedy && got < want) {
             for (CellState state : states) {
                 if (!state.greedy || state.pos == excludePos || state.blob.greedySamples == null || state.blob.greedyAmounts == null) {
                     continue;

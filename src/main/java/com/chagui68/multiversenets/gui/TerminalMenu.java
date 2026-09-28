@@ -615,7 +615,11 @@ public class TerminalMenu extends MenuHolder {
                 int leftover = NetworkManager.insertInto(player.getInventory(), withdrawn);
                 if (leftover > 0) {
                     withdrawn.setAmount(leftover);
-                    network.storage().deposit(withdrawn);
+                    int unreturned = network.storage().deposit(withdrawn);
+                    if (unreturned > 0) {
+                        withdrawn.setAmount(unreturned);
+                        giveOrDrop(withdrawn);
+                    }
                 }
             }
             draw();
