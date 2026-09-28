@@ -1,11 +1,15 @@
 package com.chagui68.multiversenets;
 
 import com.chagui68.multiversenets.compat.SlimefunBridge;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockbukkit.mockbukkit.MockBukkit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Unit tests verifying SlimefunBridge fallback behavior when Slimefun is absent.
@@ -13,6 +17,16 @@ import static org.junit.jupiter.api.Assertions.assertNull;
  * Pruebas unitarias que verifican el comportamiento seguro del SlimefunBridge cuando Slimefun no está presente.
  */
 class SlimefunBridgeTest {
+
+    @BeforeEach
+    void setUp() {
+        MockBukkit.mock();
+    }
+
+    @AfterEach
+    void tearDown() {
+        MockBukkit.unmock();
+    }
 
     @Test
     void withoutSlimefunBridgeIsUnavailable() {
@@ -50,5 +64,17 @@ class SlimefunBridgeTest {
         org.bukkit.inventory.ItemStack nullItem = null;
         assertEquals(0, SlimefunBridge.insert(null, nullItem));
         assertEquals(0, SlimefunBridge.insertar(null, nullItem));
+    }
+
+    @Test
+    void testSlimefunItemIdentificationViaPdc() {
+        org.bukkit.inventory.ItemStack item = new org.bukkit.inventory.ItemStack(org.bukkit.Material.IRON_INGOT);
+        var meta = item.getItemMeta();
+        meta.getPersistentDataContainer().set(new org.bukkit.NamespacedKey("slimefun", "slimefun_item"),
+                org.bukkit.persistence.PersistentDataType.STRING, "STEEL_INGOT");
+        item.setItemMeta(meta);
+
+        assertEquals("STEEL_INGOT", SlimefunBridge.getId(item));
+        assertTrue(SlimefunBridge.isSlimefunItem(item));
     }
 }

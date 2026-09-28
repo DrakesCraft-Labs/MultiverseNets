@@ -79,4 +79,22 @@ class DeviceTypeTest {
         assertTrue(DeviceType.MVN_REQUEST_CRAFTER.placeable());
         assertEquals("Request Crafter", DeviceType.MVN_REQUEST_CRAFTER.display());
     }
+
+    @Test
+    void testSlimefunCrafterProperties() {
+        assertTrue(DeviceType.MVN_SF_CRAFTER.isAutoCrafter());
+        assertTrue(DeviceType.MVN_CRAFTER.isAutoCrafter());
+        assertTrue(DeviceType.MVN_SF_REQUEST_CRAFTER.isRequestCrafter());
+        assertTrue(DeviceType.MVN_REQUEST_CRAFTER.isRequestCrafter());
+
+        assertTrue(DeviceType.MVN_SF_CRAFTER.isSlimefunCrafter());
+        assertTrue(DeviceType.MVN_SF_REQUEST_CRAFTER.isSlimefunCrafter());
+        assertFalse(DeviceType.MVN_CRAFTER.isSlimefunCrafter());
+        assertFalse(DeviceType.MVN_REQUEST_CRAFTER.isSlimefunCrafter());
+
+        assertTrue(DeviceType.MVN_SF_CRAFTER.placeable());
+        assertTrue(DeviceType.MVN_SF_REQUEST_CRAFTER.placeable());
+        assertEquals("Slimefun Auto-Crafter", DeviceType.MVN_SF_CRAFTER.display());
+        assertEquals("Slimefun Request Crafter", DeviceType.MVN_SF_REQUEST_CRAFTER.display());
+    }
 }

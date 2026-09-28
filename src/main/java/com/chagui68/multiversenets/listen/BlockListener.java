@@ -592,7 +592,11 @@ public class BlockListener implements Listener {
                 new SfEncoderMenu(plugin, player, block).openMenu();
                 return true;
             }
-            case MVN_CRAFTER, MVN_REQUEST_CRAFTER -> {
+            case MVN_CRAFTER, MVN_REQUEST_CRAFTER, MVN_SF_CRAFTER, MVN_SF_REQUEST_CRAFTER -> {
+                if ((type == DeviceType.MVN_SF_CRAFTER || type == DeviceType.MVN_SF_REQUEST_CRAFTER) && !Settings.sfCrafterEnabled()) {
+                    player.sendMessage(Text.msg("Slimefun Crafters are disabled on this server.", NamedTextColor.RED));
+                    return true;
+                }
                 new CrafterMenu(plugin, player, block).openMenu();
                 return true;
             }

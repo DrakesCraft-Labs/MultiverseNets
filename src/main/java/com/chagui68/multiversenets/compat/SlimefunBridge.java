@@ -663,7 +663,23 @@ public final class SlimefunBridge {
     private static boolean matchesSlimefunMatrix(ItemStack[] a, ItemStack[] b) {
         if (a == null || b == null || a.length != 9 || b.length != 9) return false;
         for (int i = 0; i < 9; i++) {
-            if (!StackUtils.itemsMatch(a[i], b[i])) {
+            boolean aAir = a[i] == null || a[i].getType().isAir();
+            boolean bAir = b[i] == null || b[i].getType().isAir();
+            if (aAir && bAir) {
+                continue;
+            }
+            if (aAir != bAir) {
+                return false;
+            }
+            String sfA = getId(a[i]);
+            String sfB = getId(b[i]);
+            if (sfA != null && sfB != null) {
+                if (!sfA.equalsIgnoreCase(sfB)) {
+                    return false;
+                }
+            } else if (sfA != null || sfB != null) {
+                return false;
+            } else if (!StackUtils.itemsMatch(a[i], b[i], false)) {
                 return false;
             }
         }

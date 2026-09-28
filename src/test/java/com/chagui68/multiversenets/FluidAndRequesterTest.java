@@ -11,6 +11,7 @@ import com.chagui68.multiversenets.net.Network;
 import com.chagui68.multiversenets.net.NetworkHologramManager;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -603,5 +604,94 @@ class FluidAndRequesterTest {
                 assertNotEquals(Material.IRON_BLOCK, item.getType(), "Request Terminal must NOT display recipes from MVN_CRAFTER");
             }
         }
+    }
+
+    @Test
+    void testRequestTerminalScansSlimefunRequestCrafter() {
+        Block ctrl = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
+        plugin.networks().registerController(ctrl);
+        place(1, 64, 0, DeviceType.MVN_CELL_T1);
+        Block sfReqCrafter = place(0, 64, 1, DeviceType.MVN_SF_REQUEST_CRAFTER);
+        Block reqTerm = place(0, 64, -1, DeviceType.MVN_REQUEST_TERMINAL);
+
+        Network net = plugin.networks().networkByController(ctrl.getLocation());
+        net.scan();
+
+        // Create a mock Slimefun output item
+        ItemStack sfOutput = new ItemStack(Material.AMETHYST_SHARD);
+        var meta = sfOutput.getItemMeta();
+        meta.displayName(Component.text("Synthetic Diamond"));
+        meta.getPersistentDataContainer().set(new org.bukkit.NamespacedKey("slimefun", "slimefun_item"),
+                org.bukkit.persistence.PersistentDataType.STRING, "SYNTHETIC_DIAMOND");
+        sfOutput.setItemMeta(meta);
+
+        ItemStack[] inputs = new ItemStack[9];
+        for (int i = 0; i < 9; i++) inputs[i] = new ItemStack(Material.COAL);
+        RecipeData sfRecipe = new RecipeData(inputs, sfOutput);
+
+        NodeBlob reqBlob = NodeStore.get(sfReqCrafter);
+        reqBlob.blueprintData.add(Blueprints.encode(sfRecipe));
+        NodeStore.put(sfReqCrafter, reqBlob);
+
+        RequestTerminalMenu menu = new RequestTerminalMenu(plugin, player, net, reqTerm);
+        menu.openMenu();
+
+        ItemStack slot0 = player.getOpenInventory().getTopInventory().getItem(0);
+        assertNotNull(slot0, "Slot 0 should display the recipe from Slimefun Request Crafter");
+        assertEquals(Material.AMETHYST_SHARD, slot0.getType());
+
+        // Check lore for Slimefun Request Crafter title
+        boolean foundCrafterTitle = false;
+        if (slot0.hasItemMeta() && slot0.getItemMeta().lore() != null) {
+            for (var line : slot0.getItemMeta().lore()) {
+                String plain = PlainTextComponentSerializer.plainText().serialize(line);
+                if (plain.contains("Slimefun Request Crafter at:")) {
+                    foundCrafterTitle = true;
+                    break;
+                }
+            }
+        }
+        assertTrue(foundCrafterTitle, "Option lore must identify the originating machine as Slimefun Request Crafter");
+    }
+
+    @Test
+    void testSlimefunAutoCrafterExecutionInNetwork() {
+        Block ctrl = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
+        plugin.networks().registerController(ctrl);
+        place(1, 64, 0, DeviceType.MVN_CELL_T1);
+        place(2, 64, 0, DeviceType.MVN_CELL_T1);
+        Block sfCrafter = place(0, 64, 1, DeviceType.MVN_SF_CRAFTER);
+
+        Network net = plugin.networks().networkByController(ctrl.getLocation());
+        net.scan();
+
+        // Create mock Slimefun output item
+        ItemStack sfOutput = new ItemStack(Material.GOLD_NUGGET);
+        var meta = sfOutput.getItemMeta();
+        meta.displayName(Component.text("Gold Dust"));
+        meta.getPersistentDataContainer().set(new org.bukkit.NamespacedKey("slimefun", "slimefun_item"),
+                org.bukkit.persistence.PersistentDataType.STRING, "GOLD_DUST");
+        sfOutput.setItemMeta(meta);
+
+        ItemStack[] inputs = new ItemStack[9];
+        inputs[0] = new ItemStack(Material.RAW_GOLD);
+        RecipeData sfRecipe = new RecipeData(inputs, sfOutput);
+
+        NodeBlob crafterBlob = NodeStore.get(sfCrafter);
+        crafterBlob.blueprintData.add(Blueprints.encode(sfRecipe));
+        NodeStore.put(sfCrafter, crafterBlob);
+
+        // Put ingredient in network storage
+        net.storage().deposit(new ItemStack(Material.RAW_GOLD, 5));
+        assertEquals(5, net.storage().count(item -> item.getType() == Material.RAW_GOLD));
+        assertEquals(0, net.storage().count(item -> "GOLD_DUST".equalsIgnoreCase(com.chagui68.multiversenets.compat.SlimefunBridge.getId(item))));
+
+        // Directly invoke doCrafting on ticker
+        plugin.ticker().doCrafting(net);
+
+        // Raw gold was consumed (1 used)
+        assertEquals(4, net.storage().count(item -> item.getType() == Material.RAW_GOLD));
+        // Gold dust was crafted and deposited!
+        assertEquals(1, net.storage().count(item -> "GOLD_DUST".equalsIgnoreCase(com.chagui68.multiversenets.compat.SlimefunBridge.getId(item))));
     }
 }

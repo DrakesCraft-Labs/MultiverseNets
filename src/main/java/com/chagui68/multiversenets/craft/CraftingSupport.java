@@ -162,9 +162,18 @@ public final class CraftingSupport {
             result = recipe.getResult().clone();
         } else if (SlimefunBridge.isAvailable()) {
             ItemStack sfResult = SlimefunBridge.findSlimefunRecipe(data.inputs);
-            if (sfResult != null && StackUtils.itemsMatch(sfResult, data.output)) {
-                result = sfResult.clone();
+            if (sfResult != null) {
+                String expectedId = SlimefunBridge.getId(data.output);
+                String actualId = SlimefunBridge.getId(sfResult);
+                if (expectedId != null && expectedId.equalsIgnoreCase(actualId)) {
+                    result = sfResult.clone();
+                } else if (StackUtils.itemsMatch(sfResult, data.output, false)) {
+                    result = sfResult.clone();
+                }
             }
+        }
+        if (result == null && data.output != null && (SlimefunBridge.isSlimefunItem(data.output) || SlimefunBridge.getId(data.output) != null)) {
+            result = data.output.clone();
         }
         if (result == null) {
             return false;

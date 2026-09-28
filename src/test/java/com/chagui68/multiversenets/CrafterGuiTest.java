@@ -156,4 +156,83 @@ class CrafterGuiTest {
         assertTrue(after.blueprintData.isEmpty(), "clear must empty blueprintData");
         assertTrue(after.recipes.isEmpty(), "clear must empty recipes");
     }
+
+    private Block placeSfCrafter() {
+        Block block = world.getBlockAt(1, 64, 0);
+        block.setType(DeviceType.MVN_SF_CRAFTER.material());
+        NodeStore.put(block, NodeBlob.create(DeviceType.MVN_SF_CRAFTER.name()));
+        return block;
+    }
+
+    private ItemStack createSlimefunBlueprint() {
+        ItemStack sfOut = new ItemStack(Material.GOLD_INGOT);
+        var meta = sfOut.getItemMeta();
+        meta.displayName(net.kyori.adventure.text.Component.text("Gold Dust"));
+        meta.getPersistentDataContainer().set(new org.bukkit.NamespacedKey("slimefun", "slimefun_item"),
+                org.bukkit.persistence.PersistentDataType.STRING, "GOLD_DUST");
+        sfOut.setItemMeta(meta);
+
+        ItemStack[] matrix = new ItemStack[9];
+        matrix[0] = new ItemStack(Material.RAW_GOLD);
+        RecipeData data = new RecipeData(matrix, sfOut);
+        return Blueprints.toItem(data);
+    }
+
+    @Test
+    void rightClickOpensSlimefunCrafterMenu() {
+        Block sfCrafter = placeSfCrafter();
+        PlayerInteractEvent interact = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK,
+                null, sfCrafter, BlockFace.NORTH, EquipmentSlot.HAND, null);
+        server.getPluginManager().callEvent(interact);
+        assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof CrafterMenu,
+                "right click on sf crafter opens CrafterMenu");
+    }
+
+    @Test
+    void slimefunCrafterRejectsVanillaBlueprint() {
+        Block sfCrafter = placeSfCrafter();
+        ItemStack vanillaBp = createSampleBlueprint();
+        player.getInventory().setItem(0, vanillaBp);
+
+        new CrafterMenu(plugin, player, sfCrafter).openMenu();
+
+        InventoryClickEvent shift = new InventoryClickEvent(player.getOpenInventory(),
+                InventoryType.SlotType.CONTAINER, 27, ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        server.getPluginManager().callEvent(shift);
+
+        NodeBlob blob = NodeStore.get(sfCrafter);
+        assertTrue(blob.blueprintData.isEmpty(), "Slimefun Crafter must reject vanilla blueprints");
+    }
+
+    @Test
+    void slimefunCrafterInstallsSlimefunBlueprint() {
+        Block sfCrafter = placeSfCrafter();
+        ItemStack sfBp = createSlimefunBlueprint();
+        player.getInventory().setItem(0, sfBp);
+
+        new CrafterMenu(plugin, player, sfCrafter).openMenu();
+
+        InventoryClickEvent shift = new InventoryClickEvent(player.getOpenInventory(),
+                InventoryType.SlotType.CONTAINER, 27, ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        server.getPluginManager().callEvent(shift);
+
+        NodeBlob blob = NodeStore.get(sfCrafter);
+        assertEquals(1, blob.blueprintData.size(), "Slimefun Crafter must accept Slimefun blueprints");
+    }
+
+    @Test
+    void vanillaCrafterRejectsSlimefunBlueprint() {
+        Block crafter = placeCrafter();
+        ItemStack sfBp = createSlimefunBlueprint();
+        player.getInventory().setItem(0, sfBp);
+
+        new CrafterMenu(plugin, player, crafter).openMenu();
+
+        InventoryClickEvent shift = new InventoryClickEvent(player.getOpenInventory(),
+                InventoryType.SlotType.CONTAINER, 27, ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        server.getPluginManager().callEvent(shift);
+
+        NodeBlob blob = NodeStore.get(crafter);
+        assertTrue(blob.blueprintData.isEmpty(), "Standard Crafter must reject Slimefun blueprints");
+    }
 }

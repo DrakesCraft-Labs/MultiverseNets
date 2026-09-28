@@ -37,6 +37,13 @@ sf-encoder:
   # [ES] Habilita o deshabilita la máquina de codificación de recetas de Slimefun.
   enabled: true
 
+# [EN] Slimefun Auto-Crafter and Request Crafter settings.
+# [ES] Ajustes de los Crafteadores automáticos y bajo demanda de Slimefun.
+sf-crafter:
+  # [EN] Enable or disable Slimefun Crafter machines (Auto-Crafter & Request Crafter).
+  # [ES] Habilita o deshabilita las máquinas crafteadoras de Slimefun.
+  enabled: true
+
 # -------------------------------------------------------------------------------------
 #  Network Topology & Timing / Topología y Tiempos de Red
 # -------------------------------------------------------------------------------------

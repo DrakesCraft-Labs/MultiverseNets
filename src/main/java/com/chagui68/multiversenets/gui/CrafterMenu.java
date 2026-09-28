@@ -1,6 +1,7 @@
 package com.chagui68.multiversenets.gui;
 
 import com.chagui68.multiversenets.MultiverseNets;
+import com.chagui68.multiversenets.compat.SlimefunBridge;
 import com.chagui68.multiversenets.craft.Blueprints;
 import com.chagui68.multiversenets.craft.CraftingSupport;
 import com.chagui68.multiversenets.craft.RecipeData;
@@ -50,8 +51,20 @@ public class CrafterMenu extends MenuHolder {
 
     public void openMenu() {
         DeviceType type = NodeStore.getType(block);
-        String title = (type != null && type.isRequestCrafter()) ? "Request Crafter" : "Auto-Crafter";
-        open(27, Component.text(title, NamedTextColor.DARK_AQUA)
+        String title;
+        NamedTextColor titleColor = NamedTextColor.DARK_AQUA;
+        if (type == DeviceType.MVN_SF_REQUEST_CRAFTER) {
+            title = "Slimefun Request Crafter";
+            titleColor = NamedTextColor.DARK_PURPLE;
+        } else if (type == DeviceType.MVN_SF_CRAFTER) {
+            title = "Slimefun Auto-Crafter";
+            titleColor = NamedTextColor.DARK_PURPLE;
+        } else if (type != null && type.isRequestCrafter()) {
+            title = "Request Crafter";
+        } else {
+            title = "Auto-Crafter";
+        }
+        open(27, Component.text(title, titleColor)
                 .decoration(TextDecoration.ITALIC, false));
     }
 
@@ -74,6 +87,9 @@ public class CrafterMenu extends MenuHolder {
     protected void draw() {
         NodeBlob blob = blob();
         int totalInstalled = blob.blueprintData.size() + blob.recipes.size();
+        DeviceType devType = NodeStore.getType(block);
+        boolean sfMachine = devType != null && devType.isSlimefunCrafter();
+        String machineName = (devType != null) ? devType.display() : "Auto-Crafter";
 
         // 1) Dibujar casillas de Blueprints / Recetas (Slots 0..17)
         for (int i = 0; i < MAX_BLUEPRINT_SLOTS; i++) {
@@ -146,7 +162,7 @@ public class CrafterMenu extends MenuHolder {
         // 3) Botón de Estado / Info (Slot 24)
         ItemStack status = new ItemStack(Material.HOPPER);
         var metaStatus = status.getItemMeta();
-        metaStatus.displayName(Component.text("Auto-Crafter Status", NamedTextColor.AQUA)
+        metaStatus.displayName(Component.text(machineName + " Status", sfMachine ? NamedTextColor.LIGHT_PURPLE : NamedTextColor.AQUA)
                 .decoration(TextDecoration.ITALIC, false));
         metaStatus.lore(List.of(
                 Component.text("Installed Blueprints: " + totalInstalled + " / " + MAX_BLUEPRINT_SLOTS,
@@ -173,13 +189,21 @@ public class CrafterMenu extends MenuHolder {
         // 5) Botón de Ayuda (Slot 26)
         ItemStack help = new ItemStack(Material.BOOK);
         var metaHelp = help.getItemMeta();
-        metaHelp.displayName(Component.text("How Auto-Crafter Works", NamedTextColor.GOLD)
+        metaHelp.displayName(Component.text("How " + machineName + " Works", NamedTextColor.GOLD)
                 .decoration(TextDecoration.ITALIC, false));
-        metaHelp.lore(List.of(
-                Component.text("• Encode recipes using the Blueprint Encoder.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                Component.text("• Shift-Click or place Blueprints here to install.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                Component.text("• The network crafts items automatically and stores output.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                Component.text("• Click any installed recipe above to uninstall it.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
+        if (sfMachine) {
+            metaHelp.lore(List.of(
+                    Component.text("• Encode recipes using the Slimefun Recipe Encoder.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("• Shift-Click or place Slimefun Blueprints here to install.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("• Only Slimefun blueprints are accepted by this machine.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("• Click any installed recipe above to uninstall it.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
+        } else {
+            metaHelp.lore(List.of(
+                    Component.text("• Encode recipes using the Blueprint Encoder.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("• Shift-Click or place Blueprints here to install.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("• The network crafts items automatically and stores output.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("• Click any installed recipe above to uninstall it.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
+        }
         help.setItemMeta(metaHelp);
         inv.setItem(HELP_SLOT, help);
     }
@@ -219,9 +243,21 @@ public class CrafterMenu extends MenuHolder {
                 player.sendMessage(Text.msg("This item is not a Blueprint. Create one with the Blueprint Encoder.", NamedTextColor.YELLOW));
                 return;
             }
+            DeviceType devType = NodeStore.getType(block);
+            boolean isSfMachine = devType != null && devType.isSlimefunCrafter();
+            boolean isSfRec = isSlimefunRecipe(data);
+            if (isSfMachine && !isSfRec) {
+                player.sendMessage(Text.msg("Slimefun Crafters only accept Slimefun recipes. Use a standard Auto-Crafter for vanilla recipes.", NamedTextColor.RED));
+                return;
+            }
+            if (!isSfMachine && isSfRec) {
+                player.sendMessage(Text.msg("Standard Crafters cannot craft Slimefun recipes. Use a Slimefun Auto-Crafter.", NamedTextColor.RED));
+                return;
+            }
             int total = blob.blueprintData.size() + blob.recipes.size();
             if (total >= MAX_BLUEPRINT_SLOTS) {
-                player.sendMessage(Text.msg("Auto-Crafter is full (max " + MAX_BLUEPRINT_SLOTS + " recipes).", NamedTextColor.RED));
+                String machineName = (devType != null) ? devType.display() : "Auto-Crafter";
+                player.sendMessage(Text.msg(machineName + " is full (max " + MAX_BLUEPRINT_SLOTS + " recipes).", NamedTextColor.RED));
                 return;
             }
             String encoded = Blueprints.encode(data);
@@ -269,6 +305,23 @@ public class CrafterMenu extends MenuHolder {
                     return;
                 }
 
+                DeviceType devType = NodeStore.getType(block);
+                boolean isSfMachine = devType != null && devType.isSlimefunCrafter();
+                if (data != null) {
+                    boolean isSfRec = isSlimefunRecipe(data);
+                    if (isSfMachine && !isSfRec) {
+                        player.sendMessage(Text.msg("Slimefun Crafters only accept Slimefun recipes. Use a standard Auto-Crafter for vanilla recipes.", NamedTextColor.RED));
+                        return;
+                    }
+                    if (!isSfMachine && isSfRec) {
+                        player.sendMessage(Text.msg("Standard Crafters cannot craft Slimefun recipes. Use a Slimefun Auto-Crafter.", NamedTextColor.RED));
+                        return;
+                    }
+                } else if (legacyKey != null && isSfMachine) {
+                    player.sendMessage(Text.msg("Slimefun Crafters only accept Slimefun blueprints.", NamedTextColor.RED));
+                    return;
+                }
+
                 if (raw < total) {
                     // Reemplazar la receta existente en este hueco
                     if (data != null) {
@@ -285,7 +338,8 @@ public class CrafterMenu extends MenuHolder {
                 } else {
                     // Instalar nueva receta
                     if (total >= MAX_BLUEPRINT_SLOTS) {
-                        player.sendMessage(Text.msg("Auto-Crafter is full (max " + MAX_BLUEPRINT_SLOTS + " recipes).", NamedTextColor.RED));
+                        String machineName = (devType != null) ? devType.display() : "Auto-Crafter";
+                        player.sendMessage(Text.msg(machineName + " is full (max " + MAX_BLUEPRINT_SLOTS + " recipes).", NamedTextColor.RED));
                         return;
                     }
                     if (data != null) {
@@ -338,6 +392,26 @@ public class CrafterMenu extends MenuHolder {
             }
         }
         return null;
+    }
+
+    private boolean isSlimefunRecipe(RecipeData data) {
+        if (data == null) {
+            return false;
+        }
+        if (data.output != null && (SlimefunBridge.isSlimefunItem(data.output) || SlimefunBridge.getId(data.output) != null)) {
+            return true;
+        }
+        if (data.inputs != null) {
+            for (ItemStack in : data.inputs) {
+                if (in != null && (SlimefunBridge.isSlimefunItem(in) || SlimefunBridge.getId(in) != null)) {
+                    return true;
+                }
+            }
+            if (SlimefunBridge.isAvailable() && SlimefunBridge.findSlimefunRecipe(data.inputs) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private ItemStack panel(Material material, String name) {

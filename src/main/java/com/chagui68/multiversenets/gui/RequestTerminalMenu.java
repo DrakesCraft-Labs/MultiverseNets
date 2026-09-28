@@ -101,6 +101,7 @@ public class RequestTerminalMenu extends MenuHolder {
     private void scanCraftables() {
         options.clear();
         network.forEach(DeviceType.MVN_REQUEST_CRAFTER, (pos, type) -> scanCrafter(pos));
+        network.forEach(DeviceType.MVN_SF_REQUEST_CRAFTER, (pos, type) -> scanCrafter(pos));
     }
 
     private void scanCrafter(long pos) {
@@ -407,8 +408,10 @@ public class RequestTerminalMenu extends MenuHolder {
             lore.addAll(meta.lore());
         }
 
+        DeviceType crafterType = NodeStore.getType(network.block(opt.crafterPos));
+        String crafterTitle = crafterType != null ? crafterType.display() : "Request Crafter";
         lore.add(Component.empty());
-        lore.add(Component.text("Request Crafter at: " + PosUtil.unpackX(opt.crafterPos) + ", "
+        lore.add(Component.text(crafterTitle + " at: " + PosUtil.unpackX(opt.crafterPos) + ", "
                 + PosUtil.unpackY(opt.crafterPos) + ", " + PosUtil.unpackZ(opt.crafterPos), NamedTextColor.DARK_GRAY)
                 .decoration(TextDecoration.ITALIC, false));
         lore.add(Component.text("Required Ingredients:", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
@@ -658,8 +661,14 @@ public class RequestTerminalMenu extends MenuHolder {
                 result = rec.getResult().clone();
             } else if (SlimefunBridge.isAvailable()) {
                 ItemStack sf = SlimefunBridge.findSlimefunRecipe(stepOpt.blueprintData.inputs);
-                if (sf != null && StackUtils.itemsMatch(sf, stepOpt.blueprintData.output, false)) {
-                    result = sf.clone();
+                if (sf != null) {
+                    String expectedId = SlimefunBridge.getId(stepOpt.blueprintData.output);
+                    String actualId = SlimefunBridge.getId(sf);
+                    if (expectedId != null && expectedId.equalsIgnoreCase(actualId)) {
+                        result = sf.clone();
+                    } else if (StackUtils.itemsMatch(sf, stepOpt.blueprintData.output, false)) {
+                        result = sf.clone();
+                    }
                 }
             }
             if (result == null && stepOpt.blueprintData.output != null) {

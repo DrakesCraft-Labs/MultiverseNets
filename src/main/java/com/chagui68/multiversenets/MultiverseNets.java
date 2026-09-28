@@ -39,6 +39,13 @@ public class MultiverseNets extends JavaPlugin {
         return networks;
     }
 
+    /**
+     * @return Global network ticker / Ticker global de redes
+     */
+    public NetworkTicker ticker() {
+        return ticker;
+    }
+
     @Override
     public void onEnable() {
         instance = this;

@@ -569,8 +569,8 @@ public class NetworkTicker {
  *
      * ES: Ejecuta intentos de autocrafteo para los blueprints y recetas instaladas.
      */
-    private void doCrafting(Network net) {
-        net.forEach(DeviceType.MVN_CRAFTER, (pos, type) -> {
+    public void doCrafting(Network net) {
+        java.util.function.Consumer<Long> ticker = pos -> {
             NodeBlob blob = blobOf(net, pos);
             if (blob == null) {
                 return;
@@ -585,7 +585,10 @@ public class NetworkTicker {
             if (!blob.recipes.isEmpty()) {
                 CraftingSupport.tryCraftAll(net, blob);
             }
-        });
+        };
+
+        net.forEach(DeviceType.MVN_CRAFTER, (pos, type) -> ticker.accept(pos));
+        net.forEach(DeviceType.MVN_SF_CRAFTER, (pos, type) -> ticker.accept(pos));
     }
 
     /**

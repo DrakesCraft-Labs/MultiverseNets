@@ -229,6 +229,14 @@ public final class Settings {
     }
 
     /**
+     * EN: Returns true if Slimefun Crafters (Auto-Crafter & Request Crafter) are enabled in config.
+     * ES: Devuelve true si los Crafteadores de Slimefun están habilitados en config.
+     */
+    public static boolean sfCrafterEnabled() {
+        return cfg == null || cfg.getBoolean("sf-crafter.enabled", true);
+    }
+
+    /**
      * EN: Returns true if debug logging mode is enabled.
  *
      * ES: Devuelve true si el modo de registro de depuración está activo.

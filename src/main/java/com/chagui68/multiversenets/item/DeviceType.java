@@ -95,7 +95,11 @@ public enum DeviceType {
     /** Crafting job requester and ordering terminal / Terminal de solicitud de crafteos */
     MVN_REQUEST_TERMINAL(Material.LECTERN, "Request Terminal", true, -1),
     /** On-demand crafting chamber managed via Request Terminal / Cámara de crafteo bajo demanda */
-    MVN_REQUEST_CRAFTER(Material.FLETCHING_TABLE, "Request Crafter", true, -1);
+    MVN_REQUEST_CRAFTER(Material.FLETCHING_TABLE, "Request Crafter", true, -1),
+    /** Slimefun automated recipe crafter / Crafteador automático de recetas de Slimefun */
+    MVN_SF_CRAFTER(Material.CRYING_OBSIDIAN, "Slimefun Auto-Crafter", true, -1),
+    /** Slimefun on-demand crafting chamber / Cámara de crafteo bajo demanda de Slimefun */
+    MVN_SF_REQUEST_CRAFTER(Material.PURPUR_PILLAR, "Slimefun Request Crafter", true, -1);
 
     private final Material material;
     private final String display;
@@ -166,10 +170,24 @@ public enum DeviceType {
     }
 
     /**
+     * @return true if device is an automated crafter (vanilla or Slimefun)
+     */
+    public boolean isAutoCrafter() {
+        return this == MVN_CRAFTER || this == MVN_SF_CRAFTER;
+    }
+
+    /**
      * @return true if device is an on-demand request crafter / true si es crafteador bajo demanda
      */
     public boolean isRequestCrafter() {
-        return this == MVN_REQUEST_CRAFTER;
+        return this == MVN_REQUEST_CRAFTER || this == MVN_SF_REQUEST_CRAFTER;
+    }
+
+    /**
+     * @return true if device is a Slimefun crafting machine
+     */
+    public boolean isSlimefunCrafter() {
+        return this == MVN_SF_CRAFTER || this == MVN_SF_REQUEST_CRAFTER;
     }
 
     /**

@@ -105,6 +105,10 @@ public final class Items {
             case MVN_CRAFTER -> {
                 lore.add(Component.text("Automated crafting machine driven by installed recipe Blueprints.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
             }
+            case MVN_SF_CRAFTER -> {
+                lore.add(Component.text("Automated crafting machine driven by Slimefun recipe Blueprints.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Compatible with recipes from Slimefun Recipe Encoder.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            }
             case MVN_ENCODER -> {
                 lore.add(Component.text("Encodes standard crafting recipes onto blank Blueprints.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
             }
@@ -157,6 +161,10 @@ public final class Items {
             case MVN_REQUEST_CRAFTER -> {
                 lore.add(Component.text("On-demand crafting unit managed via the Request Terminal.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
                 lore.add(Component.text("Holds blueprints for batch crafting jobs (does not auto-craft).", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_SF_REQUEST_CRAFTER -> {
+                lore.add(Component.text("On-demand Slimefun crafting unit managed via the Request Terminal.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Holds Slimefun blueprints for on-demand batch requests.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
             }
             default -> {
                 if (type.isCacheModule()) {
@@ -736,6 +744,22 @@ public final class Items {
             r.setIngredient('I', Material.IRON_INGOT);
             r.setIngredient('L', Material.LECTERN);
         });
+        if (Settings.sfCrafterEnabled()) {
+            shaped(plugin, "sf_crafter", create(DeviceType.MVN_SF_CRAFTER), r -> {
+                r.shape("RCR", "ITI", "RCR");
+                r.setIngredient('R', Material.ENDER_PEARL);
+                r.setIngredient('C', Material.CRYING_OBSIDIAN);
+                r.setIngredient('I', Material.IRON_INGOT);
+                r.setIngredient('T', Material.TARGET);
+            });
+            shaped(plugin, "sf_request_crafter", create(DeviceType.MVN_SF_REQUEST_CRAFTER), r -> {
+                r.shape("RCR", "ILI", "RCR");
+                r.setIngredient('R', Material.ENDER_PEARL);
+                r.setIngredient('C', Material.PURPUR_PILLAR);
+                r.setIngredient('I', Material.IRON_INGOT);
+                r.setIngredient('L', Material.LECTERN);
+            });
+        }
         plugin.getLogger().info("Registered " + recipeCount() + " crafting recipes with Bukkit.");
     }
 

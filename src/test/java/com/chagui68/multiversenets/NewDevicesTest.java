@@ -88,6 +88,10 @@ class NewDevicesTest {
         assertEquals(DeviceType.MVN_LIQUID_PUMP, DeviceType.parse("MVN_LIQUID_PUMP"));
         assertEquals(DeviceType.MVN_REQUEST_TERMINAL, DeviceType.parse("REQUEST_TERMINAL"));
         assertEquals(DeviceType.MVN_REQUEST_TERMINAL, DeviceType.parse("MVN_REQUEST_TERMINAL"));
+        assertEquals(DeviceType.MVN_SF_CRAFTER, DeviceType.parse("SF_CRAFTER"));
+        assertEquals(DeviceType.MVN_SF_CRAFTER, DeviceType.parse("MVN_SF_CRAFTER"));
+        assertEquals(DeviceType.MVN_SF_REQUEST_CRAFTER, DeviceType.parse("SF_REQUEST_CRAFTER"));
+        assertEquals(DeviceType.MVN_SF_REQUEST_CRAFTER, DeviceType.parse("MVN_SF_REQUEST_CRAFTER"));
     }
 
     /**
@@ -117,5 +121,19 @@ class NewDevicesTest {
         DeviceType req = DeviceType.MVN_REQUEST_TERMINAL;
         assertTrue(req.placeable());
         assertTrue(req.isRequestTerminal());
+
+        DeviceType sfCrafter = DeviceType.MVN_SF_CRAFTER;
+        assertTrue(sfCrafter.placeable());
+        assertFalse(sfCrafter.isCell());
+        assertTrue(sfCrafter.isAutoCrafter());
+        assertTrue(sfCrafter.isSlimefunCrafter());
+        assertEquals("Slimefun Auto-Crafter", sfCrafter.display());
+
+        DeviceType sfReq = DeviceType.MVN_SF_REQUEST_CRAFTER;
+        assertTrue(sfReq.placeable());
+        assertFalse(sfReq.isCell());
+        assertTrue(sfReq.isRequestCrafter());
+        assertTrue(sfReq.isSlimefunCrafter());
+        assertEquals("Slimefun Request Crafter", sfReq.display());
     }
 }
