@@ -34,6 +34,8 @@ public final class Keys {
     public static NamespacedKey CONFIG_DATA;
     /** EN: Remaining durability uses of Network Rake / ES: Usos restantes de durabilidad del Network Rake. */
     public static NamespacedKey RAKE_USES;
+    /** EN: Marker identifying blueprints encoded with Slimefun recipes / ES: Marca de plano codificado con receta de Slimefun. */
+    public static NamespacedKey SF_BLUEPRINT;
 
     private Keys() {
     }
@@ -56,5 +58,6 @@ public final class Keys {
         BLUEPRINT_DATA = new NamespacedKey(plugin, "blueprint_data");
         CONFIG_DATA = new NamespacedKey(plugin, "config_data");
         RAKE_USES = new NamespacedKey(plugin, "rake_uses");
+        SF_BLUEPRINT = new NamespacedKey(plugin, "sf_blueprint");
     }
 }

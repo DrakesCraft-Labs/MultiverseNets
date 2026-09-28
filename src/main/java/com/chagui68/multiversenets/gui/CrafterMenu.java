@@ -245,7 +245,7 @@ public class CrafterMenu extends MenuHolder {
             }
             DeviceType devType = NodeStore.getType(block);
             boolean isSfMachine = devType != null && devType.isSlimefunCrafter();
-            boolean isSfRec = isSlimefunRecipe(data);
+            boolean isSfRec = isSlimefunRecipe(data, mover);
             if (isSfMachine && !isSfRec) {
                 player.sendMessage(Text.msg("Slimefun Crafters only accept Slimefun recipes. Use a standard Auto-Crafter for vanilla recipes.", NamedTextColor.RED));
                 return;
@@ -308,7 +308,7 @@ public class CrafterMenu extends MenuHolder {
                 DeviceType devType = NodeStore.getType(block);
                 boolean isSfMachine = devType != null && devType.isSlimefunCrafter();
                 if (data != null) {
-                    boolean isSfRec = isSlimefunRecipe(data);
+                    boolean isSfRec = isSlimefunRecipe(data, cursor);
                     if (isSfMachine && !isSfRec) {
                         player.sendMessage(Text.msg("Slimefun Crafters only accept Slimefun recipes. Use a standard Auto-Crafter for vanilla recipes.", NamedTextColor.RED));
                         return;
@@ -392,6 +392,17 @@ public class CrafterMenu extends MenuHolder {
             }
         }
         return null;
+    }
+
+    private boolean isSlimefunRecipe(RecipeData data, ItemStack blueprintItem) {
+        if (blueprintItem != null && blueprintItem.hasItemMeta()) {
+            Byte sf = blueprintItem.getItemMeta().getPersistentDataContainer()
+                    .get(com.chagui68.multiversenets.util.Keys.SF_BLUEPRINT, org.bukkit.persistence.PersistentDataType.BYTE);
+            if (sf != null && sf == (byte) 1) {
+                return true;
+            }
+        }
+        return isSlimefunRecipe(data);
     }
 
     private boolean isSlimefunRecipe(RecipeData data) {

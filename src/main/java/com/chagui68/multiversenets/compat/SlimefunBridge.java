@@ -79,6 +79,7 @@ public final class SlimefunBridge {
     private static Method mGetLocationInfo;
     private static Method mAddBlockInfo;
     private static Method mCheckItem;
+    private static Method mGetByItem;
     private static final int BARREL_DISPLAY_SLOT = 31;
 
     // Advanced BlockMenu reflection hooks for Quantum Cell coexistence
@@ -103,7 +104,20 @@ public final class SlimefunBridge {
      *
      * @param log Logger instance for diagnostic notices / ES: Instancia del logger para mensajes.
      */
+    public static void registerSerializationAliases() {
+        try {
+            org.bukkit.configuration.serialization.ConfigurationSerialization.registerClass(
+                    ItemStack.class, "com.github.drakescraft_labs.slimefun4.api.items.SlimefunItemStack");
+            org.bukkit.configuration.serialization.ConfigurationSerialization.registerClass(
+                    ItemStack.class, "io.github.thebusybiscuit.slimefun4.api.items.SlimefunItemStack");
+            org.bukkit.configuration.serialization.ConfigurationSerialization.registerClass(
+                    ItemStack.class, "me.mrCookieSlime.Slimefun.api.SlimefunItemStack");
+        } catch (Throwable ignored) {
+        }
+    }
+
     public static void init(Logger log) {
+        registerSerializationAliases();
         if (!com.chagui68.multiversenets.util.Settings.compatSlimefun()) {
             log.info("[Compat] Slimefun integration disabled in config (compat.slimefun).");
             return;
@@ -157,6 +171,15 @@ public final class SlimefunBridge {
                 cBlockMenuPreset = Class.forName(root + ".inventory.BlockMenuPreset");
                 ctorBlockMenu = cBlockMenu.getConstructor(cBlockMenuPreset, org.bukkit.Location.class);
             } catch (Exception ignored) {}
+            try {
+                for (String prefix : new String[]{"com.github.drakescraft_labs.slimefun4", "io.github.thebusybiscuit.slimefun4", "me.mrCookieSlime.Slimefun"}) {
+                    try {
+                        Class<?> itemClass = Class.forName(prefix + ".api.items.SlimefunItem");
+                        mGetByItem = itemClass.getMethod("getByItem", ItemStack.class);
+                        break;
+                    } catch (Exception ignored) {}
+                }
+            } catch (Exception ignored) {}
 
             Object[] values = flow.getEnumConstants();
             for (Object val : values) {
@@ -209,18 +232,37 @@ public final class SlimefunBridge {
      * ES: Obtiene el ID de Slimefun del PersistentDataContainer de un ItemStack, o null si es vanilla.
      */
     public static String getId(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) {
+        if (item == null) {
             return null;
         }
-        var meta = item.getItemMeta();
-        var pdc = meta.getPersistentDataContainer();
-        for (org.bukkit.NamespacedKey key : pdc.getKeys()) {
-            if ("slimefun_item".equalsIgnoreCase(key.getKey())) {
-                String id = pdc.get(key, org.bukkit.persistence.PersistentDataType.STRING);
-                if (id != null && !id.isBlank()) {
-                    return id;
+        if (item.hasItemMeta()) {
+            var meta = item.getItemMeta();
+            var pdc = meta.getPersistentDataContainer();
+            for (org.bukkit.NamespacedKey key : pdc.getKeys()) {
+                if ("slimefun_item".equalsIgnoreCase(key.getKey())) {
+                    String id = pdc.get(key, org.bukkit.persistence.PersistentDataType.STRING);
+                    if (id != null && !id.isBlank()) {
+                        return id;
+                    }
                 }
             }
+        }
+        if (mGetByItem != null) {
+            try {
+                Object sfItem = mGetByItem.invoke(null, item);
+                if (sfItem != null) {
+                    Method mId = sfItem.getClass().getMethod("getId");
+                    Object id = mId.invoke(sfItem);
+                    if (id != null) return id.toString();
+                }
+            } catch (Throwable ignored) {}
+        }
+        if (item.getClass().getSimpleName().equals("SlimefunItemStack")) {
+            try {
+                Method mId = item.getClass().getMethod("getItemId");
+                Object id = mId.invoke(item);
+                if (id != null) return id.toString();
+            } catch (Throwable ignored) {}
         }
         return null;
     }

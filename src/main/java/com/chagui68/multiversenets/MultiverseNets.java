@@ -53,6 +53,7 @@ public class MultiverseNets extends JavaPlugin {
 
         Keys.init(this);
         Settings.refresh(this);
+        com.chagui68.multiversenets.compat.SlimefunBridge.registerSerializationAliases();
         // Slimefun integration initialization: active if present, dormant otherwise.
         com.chagui68.multiversenets.compat.SlimefunBridge.init(getLogger());
         Items.registerRecipes(this);

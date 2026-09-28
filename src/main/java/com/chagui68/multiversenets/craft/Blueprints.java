@@ -61,7 +61,8 @@ public final class Blueprints {
                 new ByteArrayInputStream(java.util.Base64.getDecoder().decode(data)))) {
             Object o = in.readObject();
             return o instanceof RecipeData rd ? rd : null;
-        } catch (IOException | ClassNotFoundException | ClassCastException e) {
+        } catch (Throwable e) {
+            org.bukkit.Bukkit.getLogger().fine("[MultiverseNets] Failed to decode blueprint: " + e.getMessage());
             return null;
         }
     }
@@ -123,7 +124,7 @@ public final class Blueprints {
         ItemStack[] out = new ItemStack[9];
         for (int i = 0; i < 9; i++) {
             ItemStack s = i < matrix.length ? matrix[i] : null;
-            out[i] = (s == null || s.getType().isAir()) ? null : StackUtils.getAsQuantity(s, 1);
+            out[i] = (s == null || s.getType().isAir()) ? null : RecipeData.sanitize(StackUtils.getAsQuantity(s, 1));
         }
         return out;
     }

@@ -235,4 +235,44 @@ class CrafterGuiTest {
         NodeBlob blob = NodeStore.get(crafter);
         assertTrue(blob.blueprintData.isEmpty(), "Standard Crafter must reject Slimefun blueprints");
     }
+
+    @Test
+    void slimefunCrafterInstallsSlimefunBlueprintViaCursorClick() {
+        Block sfCrafter = placeSfCrafter();
+        ItemStack sfBp = createSlimefunBlueprint();
+
+        new CrafterMenu(plugin, player, sfCrafter).openMenu();
+        player.getOpenInventory().setCursor(sfBp);
+
+        InventoryClickEvent click = new InventoryClickEvent(player.getOpenInventory(),
+                InventoryType.SlotType.CONTAINER, 0, ClickType.LEFT, InventoryAction.SWAP_WITH_CURSOR);
+        server.getPluginManager().callEvent(click);
+
+        NodeBlob blob = NodeStore.get(sfCrafter);
+        assertEquals(1, blob.blueprintData.size(), "Cursor click must install Slimefun blueprint into Slimefun Crafter");
+    }
+
+    @Test
+    void slimefunCrafterAcceptsTaggedSfBlueprint() {
+        Block sfCrafter = placeSfCrafter();
+        ItemStack vanillaOut = new ItemStack(Material.BREAD);
+        ItemStack[] matrix = new ItemStack[9];
+        matrix[0] = new ItemStack(Material.WHEAT);
+        RecipeData data = new RecipeData(matrix, vanillaOut);
+        ItemStack taggedBp = Blueprints.toItem(data);
+        var meta = taggedBp.getItemMeta();
+        meta.getPersistentDataContainer().set(com.chagui68.multiversenets.util.Keys.SF_BLUEPRINT,
+                org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+        taggedBp.setItemMeta(meta);
+
+        player.getInventory().setItem(0, taggedBp);
+        new CrafterMenu(plugin, player, sfCrafter).openMenu();
+
+        InventoryClickEvent shift = new InventoryClickEvent(player.getOpenInventory(),
+                InventoryType.SlotType.CONTAINER, 27, ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        server.getPluginManager().callEvent(shift);
+
+        NodeBlob blob = NodeStore.get(sfCrafter);
+        assertEquals(1, blob.blueprintData.size(), "Tagged SF blueprint must be accepted even if output is vanilla");
+    }
 }

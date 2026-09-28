@@ -185,8 +185,15 @@ public class SfEncoderMenu extends MenuHolder {
                     NamedTextColor.RED));
             return;
         }
-        RecipeData data = new RecipeData(Blueprints.normalize(blob().craftingMatrix), details.output().clone());
+        ItemStack output = RecipeData.sanitize(details.output());
+        RecipeData data = new RecipeData(Blueprints.normalize(blob().craftingMatrix), output);
         ItemStack encoded = Blueprints.toItem(data);
+        var meta = encoded.getItemMeta();
+        if (meta != null) {
+            meta.getPersistentDataContainer().set(com.chagui68.multiversenets.util.Keys.SF_BLUEPRINT,
+                    org.bukkit.persistence.PersistentDataType.BYTE, (byte) 1);
+            encoded.setItemMeta(meta);
+        }
 
         ItemStack outputItem = inv.getItem(OUTPUT_SLOT);
         if (outputItem != null && !outputItem.getType().isAir()) {

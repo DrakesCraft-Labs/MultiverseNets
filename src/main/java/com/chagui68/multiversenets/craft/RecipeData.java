@@ -26,7 +26,29 @@ public class RecipeData implements Serializable {
         if (inputs == null || inputs.length != 9) {
             throw new IllegalArgumentException("Recipe matrix must have exactly 9 slots / La matriz debe tener 9 huecos");
         }
-        this.inputs = inputs;
-        this.output = output;
+        this.inputs = new ItemStack[9];
+        for (int i = 0; i < 9; i++) {
+            this.inputs[i] = sanitize(inputs[i]);
+        }
+        this.output = sanitize(output);
+    }
+
+    /**
+     * Sanitizes an ItemStack to guarantee it is a standard org.bukkit.inventory.ItemStack,
+     * stripping any vendor-specific subclasses (e.g. SlimefunItemStack) that fail during
+     * BukkitObjectInputStream deserialization while preserving all metadata and PDC tags.
+     */
+    public static ItemStack sanitize(ItemStack stack) {
+        if (stack == null || stack.getType().isAir()) {
+            return null;
+        }
+        if (stack.getClass() == ItemStack.class) {
+            return stack;
+        }
+        ItemStack pure = new ItemStack(stack.getType(), stack.getAmount());
+        if (stack.hasItemMeta()) {
+            pure.setItemMeta(stack.getItemMeta().clone());
+        }
+        return pure;
     }
 }
