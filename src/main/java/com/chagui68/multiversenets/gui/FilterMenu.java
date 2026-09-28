@@ -7,6 +7,7 @@ import com.chagui68.multiversenets.item.Items;
 import com.chagui68.multiversenets.net.NetworkManager;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
+import com.chagui68.multiversenets.util.Settings;
 import com.chagui68.multiversenets.util.StackUtils;
 import com.chagui68.multiversenets.util.Text;
 import net.kyori.adventure.text.Component;
@@ -23,6 +24,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Configuration GUI for item filters (whitelist / blacklist) and directional target faces.
@@ -163,6 +165,7 @@ public class FilterMenu extends MenuHolder {
                     } else {
                         lore.add(Component.text("Click to target ONLY this face / block", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
                     }
+                    lore.add(Component.text("Shift-Click / Right-Click: Open Target Block GUI", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
                     meta.lore(lore);
                     icon.setItemMeta(meta);
                 }
@@ -186,15 +189,44 @@ public class FilterMenu extends MenuHolder {
                 } else {
                     lore.add(Component.text("Click to allow interacting with all adjacent blocks.", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
                 }
+                lore.add(Component.text("Shift-Click / Right-Click: Open First Adjacent GUI", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
                 metaAll.lore(lore);
                 allIcon.setItemMeta(metaAll);
             }
             inv.setItem(ALL_DIRECTIONS_SLOT, allIcon);
         } else {
-            ItemStack border = panel(Material.GRAY_STAINED_GLASS_PANE, " ");
-            for (int slot : BOTTOM_BORDER_SLOTS) {
+            for (int i = 0; i < DIRECTION_SLOTS.length; i++) {
+                int slot = DIRECTION_SLOTS[i];
+                BlockFace f = DIRECTION_FACES[i];
+                Block adj = block.getRelative(f);
+                ItemStack border = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+                var meta = border.getItemMeta();
+                if (meta != null) {
+                    meta.displayName(Component.text(f.name() + ": " + getBlockDescription(adj), NamedTextColor.GRAY)
+                            .decoration(TextDecoration.ITALIC, false));
+                    List<Component> lore = new ArrayList<>();
+                    lore.add(Component.text("Block: " + adj.getType().name(), NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+                    if (isInteractableTarget(adj)) {
+                        lore.add(Component.empty());
+                        lore.add(Component.text("Shift-Click / Right-Click: Open Target Block GUI", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
+                    }
+                    meta.lore(lore);
+                    border.setItemMeta(meta);
+                }
                 inv.setItem(slot, border);
             }
+            ItemStack borderAll = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+            var metaAll = borderAll.getItemMeta();
+            if (metaAll != null) {
+                metaAll.displayName(Component.text("All Sides (Simple Mode)", NamedTextColor.GRAY)
+                        .decoration(TextDecoration.ITALIC, false));
+                metaAll.lore(List.of(
+                        Component.text("Simple Grabbers and Pushers interact with all sides.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false),
+                        Component.text("Shift-Click / Right-Click: Open First Adjacent GUI", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false)
+                ));
+                borderAll.setItemMeta(metaAll);
+            }
+            inv.setItem(ALL_DIRECTIONS_SLOT, borderAll);
         }
 
         ItemStack clear = new ItemStack(Material.BARRIER);
@@ -243,26 +275,40 @@ public class FilterMenu extends MenuHolder {
             return;
         }
 
-        if (type.isDirectional() && raw >= 18 && raw <= 24) {
+        boolean isActionOpen = event.isShiftClick() || event.isRightClick();
+        if (raw >= 18 && raw <= 24) {
             if (raw == ALL_DIRECTIONS_SLOT) {
-                blob.targetFace = "ALL";
-                NodeStore.put(block, blob);
-                player.sendMessage(Text.msg("Target direction set to: ALL (Any adjacent container)", NamedTextColor.GREEN));
-                draw();
+                if (isActionOpen) {
+                    openFirstAdjacentBlock();
+                    return;
+                }
+                if (type.isDirectional()) {
+                    blob.targetFace = "ALL";
+                    NodeStore.put(block, blob);
+                    player.sendMessage(Text.msg("Target direction set to: ALL (Any adjacent container)", NamedTextColor.GREEN));
+                    draw();
+                }
                 return;
             }
             for (int i = 0; i < DIRECTION_SLOTS.length; i++) {
                 if (DIRECTION_SLOTS[i] == raw) {
                     BlockFace f = DIRECTION_FACES[i];
-                    if (blob.targetFace != null && blob.targetFace.equalsIgnoreCase(f.name())) {
-                        blob.targetFace = "ALL";
-                        player.sendMessage(Text.msg("Reset target direction to: ALL", NamedTextColor.YELLOW));
-                    } else {
-                        blob.targetFace = f.name();
-                        player.sendMessage(Text.msg("Target direction set to: " + f.name() + " (" + getBlockDescription(block.getRelative(f)) + ")", NamedTextColor.GREEN));
+                    Block target = block.getRelative(f);
+                    if (isActionOpen) {
+                        openTargetBlock(target);
+                        return;
                     }
-                    NodeStore.put(block, blob);
-                    draw();
+                    if (type.isDirectional()) {
+                        if (blob.targetFace != null && blob.targetFace.equalsIgnoreCase(f.name())) {
+                            blob.targetFace = "ALL";
+                            player.sendMessage(Text.msg("Reset target direction to: ALL", NamedTextColor.YELLOW));
+                        } else {
+                            blob.targetFace = f.name();
+                            player.sendMessage(Text.msg("Target direction set to: " + f.name() + " (" + getBlockDescription(target) + ")", NamedTextColor.GREEN));
+                        }
+                        NodeStore.put(block, blob);
+                        draw();
+                    }
                     return;
                 }
             }
@@ -354,13 +400,66 @@ public class FilterMenu extends MenuHolder {
         if (b == null || b.getType().isAir()) {
             return "Air";
         }
-        if (SlimefunBridge.isMachine(b)) {
+        NodeBlob targetBlob = NodeStore.get(b);
+        if (targetBlob != null) {
+            DeviceType dev = DeviceType.parse(targetBlob.typeName);
+            if (dev != null) {
+                return dev.display();
+            }
+        }
+        if (SlimefunBridge.isMachine(b) || SlimefunBridge.isContainer(b)) {
             String sfId = SlimefunBridge.getId(b);
             if (sfId != null) {
                 return sfId;
             }
         }
         return b.getType().name();
+    }
+
+    private void openTargetBlock(Block target) {
+        if (target == null) {
+            player.sendMessage(Text.msg("No target block selected.", NamedTextColor.RED));
+            return;
+        }
+        plugin.getServer().getScheduler().runTask(plugin, () -> {
+            boolean opened = plugin.blockListener() != null && plugin.blockListener().openTargetBlockInterface(player, target);
+            if (!opened) {
+                player.sendMessage(Text.msg("No interactable container or machine found at that side (" + getBlockDescription(target) + ").", NamedTextColor.RED));
+            }
+        });
+    }
+
+    private void openFirstAdjacentBlock() {
+        for (BlockFace face : DIRECTION_FACES) {
+            Block adj = block.getRelative(face);
+            if (isInteractableTarget(adj)) {
+                openTargetBlock(adj);
+                return;
+            }
+        }
+        player.sendMessage(Text.msg("No adjacent interactable containers or machines found.", NamedTextColor.RED));
+    }
+
+    private boolean isInteractableTarget(Block b) {
+        if (b == null || b.getType().isAir()) {
+            return false;
+        }
+        if (NodeStore.get(b) != null) {
+            return true;
+        }
+        if (Settings.compatSlimefun() && SlimefunBridge.isAvailable()) {
+            if (SlimefunBridge.isMachine(b) || SlimefunBridge.isContainer(b)) {
+                return true;
+            }
+        }
+        if (b.getState() instanceof org.bukkit.block.Container) {
+            return true;
+        }
+        return switch (b.getType()) {
+            case CRAFTING_TABLE, ENCHANTING_TABLE, ANVIL, CHIPPED_ANVIL, DAMAGED_ANVIL,
+                 SMITHING_TABLE, GRINDSTONE, STONECUTTER, LOOM, CARTOGRAPHY_TABLE, ENDER_CHEST -> true;
+            default -> false;
+        };
     }
 
     private String getItemDisplayName(ItemStack item) {

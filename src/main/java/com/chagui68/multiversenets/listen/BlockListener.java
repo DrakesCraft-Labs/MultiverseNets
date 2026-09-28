@@ -449,30 +449,45 @@ public class BlockListener implements Listener {
             if (candidate == null || candidate.equals(clickedBlock)) {
                 continue;
             }
-            if (!canAccessIslandNetwork(player, candidate.getLocation())) {
-                continue;
-            }
-
-            // A. Check MultiverseNets device
-            NodeBlob candidateBlob = NodeStore.get(candidate);
-            if (candidateBlob != null) {
-                DeviceType candType = DeviceType.parse(candidateBlob.typeName);
-                if (candType != null && openDeviceMenu(player, candidate, candidateBlob, candType)) {
-                    return true;
-                }
-            }
-
-            // B. Check Slimefun machine BlockMenu
-            if (Settings.compatSlimefun() && SlimefunBridge.isAvailable()) {
-                if (SlimefunBridge.openSlimefunMenu(candidate, player)) {
-                    return true;
-                }
-            }
-
-            // C. Check Vanilla Container or interactive block
-            if (openVanillaInterface(candidate, player)) {
+            if (openTargetBlockInterface(player, candidate)) {
                 return true;
             }
+        }
+        return false;
+    }
+
+    /**
+     * EN: Opens the GUI interface of an adjacent/target block (MultiverseNets device, Slimefun BlockMenu, or Vanilla container).
+     * ES: Abre la interfaz gráfica de un bloque objetivo o adyacente (nodo MultiverseNets, máquina Slimefun o contenedor Vanilla).
+     */
+    public boolean openTargetBlockInterface(Player player, Block candidate) {
+        if (candidate == null || player == null) {
+            return false;
+        }
+        if (!canAccessIslandNetwork(player, candidate.getLocation())) {
+            player.sendMessage(Text.msg("You do not have permission to access devices on this island.", NamedTextColor.RED));
+            return false;
+        }
+
+        // A. Check MultiverseNets device
+        NodeBlob candidateBlob = NodeStore.get(candidate);
+        if (candidateBlob != null) {
+            DeviceType candType = DeviceType.parse(candidateBlob.typeName);
+            if (candType != null && openDeviceMenu(player, candidate, candidateBlob, candType)) {
+                return true;
+            }
+        }
+
+        // B. Check Slimefun machine BlockMenu
+        if (Settings.compatSlimefun() && SlimefunBridge.isAvailable()) {
+            if (SlimefunBridge.openSlimefunMenu(candidate, player)) {
+                return true;
+            }
+        }
+
+        // C. Check Vanilla Container or interactive block
+        if (openVanillaInterface(candidate, player)) {
+            return true;
         }
         return false;
     }

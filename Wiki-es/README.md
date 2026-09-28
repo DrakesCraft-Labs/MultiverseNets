@@ -56,6 +56,7 @@
 * **Configuration Wrench**: shift+clic sobre un dispositivo con filtro **copia** su configuración; clic normal la **pega** en otro.
 * **Network Rake**: retira nodos al instante (250 usos por defecto, `rake.uses`); no toca controladores ni celdas cargadas.
 * Filtros con **modo whitelist/blacklist** en cualquier dispositivo con filtro (grabbers, pushers, vacuum, purgador, greedy cell, receptor).
+* **Inspección rápida de máquinas/contenedores adyacentes**: Shift+Clic o Clic Derecho en cualquier botón de dirección dentro del menú de un Grabber o Pusher abre directamente la GUI o inventario del bloque o máquina adyacente (máquinas Slimefun, cofres/contenedores vanilla, dispositivos MultiverseNets).
 
 ### 🛡️ Fiabilidad
 * Protección contra pistones y explosiones sobre nodos.

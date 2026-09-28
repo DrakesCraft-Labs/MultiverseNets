@@ -24,6 +24,7 @@ public class MultiverseNets extends JavaPlugin {
 
     private NetworkManager networks;
     private NetworkTicker ticker;
+    private BlockListener blockListener;
 
     /**
      * @return Global singleton plugin instance / Instancia singleton global del plugin
@@ -46,6 +47,13 @@ public class MultiverseNets extends JavaPlugin {
         return ticker;
     }
 
+    /**
+     * @return Global block listener / Listener global de bloques
+     */
+    public BlockListener blockListener() {
+        return blockListener;
+    }
+
     @Override
     public void onEnable() {
         instance = this;
@@ -62,7 +70,7 @@ public class MultiverseNets extends JavaPlugin {
         networks = new NetworkManager(this);
         networks.load();
 
-        new BlockListener(this, networks);
+        blockListener = new BlockListener(this, networks);
         new GuiListener(this);
         new ChatPrompts(this);
         new com.chagui68.multiversenets.listen.CraftingListener(this);

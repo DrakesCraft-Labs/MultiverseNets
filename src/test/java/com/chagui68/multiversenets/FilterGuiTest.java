@@ -270,4 +270,80 @@ class FilterGuiTest {
         NodeBlob blob = NodeStore.get(grabber);
         assertNull(blob.targetFace, "clicking decorative pane must not modify targetFace");
     }
+
+    /**
+     * [EN] Shift-clicking a directional slot opens the adjacent container GUI.
+     * [ES] Shift-clic en una ranura direccional abre la GUI del contenedor adyacente.
+     */
+    @Test
+    void shiftClickDirectionSlotOpensAdjacentBlockInterface() {
+        Block grabber = place(DeviceType.MVN_GRABBER_HT);
+        Block northBlock = world.getBlockAt(0, 64, -1);
+        northBlock.setType(Material.CHEST);
+
+        new FilterMenu(plugin, player, grabber, DeviceType.MVN_GRABBER_HT).openMenu();
+
+        clickTop(20, ClickType.SHIFT_RIGHT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        server.getScheduler().performOneTick();
+
+        assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof org.bukkit.block.Chest,
+                "Shift-clicking direction slot must open adjacent chest GUI");
+    }
+
+    /**
+     * [EN] Right-clicking a directional slot opens the adjacent container GUI.
+     * [ES] Clic derecho en una ranura direccional abre la GUI del contenedor adyacente.
+     */
+    @Test
+    void rightClickDirectionSlotOpensAdjacentBlockInterface() {
+        Block pusher = place(DeviceType.MVN_PUSHER_HT);
+        Block eastBlock = world.getBlockAt(1, 64, 0);
+        eastBlock.setType(Material.BARREL);
+
+        new FilterMenu(plugin, player, pusher, DeviceType.MVN_PUSHER_HT).openMenu();
+
+        clickTop(23, ClickType.RIGHT, InventoryAction.PICKUP_HALF);
+        server.getScheduler().performOneTick();
+
+        assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof org.bukkit.block.Barrel,
+                "Right-clicking direction slot must open adjacent barrel GUI");
+    }
+
+    /**
+     * [EN] Shift-clicking ALL slot opens the first adjacent interactable block GUI.
+     * [ES] Shift-clic en ranura ALL abre la GUI del primer bloque interactuable adyacente.
+     */
+    @Test
+    void shiftClickAllSlotOpensFirstAdjacentBlock() {
+        Block grabber = place(DeviceType.MVN_GRABBER_HT);
+        Block upBlock = world.getBlockAt(0, 65, 0);
+        upBlock.setType(Material.CHEST);
+
+        new FilterMenu(plugin, player, grabber, DeviceType.MVN_GRABBER_HT).openMenu();
+
+        clickTop(FilterMenu.ALL_DIRECTIONS_SLOT, ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        server.getScheduler().performOneTick();
+
+        assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof org.bukkit.block.Chest,
+                "Shift-clicking ALL directions slot must open first adjacent container GUI");
+    }
+
+    /**
+     * [EN] Simple grabber allows shift-clicking adjacent face slot to open target container GUI.
+     * [ES] El grabber simple permite shift-clic en una ranura de cara adyacente para abrir la GUI del contenedor.
+     */
+    @Test
+    void simpleGrabberAllowsShiftClickToOpenAdjacentContainer() {
+        Block grabber = place(DeviceType.MVN_GRABBER);
+        Block southBlock = world.getBlockAt(0, 64, 1);
+        southBlock.setType(Material.CHEST);
+
+        new FilterMenu(plugin, player, grabber, DeviceType.MVN_GRABBER).openMenu();
+
+        clickTop(21, ClickType.SHIFT_LEFT, InventoryAction.MOVE_TO_OTHER_INVENTORY);
+        server.getScheduler().performOneTick();
+
+        assertTrue(player.getOpenInventory().getTopInventory().getHolder() instanceof org.bukkit.block.Chest,
+                "Shift-clicking adjacent slot on simple grabber must open adjacent chest GUI");
+    }
 }
