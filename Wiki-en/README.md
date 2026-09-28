@@ -42,7 +42,9 @@
 
 ### 🛠️ Auto-crafting
 * **Auto-Crafter**: accepts **Blueprints** (real 3×3 grid) and result-based recipes (legacy mode). Each blueprint is attempted once per cycle with **atomic extraction**: either there are ingredients for everything or nothing is touched.
+* **Slimefun Auto-Crafter**: dedicated autonomous crafter for Slimefun item recipes (Crying Obsidian). Strictly accepts Slimefun blueprints, keeping Slimefun automated production completely isolated from vanilla recipes.
 * **Request Crafter**: dedicated on-demand crafting node managed exclusively by Request Terminals. Blueprints placed here are not auto-crafted periodically, keeping manual crafting orders clean and isolated.
+* **Slimefun Request Crafter**: dedicated on-demand crafting node for Slimefun recipes (Purpur Pillar). Discovered exclusively by Request Terminals for manual and recursive Slimefun crafting.
 * **Request Terminal**: on-demand crafting console linked strictly to Request Crafters across the network. Resolves recursive chained dependencies (e.g., Oak Logs -> Planks -> Crafting Table). Left-click crafts 1x, right-click crafts 64x, and shift+right-click prompts in chat to specify an exact custom quantity with strict numeric validation.
 * **Recipe Encoder**: builds the recipe in a persistent 3×3 template grid (click to fix slots, without spending items) and encodes a blank Blueprint with one click.
 * **Slimefun Recipe Encoder**: Dedicated encoder for Slimefun recipes (toggleable via `sf-encoder.enabled`).
@@ -104,6 +106,8 @@ Each device is crafted on a standard 3×3 crafting table. `·` marks an empty sl
 | Liquid Pump | <pre>· G ·<br/>P B P<br/>· R ·</pre> | G = Blue Stained Glass · P = Piston · B = Bucket · R = Redstone |
 | Request Terminal | <pre>G L G<br/>R C R<br/>G G G</pre> | G = Glass · L = Lectern · C = Crafting Table · R = Redstone |
 | Request Crafter | <pre>R C R<br/>I L I<br/>R C R</pre> | R = Redstone · C = Crafting Table · I = Iron Ingot · L = Lectern |
+| Slimefun Auto-Crafter | <pre>R C R<br/>I T I<br/>R C R</pre> | R = Ender Pearl · C = Crying Obsidian · I = Iron Ingot · T = Target |
+| Slimefun Request Crafter | <pre>R C R<br/>I L I<br/>R C R</pre> | R = Ender Pearl · C = Purpur Pillar · I = Iron Ingot · L = Lectern |
 
 
 ## ⌨️ Commands

@@ -558,4 +558,30 @@ Almacenamiento interno multi-ítem instalado directamente sobre el **Network Con
 
 ---
 
+## Slimefun Auto-Crafter
+- **Receta (3×3)**:
+  ```
+  R C R
+  I T I
+  R C R
+  ```
+  > R = **Perla de ender** · C = **Obsidiana llorosa** · I = **Lingote de hierro** · T = **Diana (Target)**
+- **Resultado**: 1× Slimefun Auto-Crafter
+- **Función**: Crafteador autónomo diseñado exclusivamente para recetas de ítems de Slimefun. Solo admite planos codificados con recetas de Slimefun (desde el Slimefun Recipe Encoder), manteniéndolos estrictamente aislados de las recetas vanilla. Ejecuta intentos de crafteo periódicamente durante los ciclos de la red con transacciones atómicas. Ajustable en config: `sf-crafter.enabled`.
+
+---
+
+## Slimefun Request Crafter
+- **Receta (3×3)**:
+  ```
+  R C R
+  I L I
+  R C R
+  ```
+  > R = **Perla de ender** · C = **Pilar de púrpura** · I = **Lingote de hierro** · L = **Atril (Lectern)**
+- **Resultado**: 1× Slimefun Request Crafter
+- **Función**: Unidad de crafteo bajo demanda dedicada para recetas de Slimefun, controlada exclusivamente desde la Request Terminal. Almacena planos de Slimefun sin elaborarlos de forma automática en los ciclos periódicos de la red. Descubierto dinámicamente por las Request Terminals conectadas para pedidos manuales y crafteos recursivos por dependencias. Ajustable en config: `sf-crafter.enabled`.
+
+---
+
 Esta documentación está pensada para servir como referencia rápida tanto a jugadores como a desarrolladores que quieran entender el funcionamiento de cada ítem y cómo fabricarlos. Las capacidades y velocidades citadas corresponden a los valores por defecto de `config.yml` y pueden ajustarse en ese archivo.

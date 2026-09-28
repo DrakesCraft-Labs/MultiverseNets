@@ -276,7 +276,29 @@ public final class GuideBook {
                 "B = Enchanting Table",
                 "Encodes Slimefun recipes"));
 
-        // Page 27: Crafting Grid
+        // Page 27: Slimefun Auto-Crafter
+        meta.addPage(recipePageEn("SF Auto-Crafter", "Autonomous Slimefun Crafter",
+                "RCR",
+                "ITI",
+                "RCR",
+                "R = Ender Pearl",
+                "C = Crying Obsidian",
+                "I = Iron Ingot",
+                "T = Target",
+                "Crafts Slimefun blueprints"));
+
+        // Page 28: Slimefun Request Crafter
+        meta.addPage(recipePageEn("SF Request Crafter", "Slimefun On-Demand Node",
+                "RCR",
+                "ILI",
+                "RCR",
+                "R = Ender Pearl",
+                "C = Purpur Pillar",
+                "I = Iron Ingot",
+                "L = Lectern",
+                "For Request Terminal"));
+
+        // Page 29: Crafting Grid
         meta.addPage(recipePageEn("Crafting Grid", "Network-Linked Workbench",
                 "CRC",
                 "RGR",
@@ -620,7 +642,29 @@ public final class GuideBook {
                 "B = Mesa de encantamientos",
                 "Graba recetas de Slimefun"));
 
-        // Page 27: Parrilla de Crafteo
+        // Page 27: Slimefun Auto-Crafter
+        meta.addPage(recipePageEs("Autocraft Slimefun", "Crafteador Autónomo Slimefun",
+                "RCR",
+                "ITI",
+                "RCR",
+                "R = Perla de ender",
+                "C = Obsidiana llorosa",
+                "I = Lingote de hierro",
+                "T = Diana (Target)",
+                "Elabora planos Slimefun"));
+
+        // Page 28: Slimefun Request Crafter
+        meta.addPage(recipePageEs("Req Craft Slimefun", "Cámara a Pedido Slimefun",
+                "RCR",
+                "ILI",
+                "RCR",
+                "R = Perla de ender",
+                "C = Pilar de púrpura",
+                "I = Lingote de hierro",
+                "L = Atril (Lectern)",
+                "Exclusivo Request Terminal"));
+
+        // Page 29: Parrilla de Crafteo
         meta.addPage(recipePageEs("Parrilla Crafteo", "Mesa Integrada a la Red",
                 "CRC",
                 "RGR",

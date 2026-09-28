@@ -403,6 +403,16 @@ class FluidAndRequesterTest {
         String p3 = meta.getPage(3);
         assertTrue(p3.contains("Controller") && p3.contains("Nether Star"));
         assertTrue(p3.contains("[ I ] [ N ] [ I ]"), "Page 3 should render 3x3 recipe grid like the wiki");
+
+        boolean foundSfCrafterEn = false;
+        boolean foundSfReqCrafterEn = false;
+        for (int p = 1; p <= meta.getPageCount(); p++) {
+            String page = meta.getPage(p);
+            if (page.contains("SF Auto-Crafter") && page.contains("Crying Obsidian")) foundSfCrafterEn = true;
+            if (page.contains("SF Request Crafter") && page.contains("Purpur Pillar")) foundSfReqCrafterEn = true;
+        }
+        assertTrue(foundSfCrafterEn, "English book must contain SF Auto-Crafter recipe page");
+        assertTrue(foundSfReqCrafterEn, "English book must contain SF Request Crafter recipe page");
     }
 
     @Test
@@ -420,6 +430,16 @@ class FluidAndRequesterTest {
         String p3 = meta.getPage(3);
         assertTrue(p3.contains("Controlador") && p3.contains("Estrella del Nether"));
         assertTrue(p3.contains("[ I ] [ N ] [ I ]"), "Spanish guide should render 3x3 recipe grid like the wiki");
+
+        boolean foundSfCrafterEs = false;
+        boolean foundSfReqCrafterEs = false;
+        for (int p = 1; p <= meta.getPageCount(); p++) {
+            String page = meta.getPage(p);
+            if (page.contains("Autocraft Slimefun") && page.contains("Obsidiana llorosa")) foundSfCrafterEs = true;
+            if (page.contains("Req Craft Slimefun") && page.contains("Pilar de púrpura")) foundSfReqCrafterEs = true;
+        }
+        assertTrue(foundSfCrafterEs, "Spanish book must contain Autocraft Slimefun recipe page");
+        assertTrue(foundSfReqCrafterEs, "Spanish book must contain Req Craft Slimefun recipe page");
     }
 
     @Test

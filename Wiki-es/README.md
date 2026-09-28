@@ -42,7 +42,9 @@
 
 ### 🛠️ Autocrafteo
 * **Auto‑Crafteador**: acepta **Blueprints** (matriz 3×3 real) y recetas por resultado (modo antiguo). Cada blueprint se intenta una vez por ciclo con **extracción atómica**: o hay ingredientes para todo o no se toca nada.
+* **Slimefun Auto-Crafter**: crafteador autónomo exclusivo para recetas de ítems de Slimefun (Obsidiana llorosa). Solo admite planos de Slimefun, garantizando el aislamiento total de la producción automática frente a recetas vanilla.
 * **Request Crafter**: nodo de crafteo dedicado bajo demanda administrado exclusivamente por la Request Terminal. Los blueprints colocados aquí no se elaboran automáticamente en segundo plano.
+* **Slimefun Request Crafter**: nodo de crafteo bajo demanda exclusivo para recetas de Slimefun (Pilar de púrpura). Descubierto por las Request Terminals para fabricar pedidos de Slimefun manualmente o de forma recursiva.
 * **Request Terminal**: consola de crafteo bajo demanda conectada estrictamente a los Request Crafters de la red. Resuelve dependencias recursivas y encadenadas (ej. Troncos -> Tablones -> Mesa de crafteo). Clic izquierdo craftea 1x, clic derecho 64x, y shift+clic derecho abre prompt de chat para definir cantidad numérica exacta con validación estricta.
 * **Recipe Encoder**: monta la receta en una matriz 3×3 de plantillas persistente (clic para fijar huecos, sin gastar ítems) y codifica un Blueprint en blanco con un clic.
 * **Slimefun Recipe Encoder**: Codificador exclusivo para recetas de Slimefun (configurable mediante `sf-encoder.enabled`).
@@ -104,6 +106,8 @@ Cada dispositivo se fabrica en una mesa de crafteo 3×3 estándar. `·` marca el
 | Liquid Pump | <pre>· G ·<br/>P B P<br/>· R ·</pre> | G = Cristal azul oscuro · P = Pistón · B = Cubo · R = Redstone |
 | Request Terminal | <pre>G L G<br/>R C R<br/>G G G</pre> | G = Cristal · L = Atril · C = Mesa de crafteo · R = Redstone |
 | Request Crafter | <pre>R C R<br/>I L I<br/>R C R</pre> | R = Redstone · C = Mesa de crafteo · I = Lingote de hierro · L = Atril |
+| Slimefun Auto-Crafter | <pre>R C R<br/>I T I<br/>R C R</pre> | R = Perla de ender · C = Obsidiana llorosa · I = Lingote de hierro · T = Diana |
+| Slimefun Request Crafter | <pre>R C R<br/>I L I<br/>R C R</pre> | R = Perla de ender · C = Pilar de púrpura · I = Lingote de hierro · L = Atril |
 
 
 ## ⌨️ Comandos

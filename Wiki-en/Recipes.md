@@ -558,4 +558,30 @@ Internal multi-item storage installed directly into the **Network Controller** b
 
 ---
 
+## Slimefun Auto-Crafter
+- **Recipe (3×3)**:
+  ```
+  R C R
+  I T I
+  R C R
+  ```
+  > R = **Ender Pearl** · C = **Crying Obsidian** · I = **Iron Ingot** · T = **Target**
+- **Result**: 1× Slimefun Auto-Crafter
+- **Function**: Dedicated autonomous crafter designed specifically for Slimefun item recipes. Only accepts blueprints encoded with Slimefun recipes (from the Slimefun Recipe Encoder), strictly isolating them from vanilla auto-crafting. Executes crafting attempts periodically during network ticks with atomic item transactions. Config toggle: `sf-crafter.enabled`.
+
+---
+
+## Slimefun Request Crafter
+- **Recipe (3×3)**:
+  ```
+  R C R
+  I L I
+  R C R
+  ```
+  > R = **Ender Pearl** · C = **Purpur Pillar** · I = **Iron Ingot** · L = **Lectern**
+- **Result**: 1× Slimefun Request Crafter
+- **Function**: Dedicated on-demand crafting node for Slimefun item recipes, managed exclusively by the Request Terminal. Holds Slimefun blueprints without auto-crafting them periodically. Discovered dynamically by connected Request Terminals for manual batch requests and recursive chained crafting. Config toggle: `sf-crafter.enabled`.
+
+---
+
 This documentation is meant as a quick reference for both players and developers who want to understand what each item does and how to craft it. The capacities and speeds quoted are the `config.yml` defaults and can be tuned in that file.
