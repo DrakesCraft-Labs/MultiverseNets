@@ -88,9 +88,6 @@ public final class SlimefunBridge {
     private static Class<?> cBlockMenu;
     private static Class<?> cBlockMenuPreset;
     private static Constructor<?> ctorBlockMenu;
-    private static Object cellPreset;
-    private static int[] cellPresetWithdrawSlots;
-    private static int[] cellPresetInsertSlots;
 
     public record SlimefunRecipeDetails(ItemStack[] inputs, ItemStack output, String sfId, String recipeType) {}
     private static final List<SlimefunRecipeDetails> SF_RECIPES = new ArrayList<>();
@@ -118,7 +115,6 @@ public final class SlimefunBridge {
         for (String root : API_ROOTS) {
             if (tryHook(root)) {
                 available = true;
-                setupCellPreset();
                 loadSlimefunRecipes();
                 log.info("[Compat] Slimefun detected (" + root + "). Grabbers, pushers, and crafters can use machines.");
                 return;
@@ -554,54 +550,6 @@ public final class SlimefunBridge {
     // Slimefun Recipe Discovery & Auto-Crafting Support
     // ----------------------------------------------------------------
 
-    private static void setupCellPreset() {
-        try {
-            Class<?> sfClass = null;
-            for (String prefix : new String[]{"com.github.drakescraft_labs.slimefun4", "io.github.thebusybiscuit.slimefun4"}) {
-                try {
-                    sfClass = Class.forName(prefix + ".implementation.Slimefun");
-                    break;
-                } catch (ClassNotFoundException ignored) {}
-            }
-            if (sfClass == null) return;
-            Method mRegistry = sfClass.getMethod("getRegistry");
-            Object registry = mRegistry.invoke(null);
-            Method mPresets = registry.getClass().getMethod("getMenuPresets");
-            Object mapObj = mPresets.invoke(registry);
-            if (mapObj instanceof Map<?, ?> map) {
-                for (Object p : map.values()) {
-                    if (p == null) continue;
-                    try {
-                        int[] withdraw = getPresetSlots(p, flowWithdraw);
-                        int[] insert = getPresetSlots(p, flowInsert);
-                        if (withdraw != null && withdraw.length > 0 && insert != null && insert.length > 0) {
-                            cellPreset = p;
-                            cellPresetWithdrawSlots = withdraw;
-                            cellPresetInsertSlots = insert;
-                            break;
-                        }
-                    } catch (Exception ignored) {}
-                }
-            }
-        } catch (Throwable ignored) {}
-    }
-
-    private static int[] getPresetSlots(Object preset, Object flow) {
-        if (preset == null || flow == null) return new int[0];
-        try {
-            if (mSlotsForTransportSimple != null) {
-                Object res = mSlotsForTransportSimple.invoke(preset, flow);
-                if (res instanceof int[] arr && arr.length > 0) return arr;
-            }
-        } catch (Exception ignored) {}
-        try {
-            if (mSlotsForTransport != null) {
-                Object res = mSlotsForTransport.invoke(preset, null, flow, null);
-                if (res instanceof int[] arr && arr.length > 0) return arr;
-            }
-        } catch (Exception ignored) {}
-        return new int[0];
-    }
 
     /**
      * EN: Caches all 3x3 recipes from enabled Slimefun items in the registry.
@@ -721,147 +669,10 @@ public final class SlimefunBridge {
         }
         return true;
     }
-
     // ----------------------------------------------------------------
-    // Quantum Cell Coexistence with Slimefun Grabbers & Pushers
+    // Quantum Cell Slimefun Cleanup
     // ----------------------------------------------------------------
 
-    /**
-     * EN: Synchronizes a Quantum Cell with both the physical container tile entity and Slimefun's BlockMenu.
-     * Allows Slimefun NetworkGrabbers and NetworkPushers to seamlessly extract from and deposit into Quantum Cells.
-     *
-     * ES: Sincroniza una Celda Cuántica con el inventario físico del contenedor y el BlockMenu de Slimefun.
-     * Permite que los Grabbers y Pushers de Slimefun extraigan y depositen ítems sin problemas en Celdas Cuánticas.
-     */
-    public static void syncCell(Block block, NodeBlob blob) {
-        if (block == null || blob == null) return;
-        DeviceType type = DeviceType.parse(blob.typeName);
-        if (type == null || !type.isCell()) return;
-
-        // 1. Sync physical tile entity (Dispenser container)
-        // Works for NetworkVanillaGrabber, NetworkVanillaPusher, Cargo Nodes, Hoppers, etc.
-        if (block.getState() instanceof org.bukkit.block.Container container) {
-            Inventory inv = container.getInventory();
-            long cap = Items.capacityOf(type);
-
-            // Read any incoming items from slots 1..8
-            for (int i = 1; i < inv.getSize(); i++) {
-                ItemStack in = inv.getItem(i);
-                if (in != null && !in.getType().isAir()) {
-                    if (blob.cellSample == null) {
-                        blob.cellSample = StackUtils.getAsQuantity(in, 1);
-                    }
-                    if (StackUtils.itemsMatch(in, blob.cellSample)) {
-                        long space = cap - blob.cellAmount;
-                        if (space > 0) {
-                            int take = (int) Math.min(space, in.getAmount());
-                            blob.cellAmount += take;
-                            in.setAmount(in.getAmount() - take);
-                            inv.setItem(i, in.getAmount() > 0 ? in : null);
-                        }
-                    }
-                }
-            }
-
-            // Slot 0 is the withdrawal buffer
-            ItemStack currentOut = inv.getItem(0);
-            int lastExpected = blob.lastSyncedOutAmount;
-            if (lastExpected > 0) {
-                if (currentOut == null || currentOut.getType().isAir()) {
-                    // Entire buffer was extracted
-                    blob.cellAmount = Math.max(0, blob.cellAmount - lastExpected);
-                } else if (StackUtils.itemsMatch(currentOut, blob.cellSample)) {
-                    if (currentOut.getAmount() < lastExpected) {
-                        int extracted = lastExpected - currentOut.getAmount();
-                        blob.cellAmount = Math.max(0, blob.cellAmount - extracted);
-                    } else if (currentOut.getAmount() > lastExpected) {
-                        int deposited = currentOut.getAmount() - lastExpected;
-                        blob.cellAmount += deposited;
-                    }
-                }
-            }
-
-            // Replenish slot 0 buffer
-            if (blob.cellSample != null && blob.cellAmount > 0) {
-                int maxStack = blob.cellSample.getMaxStackSize();
-                int fill = (int) Math.min(blob.cellAmount, maxStack);
-                ItemStack out = StackUtils.getAsQuantity(blob.cellSample, fill);
-                inv.setItem(0, out);
-                blob.lastSyncedOutAmount = fill;
-            } else {
-                inv.setItem(0, null);
-                blob.lastSyncedOutAmount = 0;
-            }
-        }
-
-        // 2. Sync Slimefun BlockMenu (for Slimefun's NetworkGrabber and NetworkPusher)
-        if (available && cellPreset != null) {
-            syncSlimefunBlockMenu(block, blob, type);
-        }
-    }
-
-    private static void syncSlimefunBlockMenu(Block block, NodeBlob blob, DeviceType type) {
-        try {
-            if (mGetStorage == null || fInventories == null || ctorBlockMenu == null) return;
-            Object storage = mGetStorage.invoke(null, block.getWorld());
-            if (storage == null) return;
-            @SuppressWarnings("unchecked")
-            Map<org.bukkit.Location, Object> invs = (Map<org.bukkit.Location, Object>) fInventories.get(storage);
-            if (invs == null) return;
-
-            Object menu = invs.get(block.getLocation());
-            if (menu == null) {
-                menu = ctorBlockMenu.newInstance(cellPreset, block.getLocation());
-                invs.put(block.getLocation(), menu);
-            }
-
-            long cap = Items.capacityOf(type);
-
-            // Read items pushed into Slimefun insert slots
-            if (cellPresetInsertSlots != null) {
-                for (int slot : cellPresetInsertSlots) {
-                    Object raw = mGetItemInSlot.invoke(menu, slot);
-                    if (raw instanceof ItemStack in && !in.getType().isAir()) {
-                        if (blob.cellSample == null) {
-                            blob.cellSample = StackUtils.getAsQuantity(in, 1);
-                        }
-                        if (StackUtils.itemsMatch(in, blob.cellSample)) {
-                            long space = cap - blob.cellAmount;
-                            if (space > 0) {
-                                int take = (int) Math.min(space, in.getAmount());
-                                blob.cellAmount += take;
-                                in.setAmount(in.getAmount() - take);
-                                mReplaceExistingItem.invoke(menu, slot, in.getAmount() > 0 ? in : null);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Sync Slimefun withdrawal slot (use first withdraw slot)
-            if (cellPresetWithdrawSlots != null && cellPresetWithdrawSlots.length > 0) {
-                int outSlot = cellPresetWithdrawSlots[0];
-                Object raw = mGetItemInSlot.invoke(menu, outSlot);
-                ItemStack current = raw instanceof ItemStack s && !s.getType().isAir() ? s : null;
-
-                if (current != null && StackUtils.itemsMatch(current, blob.cellSample)) {
-                    int present = current.getAmount();
-                    int maxStack = blob.cellSample.getMaxStackSize();
-                    int target = (int) Math.min(blob.cellAmount, maxStack);
-                    if (present < target) {
-                        current.setAmount(target);
-                        mReplaceExistingItem.invoke(menu, outSlot, current);
-                    }
-                } else if (current == null && blob.cellSample != null && blob.cellAmount > 0) {
-                    int maxStack = blob.cellSample.getMaxStackSize();
-                    int target = (int) Math.min(blob.cellAmount, maxStack);
-                    ItemStack out = StackUtils.getAsQuantity(blob.cellSample, target);
-                    mReplaceExistingItem.invoke(menu, outSlot, out);
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-    }
 
     /**
      * EN: Cleans up registered BlockMenu and block info when a Quantum Cell is broken.

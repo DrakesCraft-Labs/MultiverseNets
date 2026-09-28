@@ -74,6 +74,10 @@ public class NetworkTicker {
         }
     }
 
+    public void tick() {
+        run();
+    }
+
     private void run() {
         scanIn -= 5;
         transferIn -= 5;
@@ -119,27 +123,6 @@ public class NetworkTicker {
         net.forEach(DeviceType.MVN_PURGER, (pos, type) -> purgeOnce(net, pos, base));
         net.forEach(DeviceType.MVN_RECEIVER, (pos, type) -> bridgeOnce(net, pos, base));
         net.forEach(DeviceType.MVN_LIQUID_PUMP, (pos, type) -> pumpTick(net, pos));
-        for (DeviceType cellType : List.of(DeviceType.MVN_CELL_T1, DeviceType.MVN_CELL_T2, DeviceType.MVN_CELL_T3,
-                DeviceType.MVN_CELL_T4, DeviceType.MVN_CELL_T5, DeviceType.MVN_CELL_T6)) {
-            net.forEach(cellType, (pos, type) -> cellTick(net, pos));
-        }
-    }
-
-    private void cellTick(Network net, long pos) {
-        Block block = net.block(pos);
-        if (block == null) return;
-        NodeBlob blob = blobOf(net, pos);
-        if (blob == null) return;
-        long beforeAmount = blob.cellAmount;
-        ItemStack beforeSample = blob.cellSample;
-        int beforeOut = blob.lastSyncedOutAmount;
-
-        SlimefunBridge.syncCell(block, blob);
-
-        if (blob.cellAmount != beforeAmount || !StackUtils.itemsMatch(blob.cellSample, beforeSample)
-                || blob.lastSyncedOutAmount != beforeOut) {
-            NodeStore.put(block, blob);
-        }
     }
 
     private NodeBlob blobOf(Network net, long pos) {

@@ -235,4 +235,24 @@ class CellGuiTest {
         assertEquals(32, after.cellAmount, "cell should have absorbed 32 cobblestone");
         assertNull(player.getInventory().getItem(0), "player inventory slot 0 should be cleared");
     }
+
+    /**
+     * [EN] Quantum Cells do not duplicate items when network ticker runs or when items are stored.
+     * [ES] Las celdas cuánticas no duplican ítems cuando corre el network ticker o cuando se almacenan ítems.
+     */
+    @Test
+    void cellItemsDoNotDuplicateOnNetworkTick() {
+        Block cell = placeCell(0, 64, 0, DeviceType.MVN_CELL_T1);
+        NodeBlob blob = NodeStore.get(cell);
+        blob.cellSample = new ItemStack(Material.DIAMOND);
+        blob.cellAmount = 64;
+        NodeStore.put(cell, blob);
+
+        // Run network ticker
+        new com.chagui68.multiversenets.net.NetworkTicker(plugin, plugin.networks()).tick();
+
+        NodeBlob after = NodeStore.get(cell);
+        assertEquals(64, after.cellAmount, "Cell item amount must remain exactly 64 without duplication");
+    }
 }
+

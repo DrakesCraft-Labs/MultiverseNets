@@ -28,8 +28,6 @@ public class NodeBlob implements Serializable {
     public ItemStack cellSample;
     /** EN: Total quantity stored in cell / ES: Cantidad total almacenada en la celda. */
     public long cellAmount;
-    /** EN: Last synced physical container output buffer count / ES: Último conteo sincronizado del búfer de salida físico. */
-    public transient int lastSyncedOutAmount = -1;
     /** EN: Material names/IDs for filtering / ES: Nombres/IDs de materiales para filtro. */
     public List<String> filterMaterials = new ArrayList<>();
     /** EN: Item templates for exact meta/custom filtering / ES: Plantillas de ítems para filtro exacto. */
