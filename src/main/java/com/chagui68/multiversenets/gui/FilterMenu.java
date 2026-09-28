@@ -407,7 +407,7 @@ public class FilterMenu extends MenuHolder {
                 return dev.display();
             }
         }
-        if (SlimefunBridge.isMachine(b) || SlimefunBridge.isContainer(b)) {
+        if (SlimefunBridge.isMachine(b)) {
             String sfId = SlimefunBridge.getId(b);
             if (sfId != null) {
                 return sfId;
@@ -448,7 +448,7 @@ public class FilterMenu extends MenuHolder {
             return true;
         }
         if (Settings.compatSlimefun() && SlimefunBridge.isAvailable()) {
-            if (SlimefunBridge.isMachine(b) || SlimefunBridge.isContainer(b)) {
+            if (SlimefunBridge.isMachine(b)) {
                 return true;
             }
         }
