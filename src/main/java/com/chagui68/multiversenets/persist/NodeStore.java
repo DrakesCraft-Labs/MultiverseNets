@@ -102,7 +102,15 @@ public final class NodeStore {
             normalize(blob);
             return blob;
         } catch (Throwable e) {
-            e.printStackTrace();
+            // A truncated or misplaced stream means the chunk PDC entry got damaged (a crash
+            // mid-write will do that). The block is not a node anymore, so the answer is null,
+            // and the world moves on. printStackTrace here would spam the console on every tick
+            // for the rest of the server session.
+            if (plugin != null && com.chagui68.multiversenets.util.Settings.debug()) {
+                plugin.getLogger().warning("Could not deserialize node data; the corrupt entry "
+                        + "is still in place and can be inspected. " + e.getClass().getSimpleName()
+                        + ": " + e.getMessage());
+            }
             return null;
         }
     }

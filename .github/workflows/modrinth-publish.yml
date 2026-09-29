@@ -77,12 +77,15 @@ jobs:
             exit 0
           fi
 
-          MENSAJE="$(git log -1 --pretty=%B || true)"
-
-          # Un hotfix se publica siempre, sin importar el tamano del cambio.
-          if echo "$MENSAJE" | grep -qiE '\[URGENT\]|\[HOTFIX\]|\[RELEASE\]|modrinth|ci:|fix: *dupe|fix: *crash|dupe|exploit'; then
+          # Un hotfix se publica siempre, sin importar el tamano del cambio. Se buscan los mensajes
+          # de TODOS los commits del push, no solo el ultimo: un fix suele venir seguido de un
+          # "chore(release): bump version", y mirar solo ese ultimo mensaje hacia que el fix se
+          # pasara por alto y la release se omitiria.
+          RANGO="${{ github.event.before }}..${{ github.sha }}"
+          MENSAJES="$(git log --pretty=%B "$RANGO" 2>/dev/null || git log -3 --pretty=%B)"
+          if echo "$MENSAJES" | grep -qiE '\[URGENT\]|\[HOTFIX\]|\[RELEASE\]|modrinth|ci:|fix: *dupe|fix: *crash|dupe|exploit|^fix\(|^hotfix'; then
             echo "publicar=true"  >> "$GITHUB_OUTPUT"
-            echo "motivo=hotfix detectado en el mensaje del commit"  >> "$GITHUB_OUTPUT"
+            echo "motivo=hotfix detectado en los mensajes del push"  >> "$GITHUB_OUTPUT"
             exit 0
           fi
 

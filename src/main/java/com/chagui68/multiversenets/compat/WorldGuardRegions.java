@@ -43,16 +43,7 @@ final class WorldGuardRegions {
         }
         resolved = true;
         try {
-            Class<?> worldGuard = Class.forName("com.sk89q.worldguard.WorldGuard");
-            Object instance = worldGuard.getMethod("getInstance").invoke(null);
-            if (instance == null) {
-                return false;
-            }
-            Object platform = worldGuard.getMethod("getPlatform").invoke(instance);
-            if (platform == null) {
-                return false;
-            }
-            Object found = platform.getClass().getMethod("getRegionContainer").invoke(platform);
+            Object found = resolveContainer();
             if (found == null) {
                 return false;
             }
@@ -65,6 +56,23 @@ final class WorldGuardRegions {
             getRegionManager = null;
             return false;
         }
+    }
+
+    /**
+     * [EN] The actual lookup into WorldGuard. Kept separate so a test can inject a stub without
+     * loading WorldGuard onto the classpath.
+     */
+    static Object resolveContainer() throws Throwable {
+        Class<?> worldGuard = Class.forName("com.sk89q.worldguard.WorldGuard");
+        Object instance = worldGuard.getMethod("getInstance").invoke(null);
+        if (instance == null) {
+            return null;
+        }
+        Object platform = worldGuard.getMethod("getPlatform").invoke(instance);
+        if (platform == null) {
+            return null;
+        }
+        return platform.getClass().getMethod("getRegionContainer").invoke(platform);
     }
 
     static Object container() {
