@@ -1,6 +1,7 @@
 package com.chagui68.multiversenets.listen;
 
 import com.chagui68.multiversenets.MultiverseNets;
+import com.chagui68.multiversenets.compat.ProtectionBridge;
 import com.chagui68.multiversenets.compat.SlimefunBridge;
 import com.chagui68.multiversenets.gui.BarrelMenu;
 import com.chagui68.multiversenets.gui.CellMenu;
@@ -17,8 +18,6 @@ import com.chagui68.multiversenets.gui.QuantumWorkbenchMenu;
 import com.chagui68.multiversenets.gui.RequestTerminalMenu;
 import com.chagui68.multiversenets.gui.SfEncoderMenu;
 import com.chagui68.multiversenets.gui.TerminalMenu;
-import org.bukkit.block.BlockFace;
-import java.util.Locale;
 import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.item.Items;
 import com.chagui68.multiversenets.net.Network;
@@ -325,8 +324,8 @@ public class BlockListener implements Listener {
         }
         NodeBlob blob = NodeStore.get(block);
 
-        if (blob != null && !canAccessIslandNetwork(event.getPlayer(), block.getLocation())) {
-            event.getPlayer().sendMessage(Text.msg("You do not have permission to access network devices on this island.", NamedTextColor.RED));
+        if (blob != null && !canAccessNetwork(event.getPlayer(), block.getLocation())) {
+            event.getPlayer().sendMessage(Text.msg("You do not have permission to access network devices in this protected area.", NamedTextColor.RED));
             event.setCancelled(true);
             return;
         }
@@ -349,12 +348,6 @@ public class BlockListener implements Listener {
         if (blob == null) {
             if (heldType == DeviceType.MVN_WIRELESS_TERMINAL && !event.getPlayer().isSneaking()) {
                 useWirelessInAir(event);
-                return;
-            }
-            if (event.getPlayer().isSneaking() && (held == null || held.getType().isAir() || !held.getType().isBlock())) {
-                if (tryAccessBlockInterface(event.getPlayer(), block, event.getBlockFace(), null, null)) {
-                    event.setCancelled(true);
-                }
             }
             return;
         }
@@ -387,14 +380,6 @@ public class BlockListener implements Listener {
             return;
         }
 
-        // Shift+Right click to access connected/adjacent block interface
-        if (player.isSneaking()) {
-            if (tryAccessBlockInterface(player, block, event.getBlockFace(), blob, type)) {
-                event.setCancelled(true);
-            }
-            return;
-        }
-
         if (held != null && held.getType().isBlock() && (type == DeviceType.MVN_CABLE || type == DeviceType.MVN_CONTROLLER)) {
             return;
         }
@@ -418,45 +403,6 @@ public class BlockListener implements Listener {
     }
 
     /**
-     * EN: Attempts to open the interface of an adjacent/target block when shift+right-clicking.
-     * Respects configured device direction (for Grabbers/Pushers) or clicked face direction.
-     * Supports MultiverseNets menus, Slimefun BlockMenus, and Vanilla containers/workbenches.
-     * If the target has no interface, it is silently ignored.
-     *
-     * ES: Intenta abrir la interfaz de un bloque adyacente u objetivo al hacer shift + clic derecho.
-     * Respeta la dirección configurada (en Grabbers/Pushers) o la cara clicada.
-     * Soporta menús de MultiverseNets, BlockMenus de Slimefun y contenedores/mesas vanilla.
-     * Si no tiene interfaz, se ignora silenciosamente.
-     */
-    private boolean tryAccessBlockInterface(Player player, Block clickedBlock, BlockFace clickedFace, NodeBlob blob, DeviceType type) {
-        List<Block> candidates = new ArrayList<>();
-
-        // 1. Directional nodes (Grabbers, Pushers): prioritize configured target direction
-        if (blob != null && blob.targetFace != null && !blob.targetFace.equalsIgnoreCase("ALL")) {
-            try {
-                BlockFace single = BlockFace.valueOf(blob.targetFace.toUpperCase(Locale.ROOT));
-                candidates.add(clickedBlock.getRelative(single));
-            } catch (IllegalArgumentException ignored) {}
-        }
-
-        // 2. Clicked face direction (the adjacent block in that direction)
-        if (clickedFace != null) {
-            candidates.add(clickedBlock.getRelative(clickedFace));
-            candidates.add(clickedBlock.getRelative(clickedFace.getOppositeFace()));
-        }
-
-        for (Block candidate : candidates) {
-            if (candidate == null || candidate.equals(clickedBlock)) {
-                continue;
-            }
-            if (openTargetBlockInterface(player, candidate)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
      * EN: Opens the GUI interface of an adjacent/target block (MultiverseNets device, Slimefun BlockMenu, or Vanilla container).
      * ES: Abre la interfaz gráfica de un bloque objetivo o adyacente (nodo MultiverseNets, máquina Slimefun o contenedor Vanilla).
      */
@@ -464,8 +410,8 @@ public class BlockListener implements Listener {
         if (candidate == null || player == null) {
             return false;
         }
-        if (!canAccessIslandNetwork(player, candidate.getLocation())) {
-            player.sendMessage(Text.msg("You do not have permission to access devices on this island.", NamedTextColor.RED));
+        if (!canAccessNetwork(player, candidate.getLocation())) {
+            player.sendMessage(Text.msg("You do not have permission to access devices in this protected area.", NamedTextColor.RED));
             return false;
         }
 
@@ -933,8 +879,8 @@ public class BlockListener implements Listener {
         }
 
         // 4. Modality restriction: BentoBox / Skyblock Island ownership check
-        if (!canAccessIslandNetwork(player, bind)) {
-            player.sendMessage(Text.msg("You do not have permission to access network devices on this island.", NamedTextColor.RED));
+        if (!canAccessNetwork(player, bind)) {
+            player.sendMessage(Text.msg("You do not have permission to access network devices in this protected area.", NamedTextColor.RED));
             return;
         }
 
@@ -960,9 +906,15 @@ public class BlockListener implements Listener {
         new TerminalMenu(plugin, player, net).openMenu();
     }
 
-        private boolean canAccessIslandNetwork(Player player, Location loc) {
+        private boolean canAccessNetwork(Player player, Location loc) {
         if (player.hasPermission("multiversenets.admin")) {
             return true;
+        }
+        // Tierra protegida: el mismo criterio que aplica al bucle de red, mas el permiso de
+        // bypass. Esta comprobacion es la que evita abrir el GUI de un dispositivo de otra
+        // region para reconfigurarlo a mano.
+        if (Settings.protectionBlocksPlayerInteraction() && !ProtectionBridge.mayPlayerAccess(player, loc)) {
+            return false;
         }
         try {
             if (org.bukkit.Bukkit.getPluginManager().isPluginEnabled("BentoBox")) {
