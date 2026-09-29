@@ -201,9 +201,14 @@ The jar is generated at `target/MultiverseNets-v<version>.jar`.
 
 | Parameter | Requirement |
 |---|---|
-| **Server** | Paper / Purpur / Folia 1.21.11 |
+| **Server** | Paper / Purpur 1.21.11 |
 | **Java** | Java 21 LTS |
 | **Dependencies** | None (standalone) |
+
+> **Not Folia-compatible.** The network ticker, the topology scan and every GUI run on Paper's
+> global scheduler and assume the main thread owns the blocks they touch. Folia's regionised
+> threads would need a region-aware ticker and per-region storage locks. Install it on Paper or
+> Purpur.
 
 ## 📜 License
 

@@ -66,6 +66,7 @@
 * **Network Router Antenna**: High-frequency broadcast antenna (`MVN_ROUTER`) that lifts the 64-block wireless restriction to full global multi-chunk reach.
 * **Slimefun Bridge**: Native automatic recognition and bidirectional routing with Slimefun Barrels and machine containers when Slimefun is present, maintaining 100% standalone Paper execution when absent.
 * **Security & Island Protection**: Atomic synchronized transaction locks preventing duplicate item race conditions, BentoBox Skyblock claim validation on both physical devices and wireless remotes, 10s combat cooldown, and 64 nodes/chunk density limit.
+* **Networks have an owner**: the Controller records who placed it, and the network may only reach into that player's own claims. Build your base inside your own ProtectionStones/WorldGuard/Lands/Towny region and it just works; a network parked next to your border still cannot touch a single chest, because it belongs to somebody else. Controllers from before this rule adopt their first legitimate user on the spot, and `/mvnets doctor` now says when a network was cut at protected land instead of leaving you with a controller in a one-node network.
 
 ### 🛡️ Reliability
 * Protection against pistons and explosions on nodes.
@@ -193,9 +194,14 @@ The jar is generated at `target/MultiverseNets-v<version>.jar`.
  
 | Parameter | Requirement |
 |---|---|
-| **Server** | Paper / Purpur / Folia 1.21.11 |
+| **Server** | Paper / Purpur 1.21.11 |
 | **Java** | Java 21 LTS |
 | **Dependencies** | None (standalone) |
+
+> **Not Folia-compatible.** The network ticker, the topology scan and every GUI run on Paper's
+> global scheduler and assume the main thread owns the blocks they touch. Folia's regionised
+> threads would need a region-aware ticker and per-region storage locks, which this plugin does not
+> have. Install it on Paper or Purpur.
 
 ## 📜 License
 

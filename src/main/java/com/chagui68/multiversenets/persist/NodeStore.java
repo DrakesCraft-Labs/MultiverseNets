@@ -36,6 +36,35 @@ public final class NodeStore {
     private static File registryFile;
     private static final Map<UUID, List<String>> CONTROLLERS = new HashMap<>();
 
+    /**
+     * [EN] Live, shared instances of decoded node blobs, keyed by world+position.
+     * <p>
+     * {@link #get} stays copy-on-read on purpose — plenty of code does get/mutate/put and relies on
+     * owning its own object. This map exists for the one caller that cannot afford that:
+     * {@code NetworkStorage}, which asks about every cell on every deposit and withdrawal, i.e.
+     * thousands of times per second. Deserialising Base64 + {@code BukkitObjectInputStream} there was
+     * the plugin's heaviest recurring cost.
+     * <p>
+     * Correctness rule: the map is always replaced wholesale by whoever writes, so it can never hold
+     * a value that is older than the last {@link #put} or {@link #remove}. A caller that mutates an
+     * object it read with {@link #get} without calling {@link #put} never reaches this map, exactly
+     * as before.
+     *
+     * [ES] Instancias vivas y compartidas de los blobs ya decodificados, indexadas por mundo+posición.
+     * <p>
+     * {@link #get} sigue devolviendo una copia a propósito: mucho código hace get/mutar/put y cuenta
+     * con ser dueño de su objeto. Este mapa existe para el único consumidor que no puede permitírselo:
+     * {@code NetworkStorage}, que pregunta por todas las celdas en cada depósito y retirada, es decir
+     * miles de veces por segundo. Deserializar Base64 + {@code BukkitObjectInputStream} ahí era el
+     * gasto recurrente más alto del plugin.
+     * <p>
+     * Regla de corrección: quien escribe reemplaza la entrada entera, así que el mapa nunca puede
+     * contener un valor más viejo que el último {@link #put} o {@link #remove}.
+     */
+    private static final Map<String, NodeBlob> CANONICAL = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Beyond this the map is dropped outright; a re-decode spike beats unbounded growth. */
+    private static final int CANONICAL_LIMIT = 8192;
+
     private NodeStore() {
     }
 
@@ -46,6 +75,7 @@ public final class NodeStore {
      */
     public static void init(MultiverseNets pl) {
         plugin = pl;
+        CANONICAL.clear();
         registryFile = new File(pl.getDataFolder(), "networks.yml");
         if (registryFile.isFile()) {
             YamlConfiguration yaml = YamlConfiguration.loadConfiguration(registryFile);
@@ -172,6 +202,48 @@ public final class NodeStore {
     }
 
     /**
+     * [EN] The shared live instance of this node's blob, decoded once and reused. Only safe for
+     * callers that treat the object as the authoritative in-memory state and always write it back
+     * with {@link #put}; everybody else wants {@link #get}.
+     *
+     * [ES] La instancia compartida y viva del blob de este nodo, decodificada una vez y reutilizada.
+     * Solo es segura para quien trata el objeto como estado autoritativo en memoria y siempre lo
+     * reescribe con {@link #put}; todos los demás quieren {@link #get}.
+     */
+    public static NodeBlob canonical(Block block) {
+        Chunk chunk = block.getChunk();
+        if (!chunk.isLoaded()) {
+            return null;
+        }
+        String key = canonicalKey(block);
+        NodeBlob hit = CANONICAL.get(key);
+        if (hit != null) {
+            return hit;
+        }
+        String data = chunk.getPersistentDataContainer()
+                .get(nodeKey(block), PersistentDataType.STRING);
+        if (data == null) {
+            return null;
+        }
+        NodeBlob blob = decode(data);
+        if (blob != null) {
+            publish(key, blob);
+        }
+        return blob;
+    }
+
+    private static void publish(String key, NodeBlob blob) {
+        if (CANONICAL.size() >= CANONICAL_LIMIT) {
+            CANONICAL.clear();
+        }
+        CANONICAL.put(key, blob);
+    }
+
+    private static String canonicalKey(Block block) {
+        return block.getWorld().getUID() + "|" + block.getX() + "_" + block.getY() + "_" + block.getZ();
+    }
+
+    /**
      * EN: Retrieves the DeviceType directly without deserializing the entire NodeBlob.
      *
      * ES: Obtiene el DeviceType directamente sin deserializar el NodeBlob completo.
@@ -222,6 +294,11 @@ public final class NodeStore {
             pdc.set(nodeTypeKey(block), PersistentDataType.STRING, blob.typeName);
         }
         pdc.set(Keys.CHUNK_HAS_NODES, PersistentDataType.BYTE, (byte) 1);
+        if (blob != null) {
+            // Whoever writes becomes the live value, so a shared reader can never be holding
+            // something older than the last write. See CANONICAL.
+            publish(canonicalKey(block), blob);
+        }
     }
 
     public static void remove(Block block) {
@@ -229,6 +306,7 @@ public final class NodeStore {
         var pdc = chunk.getPersistentDataContainer();
         pdc.remove(nodeKey(block));
         pdc.remove(nodeTypeKey(block));
+        CANONICAL.remove(canonicalKey(block));
     }
 
     public static int countNodesInChunk(Chunk chunk) {

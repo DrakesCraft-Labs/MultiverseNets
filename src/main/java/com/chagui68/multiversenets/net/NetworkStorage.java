@@ -115,7 +115,7 @@ public class NetworkStorage {
             return null;
         }
         Block ctrlBlock = network.block(ctrlPos);
-        NodeBlob blob = NodeStore.get(ctrlBlock);
+        NodeBlob blob = NodeStore.canonical(ctrlBlock);
         if (blob == null || blob.virtualCacheTier <= 0) {
             return null;
         }
@@ -155,7 +155,9 @@ public class NetworkStorage {
                 continue;
             }
             Block block = network.block(ref.pos());
-            NodeBlob blob = NodeStore.get(block);
+            // canonical(), no get(): esta lista se reconstruye en cada deposito y retirada, y
+            // decodificar el blob de cada celda cada vez era el coste dominante del ticker.
+            NodeBlob blob = NodeStore.canonical(block);
             if (blob == null) {
                 continue;
             }
@@ -198,6 +200,15 @@ public class NetworkStorage {
     }
 
     public synchronized long remainingQuota(ItemStack item) {
+        return remainingQuota(item, load(), loadVirtualCache(), loadSfBarrels());
+    }
+
+    /**
+     * Misma regla que la version publica, pero sobre estructuras que el llamante ya leyó. Existe para
+     * que un deposito no vuelva a leer y deserializar cada celda solo para calcular su cuota.
+     */
+    private long remainingQuota(ItemStack item, List<CellState> states,
+                                VirtualCacheState vCache, List<Block> sfBarrels) {
         if (item == null || item.getType().isAir()) {
             return Long.MAX_VALUE;
         }
@@ -213,7 +224,7 @@ public class NetworkStorage {
                         continue;
                     }
                     Block b = network.block(pos);
-                    NodeBlob blob = NodeStore.get(b);
+                    NodeBlob blob = NodeStore.canonical(b);
                     if (blob == null || !blob.quotaActive || blob.quotaSample == null || blob.quotaLimit < 0) {
                         continue;
                     }
@@ -229,7 +240,7 @@ public class NetworkStorage {
         if (!hasLimiter) {
             return Long.MAX_VALUE;
         }
-        long currentTotal = count(i -> StackUtils.itemsMatch(i, item));
+        long currentTotal = count(i -> StackUtils.itemsMatch(i, item), states, vCache, sfBarrels);
         return Math.max(0, minAllowed - currentTotal);
     }
 
@@ -237,16 +248,19 @@ public class NetworkStorage {
         if (item == null || item.getType().isAir() || item.getAmount() <= 0) {
             return 0;
         }
-        long quotaHeadroom = remainingQuota(item);
+        // Una sola lectura de las celdas para toda la operacion. Antes el calculo de cuota volvia a
+        // llamar a count(), que re-deserializaba cada blob, y un deposito pagaba tres lecturas por
+        // celda en lugar de una.
+        List<CellState> states = load();
+        VirtualCacheState vCache = loadVirtualCache();
+        List<Block> sfBarrels = loadSfBarrels();
+
+        long quotaHeadroom = remainingQuota(item, states, vCache, sfBarrels);
         if (quotaHeadroom <= 0) {
             return item.getAmount();
         }
         long amountToDeposit = Math.min((long) item.getAmount(), quotaHeadroom);
         long rejectedByQuota = item.getAmount() - amountToDeposit;
-
-        List<CellState> states = load();
-        VirtualCacheState vCache = loadVirtualCache();
-        List<Block> sfBarrels = loadSfBarrels();
         long remaining = amountToDeposit;
 
         // 1. Greedy cells
@@ -505,8 +519,12 @@ public class NetworkStorage {
     }
 
     public synchronized long count(Predicate<ItemStack> matcher) {
+        return count(matcher, load(), loadVirtualCache(), loadSfBarrels());
+    }
+
+    private long count(Predicate<ItemStack> matcher, List<CellState> states,
+                       VirtualCacheState vCache, List<Block> sfBarrels) {
         long total = 0;
-        VirtualCacheState vCache = loadVirtualCache();
         if (vCache != null && vCache.blob.virtualSamples != null) {
             for (int i = 0; i < vCache.blob.virtualSamples.size(); i++) {
                 ItemStack sample = vCache.blob.virtualSamples.get(i);
@@ -516,7 +534,7 @@ public class NetworkStorage {
                 }
             }
         }
-        for (CellState state : load()) {
+        for (CellState state : states) {
             if (state.greedy) {
                 if (state.blob.greedySamples != null && state.blob.greedyAmounts != null) {
                     for (int i = 0; i < state.blob.greedySamples.size(); i++) {
@@ -533,7 +551,7 @@ public class NetworkStorage {
                 }
             }
         }
-        for (Block barrel : loadSfBarrels()) {
+        for (Block barrel : sfBarrels) {
             ItemStack sample = SlimefunBridge.getBarrelStoredItem(barrel);
             if (sample != null && matcher.test(sample)) {
                 total += SlimefunBridge.getBarrelStoredAmount(barrel);
@@ -634,7 +652,7 @@ public class NetworkStorage {
                         continue;
                     }
                     Block block = network.block(pos);
-                    NodeBlob blob = NodeStore.get(block);
+                    NodeBlob blob = NodeStore.canonical(block);
                     if (blob == null) {
                         continue;
                     }
@@ -673,7 +691,7 @@ public class NetworkStorage {
                         continue;
                     }
                     Block b = network.block(pos);
-                    NodeBlob blob = NodeStore.get(b);
+                    NodeBlob blob = NodeStore.canonical(b);
                     if (blob == null) {
                         continue;
                     }

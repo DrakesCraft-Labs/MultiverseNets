@@ -78,6 +78,15 @@ public class NodeBlob implements Serializable {
     public String pumpMode;
     /** EN: Liquid pump fluid filter (e.g. WATER, LAVA, etc. or null for ANY) / ES: Filtro de fluido para bomba. */
     public String pumpFluid;
+    /**
+     * EN: UUID of the player who placed this Controller, i.e. the network's owner. Only the
+     * Controller carries it. It is what lets a network operate inside the claim of the player who
+     * built it, instead of being blocked by land it cannot prove it belongs to.
+     * ES: UUID del jugador que colocó este Controlador, es decir, el dueño de la red. Solo lo
+     * lleva el Controlador. Es lo que permite a una red operar dentro del reclamo del jugador que
+     * la construyó, en vez de quedar bloqueada por tierra que no puede demostrar que es suya.
+     */
+    public String ownerUuid;
 
     /**
      * EN: Returns the combined sum of all items stored in the Greedy Cell.
@@ -215,6 +224,22 @@ public class NodeBlob implements Serializable {
             virtualAmounts.set(index, remaining);
         }
         return take;
+    }
+
+    /**
+     * EN: Parses {@link #ownerUuid} back into a UUID, or null when absent/corrupt.
+     *
+     * ES: Convierte {@link #ownerUuid} en UUID, o null si falta o está corrupto.
+     */
+    public java.util.UUID owner() {
+        if (ownerUuid == null || ownerUuid.isBlank()) {
+            return null;
+        }
+        try {
+            return java.util.UUID.fromString(ownerUuid);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     /**

@@ -125,6 +125,30 @@ public final class ProtectionBridge {
         default Boolean allowsPlayer(Player player, Location loc) {
             return null;
         }
+
+        /**
+         * [EN] The same question for an actor that is not online: the UUID baked into a network's
+         * Controller. A network has no {@link Player} to ask about, so without this the whole item
+         * loop is an anonymous stranger inside every claim, including the one it was built in.
+         * <p>
+         * {@code TRUE} only when the provider can certify that this UUID owns or is a member of
+         * the land; {@code null} otherwise. A provider that cannot answer (no owner model, missing
+         * method) leaves its claims closed to every network, which is the same fail-closed default
+         * as {@link #allowsPlayer}.
+         *
+         * [ES] La misma pregunta para un actor que no está conectado: el UUID grabado en el
+         * Controlador de una red. Una red no tiene {@link Player} al que preguntar, así que sin esto
+         * todo el bucle de ítems es un extraño anónimo dentro de cada reclamo, incluido aquel en el
+         * que se construyó.
+         * <p>
+         * {@code TRUE} solo si el provider puede certificar que ese UUID es dueño o miembro de la
+         * tierra; {@code null} en caso contrario. Un provider que no sabe responder (sin modelo de
+         * propietarios, método ausente) deja sus reclamos cerrados a toda red, que es el mismo
+         * comportamiento fail-closed de {@link #allowsPlayer}.
+         */
+        default Boolean allowsActor(java.util.UUID who, Location loc) {
+            return null;
+        }
     }
 
     /**
@@ -162,8 +186,16 @@ public final class ProtectionBridge {
     private static final List<ExemptZone> EXEMPT = new ArrayList<>();
     private static final Map<UUID, Map<Long, Boolean>> CACHE = new ConcurrentHashMap<>();
     private static final Map<String, Boolean> UNMANAGED = new ConcurrentHashMap<>();
+    /**
+     * Memoised answers to {@link #ownsAt}: "is this specific actor the owner here?". It lives
+     * apart from {@link #CACHE} because that one is keyed by position only, and the same spot can
+     * be somebody's claim for one network and a stranger's for the next.
+     */
+    private static final Map<String, Boolean> OWNED = new ConcurrentHashMap<>();
     private static final AtomicInteger CACHE_ENTRIES = new AtomicInteger();
+    private static final AtomicInteger OWNER_ENTRIES = new AtomicInteger();
     private static final int CACHE_LIMIT = 60_000;
+    private static final int OWNER_LIMIT = 20_000;
 
     private static boolean initialised;
     private static String summary = "disabled";
@@ -181,7 +213,9 @@ public final class ProtectionBridge {
         ACTIVE.clear();
         CACHE.clear();
         UNMANAGED.clear();
+        OWNED.clear();
         CACHE_ENTRIES.set(0);
+        OWNER_ENTRIES.set(0);
         initialised = false;
         loadExemptions();
         if (!Settings.protectionEnabled()) {
@@ -273,8 +307,12 @@ public final class ProtectionBridge {
         UNMANAGED.clear();
         if (!CACHE.isEmpty()) {
             CACHE.clear();
-            CACHE_ENTRIES.set(0);
         }
+        if (!OWNED.isEmpty()) {
+            OWNED.clear();
+        }
+        CACHE_ENTRIES.set(0);
+        OWNER_ENTRIES.set(0);
     }
 
     /**
@@ -502,6 +540,131 @@ public final class ProtectionBridge {
             }
         }
         return true;
+    }
+
+    /**
+     * [EN] The question the network loop actually asks: may a network owned by {@code actor} touch
+     * this block?
+     * <p>
+     * Three answers, in order:
+     * <ol>
+     *   <li>No protection plugin is wired up: yes, nothing is claimed.</li>
+     *   <li>A provider certifies that {@code actor} owns or is a member of this spot: yes. That is
+     *       what lets a player's own network run inside the player's own claim — the case that used
+     *       to leave a controller sitting in an empty network with no visible reason.</li>
+     *   <li>Otherwise the anonymous rule decides, exactly as before.</li>
+     * </ol>
+     * A null actor (a controller placed before this field existed) skips rule 2 and is therefore
+     * treated as a stranger, never as an owner.
+     *
+     * [ES] La pregunta que realmente hace el bucle de red: ¿puede una red cuyo dueño es
+     * {@code actor} tocar este bloque?
+     * <p>
+     * Tres respuestas, en orden:
+     * <ol>
+     *   <li>No hay ningún plugin de protección: sí, no hay nada reclamado.</li>
+     *   <li>Un provider certifica que {@code actor} es dueño o miembro de este punto: sí. Eso es lo
+     *       que permite que la red de un jugador funcione dentro de su propio reclamo, el caso que
+     *       dejaba un controlador en una red vacía sin motivo visible.</li>
+     *   <li>En otro caso decide la regla anónima, igual que antes.</li>
+     * </ol>
+     * Un actor nulo (controlador colocado antes de que existiera este campo) se salta la regla 2 y
+     * por tanto es un extraño, nunca un dueño.
+     */
+    public static boolean mayActorUse(World world, int x, int y, int z, UUID actor) {
+        if (!initialised || ACTIVE.isEmpty() || world == null) {
+            return true;
+        }
+        return mayActorUse(ACTIVE, world, x, y, z, actor);
+    }
+
+    /**
+     * [EN] The provider loop, extracted for the same reason as {@link #mayPlayerAccess(List, Player,
+     * Location)}: the owner rule has to be exercisable without a server or a real protection plugin.
+     *
+     * [ES] El bucle de providers, extraído por la misma razón que
+     * {@link #mayPlayerAccess(List, Player, Location)}: la regla de propietario tiene que poder
+     * probarse sin servidor ni plugin de protección real.
+     */
+    static boolean mayActorUse(List<Provider> providers, World world, int x, int y, int z, UUID actor) {
+        if (providers == null || providers.isEmpty() || world == null) {
+            return true;
+        }
+        if (ownsAt(providers, world, x, y, z, actor)) {
+            return true;
+        }
+        return !query(providers, world, x, y, z);
+    }
+
+    public static boolean mayActorUse(Block block, UUID actor) {
+        return block == null
+                || mayActorUse(block.getWorld(), block.getX(), block.getY(), block.getZ(), actor);
+    }
+
+    public static boolean mayActorUse(Location loc, UUID actor) {
+        return loc == null
+                || mayActorUse(loc.getWorld(), loc.getBlockX(), loc.getBlockY(), loc.getBlockZ(), actor);
+    }
+
+    /**
+     * [EN] Whether this specific actor is certified as owner/member here, memoised apart from
+     * {@link #CACHE} because the same spot can be somebody's land for one network and a stranger's
+     * for the next.
+     *
+     * [ES] Si este actor concreto está certificado como dueño/miembro aquí, memorizado aparte de
+     * {@link #CACHE} porque el mismo punto puede ser tierra de uno para una red y de un extraño para
+     * la siguiente.
+     */
+    static boolean ownsAt(World world, int x, int y, int z, UUID actor) {
+        return ownsAt(ACTIVE, world, x, y, z, actor);
+    }
+
+    static boolean ownsAt(List<Provider> providers, World world, int x, int y, int z, UUID actor) {
+        if (actor == null || world == null) {
+            return false;
+        }
+        String key = world.getUID() + "|" + actor + "|" + PosUtil.pack(x, y, z);
+        Boolean hit = OWNED.get(key);
+        if (hit != null) {
+            return hit;
+        }
+        boolean result = queryOwner(providers, world, x, y, z, actor);
+        OWNED.put(key, result);
+        if (OWNER_ENTRIES.incrementAndGet() > OWNER_LIMIT) {
+            OWNED.clear();
+            OWNER_ENTRIES.set(0);
+        }
+        return result;
+    }
+
+    /**
+     * [EN] Asks every provider whether this actor owns the spot. A provider that throws is not an
+     * owner: ownership <em>unlocks</em> land, so a broken API must never grant it — the mirror image
+     * of {@link #evaluate}, where a throw protects.
+     *
+     * [ES] Pregunta a cada provider si este actor posee el punto. Un provider que lanza no es dueño:
+     * la propiedad <em>desbloquea</em> tierra, así que una API rota nunca debe concederla — la imagen
+     * especular de {@link #evaluate}, donde lanzar protege.
+     */
+    private static boolean queryOwner(List<Provider> providers, World world, int x, int y, int z, UUID actor) {
+        Location loc = new Location(world, x, y, z);
+        for (Provider provider : providers) {
+            if (!supports(provider, world)) {
+                continue;
+            }
+            try {
+                if (Boolean.TRUE.equals(provider.allowsActor(actor, loc))) {
+                    return true;
+                }
+            } catch (Throwable error) {
+                java.util.logging.Logger logger = logger();
+                if (logger != null && Settings.debug()) {
+                    logger.warning("Protection: " + provider.id() + " failed the owner check at "
+                            + world.getName() + " " + x + "," + y + "," + z + ": " + error);
+                }
+            }
+        }
+        return false;
     }
 
     private static void loadExemptions() {

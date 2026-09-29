@@ -46,6 +46,10 @@ public class Network {
     private volatile long version = 0;
     private long lastScanMs = 0;
     private volatile boolean dirty = true;
+    /** Owner of the network, taken from the Controller blob. Null for legacy controllers. */
+    private volatile java.util.UUID owner;
+    /** How many links the last scan refused because the land was somebody else's. */
+    private volatile int blockedByProtection;
     public String error;
 
     public Network(com.chagui68.multiversenets.MultiverseNets plugin, org.bukkit.World world, long controllerPos) {
@@ -88,6 +92,31 @@ public class Network {
 
     public long versionSnapshot() {
         return version;
+    }
+
+    /**
+     * EN: UUID of the player who placed this network's Controller, used to decide whether the
+     * network may operate inside claimed land. Null means "unknown", which is treated as a
+     * stranger, never as an owner.
+     *
+     * ES: UUID del jugador que colocó el Controlador de esta red, usado para decidir si la red
+     * puede operar dentro de tierra reclamada. Null significa "desconocido", y se trata como
+     * extraño, nunca como dueño.
+     */
+    public java.util.UUID ownerUuid() {
+        return owner;
+    }
+
+    /**
+     * EN: Links the last scan refused because of land protection. Non-zero means the network is
+     * smaller than the player built it, which is the case that used to be silent.
+     *
+     * ES: Enlaces que el último escaneo rechazó por protección de tierras. Distinto de cero
+     * significa que la red es más pequeña de lo que el jugador construyó, el caso que antes era
+     * silencioso.
+     */
+    public int linksBlockedByProtection() {
+        return blockedByProtection;
     }
 
     public boolean isDirty() {
@@ -134,6 +163,7 @@ public class Network {
         Deque<Long> queue = new ArrayDeque<>();
         List<String> errors = new ArrayList<>();
         sfBarrels.clear();
+        blockedByProtection = 0;
 
         // No cargar chunks a la fuerza: si el controlador esta en uno sin cargar, la red se queda
         // como estaba y el proximo scan (o la carga del chunk) lo resuelve. Antes el BFS llamaba
@@ -158,17 +188,27 @@ public class Network {
             return;
         }
 
+        // El dueno de la red sale del propio controlador. La semilla no se comprueba contra
+        // proteccion (el jugador que la coloco paso por su plugin al hacerlo), pero todo lo que
+        // cuelgue de ella si: la red solo tiende cable por tierra que sea suya.
+        this.owner = ctrlBlob.owner();
+
         found.put(controllerPos, DeviceType.MVN_CONTROLLER);
         visited.add(controllerPos);
         queue.add(controllerPos);
 
+        // Un solo buffer reutilizado para los seis vecinos: antes cada nodo asignaba una List y
+        // seis Long boxeados, que con max-nodes altos es la mayor fuente de basura del escaneo.
+        long[] neighborBuffer = new long[6];
         while (!queue.isEmpty()) {
             if (found.size() >= Settings.maxNodes()) {
                 errors.add("node limit reached (" + Settings.maxNodes() + ")");
                 break;
             }
             long pos = queue.poll();
-            for (long next : neighbors(pos)) {
+            fillNeighbors(pos, neighborBuffer);
+            for (int neighborIndex = 0; neighborIndex < neighborBuffer.length; neighborIndex++) {
+                long next = neighborBuffer[neighborIndex];
                 if (!visited.add(next)) {
                     continue;
                 }
@@ -180,8 +220,9 @@ public class Network {
                 // items. El controlador es la semilla y no se comprueba; sus transferencias si
                 // pasan por el chequeo de bloque de NetworkTicker.
                 if (Settings.protectionBlocksNetworkLinking()
-                        && ProtectionBridge.isProtected(world, PosUtil.unpackX(next), PosUtil.unpackY(next),
-                                PosUtil.unpackZ(next))) {
+                        && !ProtectionBridge.mayActorUse(world, PosUtil.unpackX(next), PosUtil.unpackY(next),
+                                PosUtil.unpackZ(next), owner)) {
+                    blockedByProtection++;
                     continue;
                 }
                 Block block = block(next);
@@ -221,6 +262,9 @@ public class Network {
                 byType.computeIfAbsent(entry.getValue(), key -> new HashSet<>()).add(entry.getKey());
             }
         }
+        if (blockedByProtection > 0) {
+            errors.add(blockedByProtection + " link(s) stopped at protected land");
+        }
         this.error = String.join("; ", errors);
         this.version++;
         this.lastScanMs = System.currentTimeMillis();
@@ -228,14 +272,20 @@ public class Network {
         storage.invalidate();
     }
 
-    private static List<Long> neighbors(long pos) {
+    /**
+     * Escribe los seis vecinos ortogonales de {@code pos} en {@code out}. Sin allocaciones: este
+     * metodo corre una vez por nodo y por escaneo, y era el punto mas caliente del BFS.
+     */
+    static void fillNeighbors(long pos, long[] out) {
         int x = PosUtil.unpackX(pos);
         int y = PosUtil.unpackY(pos);
         int z = PosUtil.unpackZ(pos);
-        return List.of(
-                PosUtil.pack(x + 1, y, z), PosUtil.pack(x - 1, y, z),
-                PosUtil.pack(x, y + 1, z), PosUtil.pack(x, y - 1, z),
-                PosUtil.pack(x, y, z + 1), PosUtil.pack(x, y, z - 1));
+        out[0] = PosUtil.pack(x + 1, y, z);
+        out[1] = PosUtil.pack(x - 1, y, z);
+        out[2] = PosUtil.pack(x, y + 1, z);
+        out[3] = PosUtil.pack(x, y - 1, z);
+        out[4] = PosUtil.pack(x, y, z + 1);
+        out[5] = PosUtil.pack(x, y, z - 1);
     }
 
     private static String coordString(long pos) {

@@ -26,12 +26,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Es un guard sobre el texto fuente y no sobre el comportamiento porque el entorno de test no
  * levanta un servidor de Bukkit, así que un click derecho real no se puede simular. Se buscan
  * posiciones de líneas y no bloques literales para que reindentar el archivo no rompa el test.
+ * <p>
+ * El enrutado de menús se movió a {@code DeviceInteractions}, así que ambas búsquedas toleran un
+ * receptor delante del nombre del método: lo que se vigila es el orden dentro del manejador, no
+ * quién es el dueño del método.
  */
 class SneakingRightClickTest {
 
     /** [ES] Abre el menu del dispositivo. Su posicion respecto al guard es lo que importa. */
     private static final Pattern OPEN_DEVICE_MENU =
-            Pattern.compile("^\\s*if \\(openDeviceMenu\\(player, block, blob, type\\)\\)");
+            Pattern.compile("^\\s*if \\((?:\\w+\\.)?openDeviceMenu\\(player, block, blob, type\\)\\)");
+
+    /** [ES] El manejador de click derecho sobre un bloque. */
+    private static final Pattern INTERACT_HANDLER =
+            Pattern.compile("^\\s*public void onInteract\\(PlayerInteractEvent event\\) \\{\\s*$");
+
+    /** [ES] El cierre de un metodo de la clase: cuatro espacios y llave. */
+    private static final Pattern METHOD_END = Pattern.compile("^ {4}\\}\\s*$");
 
     /** [ES] Un corte por agachado que no hace nada mas que devolver. */
     private static final Pattern SNEAKING_CUT =
@@ -78,16 +89,34 @@ class SneakingRightClickTest {
 
     /**
      * [ES] El codigo que abria la interfaz de un bloque adyacente no debe volver a este manejador.
-     * El helper {@code openTargetBlockInterface} si sigue existiendo y lo usa {@code FilterMenu}
-     * para inspeccion dentro de un GUI, que es otro feature y no el de este guard.
+     * El helper {@code openTargetBlockInterface} si sigue existiendo: lo usa {@code FilterMenu} para
+     * inspeccion dentro de un GUI, que es otro feature y no el de este guard. Por eso se mira solo el
+     * cuerpo de {@code onInteract}, que es donde estaba el acceso shift+derecho al bloque vecino.
      */
     @Test
     void shiftRightAdjacentAccessIsNotCalledFromTheRightClickHandler() throws IOException {
-        String src = String.join("\n", lines());
-        assertFalse(src.contains("tryAccessBlockInterface"),
+        String[] lines = lines();
+        assertFalse(String.join("\n", lines).contains("tryAccessBlockInterface"),
                 "shift+right must not open the interface of an adjacent block");
-        assertFalse(src.contains("tryAccessBlockInterface(") || src.contains("openTargetBlockInterface(player, candidate"),
-                "no adjacent-interface helper may be invoked from the world right-click handler");
+
+        String handler = interactHandlerBody(lines);
+        assertFalse(handler.contains("openTargetBlockInterface"),
+                "the world right-click handler must not open an adjacent block's interface");
+    }
+
+    /**
+     * [ES] El cuerpo de {@code onInteract}, acotado por el cierre del metodo a cuatro espacios.
+     * Cortar en el siguiente {@code @EventHandler} no serviria: entre medias viven el helper de
+     * {@code FilterMenu} y las herramientas, y lo que se vigila es solo este manejador.
+     */
+    private static String interactHandlerBody(String[] lines) {
+        int start = lineOf(lines, INTERACT_HANDLER, 0);
+        assertTrue(start > 0, "onInteract must still exist; it is the handler this guard protects");
+        int end = lineOf(lines, METHOD_END, start + 1);
+        if (end < 0) {
+            end = lines.length;
+        }
+        return String.join("\n", java.util.Arrays.copyOfRange(lines, start, end));
     }
 
     /**

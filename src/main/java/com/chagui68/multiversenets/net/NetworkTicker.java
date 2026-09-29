@@ -212,13 +212,19 @@ public class NetworkTicker {
      * "de confianza" como a un miembro de ProtectionStones o a un jugador de confianza de
      * GriefPrevention. Por eso cualquier tierra reclamada queda intocable en ambos sentidos, que
      * es lo que evita que dos jugadores se roben entre sí a través de sus dispositivos.
+     * <p>
+     * La única excepción es el dueño de la propia red, tomado del Controlador: si el plugin de
+     * protección certifica que ese jugador es dueño o miembro de la tierra, su red sí puede operar
+     * ahí. Sin eso, un controlador colocado en el claim de quien lo puso se quedaba en una red
+     * vacía. Deliberadamente silencioso: esto corre miles de veces por segundo y una transferencia
+     * denegada es el resultado esperado, no un evento.
      */
-    private static boolean denied(Block block) {
-        return block != null && ProtectionBridge.isProtected(block);
+    private static boolean denied(Network net, Block block) {
+        return block != null && !ProtectionBridge.mayActorUse(block, net.ownerUuid());
     }
 
-    private static boolean denied(org.bukkit.entity.Entity entity) {
-        return entity != null && ProtectionBridge.isProtected(entity.getLocation());
+    private static boolean denied(Network net, org.bukkit.entity.Entity entity) {
+        return entity != null && !ProtectionBridge.mayActorUse(entity.getLocation(), net.ownerUuid());
     }
 
     private void grabOnce(Network net, long pos, int rate) {
@@ -255,7 +261,7 @@ public class NetworkTicker {
             // Tierra ajena=intocable: la red es un actor sin identidad de jugador, asi que si un
             // cofre esta dentro de una region protegida aqui no se toca. Se sigue con la siguiente
             // cara, igual que con un bloque que no sea contenedor.
-            if (denied(target)) {
+            if (denied(net, target)) {
                 continue;
             }
 
@@ -354,7 +360,7 @@ public class NetworkTicker {
             Material mat = target.getType();
             // Tambien a la inversa: meter items dentro de una region ajena es el mismo robo con
             // el signo cambiado, y si el destino es una maquina con salida puede duplicar.
-            if (denied(target)) {
+            if (denied(net, target)) {
                 continue;
             }
 
@@ -471,7 +477,7 @@ public class NetworkTicker {
                     if (NodeStore.hasNode(target)) {
                         continue;
                     }
-                    if (denied(target)) {
+                    if (denied(net, target)) {
                         continue;
                     }
                     Material targetMat = target.getType();
@@ -547,8 +553,9 @@ public class NetworkTicker {
         }
         Block txBlock = world.getBlockAt(blob.txX, blob.txY, blob.txZ);
         // El enlace es el unico punto donde dos redes se tocan aunque no sean la misma, asi que
-        // se comprueban los dos extremos.
-        if (denied(txBlock) || denied(net.block(pos))) {
+        // se comprueban los dos extremos, cada uno con el dueño de SU red: el receptor con el de
+        // esta red y el transmisor con el de la red remota.
+        if (denied(net, net.block(pos))) {
             return;
         }
         NodeBlob txBlob = NodeStore.get(txBlock);
@@ -557,6 +564,9 @@ public class NetworkTicker {
         }
         Network remote = manager.networkAt(txBlock);
         if (remote == null || remote == net) {
+            return;
+        }
+        if (denied(remote, txBlock)) {
             return;
         }
         Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
@@ -599,7 +609,7 @@ public class NetworkTicker {
                 }
                 // Suctionar el suelo de una region ajena tambien es robar: los drops de un
                 // segundo no salen de su base.
-                if (denied(item)) {
+                if (denied(net, item)) {
                     continue;
                 }
                 int leftover = net.storage().deposit(stack);
@@ -658,7 +668,7 @@ public class NetworkTicker {
         if (target == null) return;
         // Drenar la lava o el agua de otro es lo mismo que vaciarle la base: ademas deja el
         // bloque en aire, asi que el grief es visible y no recuperable.
-        if (denied(target)) return;
+        if (denied(net, target)) return;
 
         String filter = blob.pumpFluid != null ? blob.pumpFluid.toUpperCase(java.util.Locale.ROOT) : null;
 

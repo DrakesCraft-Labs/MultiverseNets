@@ -159,6 +159,26 @@ public final class ProtectionStonesProvider implements ProtectionBridge.Provider
     }
 
     /**
+     * [EN] The same owner/member rule for a network's Controller owner, which is not a
+     * {@link org.bukkit.entity.Player} and never will be. A claim is personal by design, so this is
+     * what lets the land's own owner run a network inside it while leaving every other network —
+     * including one parked right outside the border — locked out.
+     *
+     * [ES] La misma regla de dueño/miembro para el dueño del Controlador de una red, que no es un
+     * {@link org.bukkit.entity.Player} ni lo será. Un reclamo es personal por diseño, así que esto es
+     * lo que permite al dueño de la tierra correr una red dentro de ella y deja fuera a cualquier
+     * otra red, incluida una aparcada justo fuera de la frontera.
+     */
+    @Override
+    public Boolean allowsActor(java.util.UUID who, Location loc) {
+        try {
+            return allowsPlayer(mFromLocation, mIsOwner, mIsMember, who, loc);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /**
      * Static and parameter-injected so the rule can run against the test stub without a server.
      */
     static Boolean allowsPlayer(Method lookup, Method isOwner, Method isMember,

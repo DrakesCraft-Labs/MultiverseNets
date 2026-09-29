@@ -14,12 +14,13 @@ language: en
 # -------------------------------------------------------------------------------------
 #  Plugin Compatibility / Compatibilidad con Otros Plugins
 # -------------------------------------------------------------------------------------
-# [EN] Worlds where network devices cannot be placed (DrakesCraft: Clasico stays vanilla).
-# [ES] Mundos donde no se pueden colocar dispositivos de red (en DrakesCraft, Clásico es vainilla).
-blocked-worlds:
-  - clasico
-  - clasico_nether
-  - clasico_the_end
+# [EN] Worlds where network devices cannot be placed. Empty by default: a standalone plugin has
+#      no business shipping another server's world names as a hard block. Add exact world names
+#      (for example "clasico") to forbid MVN there.
+# [ES] Mundos donde no se pueden colocar dispositivos de red. Vacío por defecto: un plugin
+#      standalone no tiene por qué traer los nombres de mundo de otro servidor como bloqueo fijo.
+#      Añade nombres exactos (por ejemplo "clasico") para prohibir MVN ahí.
+blocked-worlds: []
 
 compat:
   # [EN] Allow grabbers and pushers to interact with Slimefun machines and containers.
@@ -173,15 +174,29 @@ virtual-cache:
 #      Every block a network reads from or writes to is checked, and the topology scan
 #      refuses to route cables through protected land, so networks on opposite sides of a
 #      border never merge into one item bus.
-#      A network has no player identity, so ANY claimed land counts as off limits to it.
-#      If you legitimately build MVN inside a claim, whitelist that spot below.
+#      A network is anonymous, so it cannot be judged "trusted" the way a member of a claim
+#      can — EXCEPT by the one identity it does have: the Controller remembers the UUID of
+#      whoever placed it, and the network may operate inside that player's own claims.
+#      Build your base's network inside your own claim and it just works; a network parked
+#      next to your border still cannot reach in, because it belongs to somebody else.
+#      Controllers placed before this rule existed have no owner: the first legitimate player
+#      to open one becomes its owner on the spot, so old worlds heal on first use. If you
+#      deliberately want somebody else's network to run in a region, use exempt-worlds /
+#      exempt-locations below, or /mvnets doctor to see where a network was cut.
 # [ES] Sin esto, un grabber en tierra pública puede leer un cofre dentro de la región de
 #      otro jugador, así que dos jugadores acaban robándose entre sí a través de sus redes.
 #      Cada bloque del que la red lee o en el que escribe se comprueba, y el escaneo se niega
 #      a tender cable por tierra protegida, así que dos redes a lados opuestos de una
 #      frontera nunca se fusionan en un mismo bus de ítems.
-#      Una red no tiene identidad de jugador, así que CUALQUIER tierra reclamada cuenta como
-#      intocable. Si construyes MVN legítimamente dentro de un reclamo, añádelo abajo.
+#      Una red es anónima, así que no se la puede juzgar "de confianza" como a un miembro de
+#      un reclamo — SALVO por la única identidad que sí tiene: el Controlador recuerda el UUID
+#      de quien lo colocó, y la red puede operar dentro de los reclamos de ese jugador.
+#      Construye la red de tu base dentro de tu propio reclamo y funciona sin más; una red
+#      aparcada junto a tu frontera sigue sin poder entrar, porque es de otro.
+#      Los controladores colocados antes de que existiera esta regla no tienen dueño: el primer
+#      jugador legítimo que abra uno pasa a ser su dueño al momento, así que los mundos
+#      antiguos se curan al primer uso. Si de verdad quieres que la red de otro corra en una
+#      región, usa exempt-worlds / exempt-locations, o /mvnets doctor para ver dónde se cortó.
 protection:
   # [EN] Master switch. false = MultiverseNets ignores every protection plugin.
   # [ES] Interruptor maestro. false = MultiverseNets ignora todos los plugins de protección.
@@ -198,16 +213,21 @@ protection:
     - TOWNY
     - GRIEFPREVENTION
 
-  # [EN] true  = server regions AND personal claims are off limits.
-  #      false = only server regions block networks; claims are treated as public.
+  # [EN] true  = other players' claims are off limits too, not just server regions. This never
+  #      affects the network's own owner: whoever placed the Controller always runs his own
+  #      claim.
+  #      false = only server regions block foreign networks; other players' claims are treated
+  #      as public, so a network can reach into them.
   #      Ignored by ProtectionStones: its API cannot tell a claim from a server region, so
-  #      every claim there stays protected either way. Use exempt-worlds / exempt-locations
-  #      for land you own.
-  # [ES] true  = regiones del servidor Y reclamos personales son intocables.
-  #      false = solo las regiones bloquean las redes; los reclamos se tratan como públicos.
+  #      claims there stay protected for strangers either way. The owner rule still applies.
+  # [ES] true  = los reclamos de otros jugadores también son intocables, no solo las regiones
+  #      del servidor. Esto nunca afecta al dueño de la propia red: quien colocó el Controlador
+  #      siempre opera dentro de su propio reclamo.
+  #      false = solo las regiones bloquean redes ajenas; los reclamos de otros se tratan como
+  #      públicos, así que una red puede alcanzarlos.
   #      ProtectionStones ignora esta opción: su API no distingue un reclamo de una región del
-  #      servidor, así que todos sus reclamos quedan protegidos igual. Usa exempt-worlds /
-  #      exempt-locations para la tierra que te pertenezca.
+  #      servidor, así que sus reclamos quedan protegidos ante extraños igual. La regla del
+  #      dueño se sigue aplicando.
   allow-claims: false
 
   # [EN] true = the topology scan stops at protected borders, so a cable cannot bridge two

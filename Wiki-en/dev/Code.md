@@ -153,7 +153,7 @@ Barrels) as a **single "vault"**. GUIs and the ticker interact with the network,
 - Synchronous, `runTaskTimer(plugin, run, 20L, 5L)` — first tick at 20, then **every 5 ticks**.
 - Per-family counters (`scanIn`, `transferIn`, `vacuumIn`, `craftIn`) — each family runs at its configured interval (multiples of 5).
 - Per network: if `dirty` or scan due → `scan()`; transfer due → `doTransfers`; vacuum due → `doVacuum`; craft due → `doCrafting`.
-- **`doTransfers`** (per-operation batching): `items-per-op` = 64 base; HT (Advanced Grabber/Pusher) uses `64 × ht-multiplier (8) = 512`. Processing order by type:
+- **`doTransfers`** (per-operation batching): `items-per-op` = 128 base; HT (Advanced Grabber/Pusher) uses `128 × ht-multiplier (8) = 1024`. Processing order by type:
   1. `GRABBER` (imports 64) → `GRABBER_HT` (512) → `PUSHER` → `PUSHER_HT` → `GREEDY_CELL` → `PURGER` → `RECEIVER`.
   2. **Grabber**: extracts from vanilla containers (or Slimefun machines when `compat.slimefun`) against its filter and deposits into the network; overflow is returned or **dropped into the world** (`dropItemNaturally`).
   3. **Pusher**: withdraws from the network against its filter and inserts into containers/machines; what does not fit **goes back to the network**.
@@ -244,6 +244,8 @@ Global listener filtering ALL clicks whenever the top inventory is a `MenuHolder
 
 ## 12. Block listener (`listen/BlockListener`)
 
+The listener owns the **event wiring** (placing, breaking, explosions, pistons, tool usage) and delegates **device behaviour** to `listen/DeviceInteractions`: which menu each type opens, the player access gate (`canAccessNetwork`, including the BentoBox island check), installing cache modules into the controller, and the fluid-cell quick interaction. `BlockListener.openTargetBlockInterface` survives as a one-line public seam because `FilterMenu` uses it to inspect the adjacent block from inside a GUI.
+
 Handled events:
 
 | Event | Behavior |
@@ -272,14 +274,19 @@ Subcommands: `help`, `info`, `guide`, `reload`, `give <id> [n]`, `devices`, `doc
 ## 15. Land protection (`compat/ProtectionBridge`)
 
 - **Why it exists**: a network is an **anonymous actor**. It carries no player identity, so a grabber sitting in public land could read a chest inside somebody else's ProtectionStones region: two players ended up robbing each other through their own devices.
-- **Where it is applied**: `NetworkTicker` checks the destination block before every operation (grabber, pusher, Greedy Cell distribution, vacuum, liquid pump and the wireless bridge, which checks both ends), and in `Network.scan()` the BFS **stops expanding** on entering protected land. That cut is what guarantees networks on opposite sides of a border never merge into one item bus. `BlockListener.canAccessNetwork` adds the same check for when a player opens a device by hand.
+- **The network has an owner**: since a network is not a player, it gets the one identity it can have. Placing a Controller stores the placer's UUID in its `NodeBlob` (`ownerUuid`), and the plugin asks about that identity instead of about an anonymous actor (`ProtectionBridge.mayActorUse`). A network may operate inside the claims of **its own owner** and nobody else's. Building your base inside your own claim used to be the broken case: the scan cut at the border and left the controller alone in a one-node network with "NO NETWORK" on every machine.
+- **A third answer**: `Provider` gained an optional `allowsActor(UUID, Location)`, alongside `test` (anonymous) and `allowsPlayer` (a real player). Only `ProtectionStonesProvider` implements it today, reusing its `isOwner`/`isMember`; the rest return `null`, meaning "I cannot certify this actor" and leaving their claims closed to every network exactly as before. The UUID is the *network owner's*, never the asker's, so a broken provider does not open land: an `allowsActor` that throws **does not** grant ownership, mirroring `test`, where a throw protects.
+- **Memoised apart**: `ownsAt` caches by `(world, actor, position)` and does not reuse the anonymous per-position cache, because the same spot can be somebody's land for one network and a stranger's for the next.
+- **Legacy controllers**: one placed before this field existed has no owner and is treated as a stranger. No need to break it: the first player `mayPlayerAccess` already vouched for becomes its owner right then (`DeviceInteractions.adoptControllerOwner`).
+- **Where it is applied**: `NetworkTicker` checks the destination block before every operation (grabber, pusher, Greedy Cell distribution, vacuum, liquid pump and the wireless bridge, which checks both ends **with each network's own owner**), and in `Network.scan()` the BFS **stops expanding** on entering land that is not the network owner's. That cut is what guarantees networks on opposite sides of a border never merge into one item bus. `DeviceInteractions.canAccessNetwork` adds the same check for when a player opens a device by hand.
 - **Via reflection**: each plugin is an independent `ProtectionBridge.Provider` that resolves its API once in `setup()`. If the plugin is missing, disabled, packaged differently, or `setup()` throws, that provider **never registers** and the others keep working. If a provider throws at runtime the position is treated as **protected** (never as "free"), so a broken API cannot open a leak.
 - **Providers**: `ProtectionStonesProvider` (`PSRegion.fromLocation`), `WorldGuardProvider` (membership of any region), `LandsProvider`, `TownyProvider` (anything that is not wilderness) and `GriefPreventionProvider`. Each one is a separate file, so adding another plugin means adding a file.
 - **The real ProtectionStones API**: an earlier draft of that provider looked for `PSProtectionManager.getProtectionFromLocation(Location)` returning an `Optional`, plus an `isRegion()` and a claims flag. **None of it exists**, in the Drake fork or in the documented public API: `setup()` returned `false`, the provider never registered, and ProtectionStones land was left uncovered without a word of warning. The only question the API answers is `PSRegion.fromLocation(Location)`, a static factory returning the innermost region or `null`. `fromLocationUnsafe` is preferred because it also reports regions whose protect block type is missing from the config, where `fromLocation` would return `null` and un-protect land the player still owns. With no `isRegion()` available, `protection.allow-claims` **does not apply to ProtectionStones**: every claim there stays protected and `exempt-locations` is the only way out.
 - **Resolved by signature, not by name**: providers bind their methods demanding the right static-or-instance kind and the exact parameter list. That is not fussiness: GriefPrevention's 4-argument `getClaimAt` is `(Location, boolean ignoreHeight, boolean ignoreSubclaims, Claim)`, so filling it by argument count passes a `Boolean` where a `Claim` belongs and throws on every single call. GriefPrevention's `ignoreHeight` is also always `false`, because `true` answers "is this in the claim's column?" and would mark a cave as claim land.
 - **Containment only, never flags**: a region that allows `BLOCK_BREAK` to its members is still territory MVN must not reach into. Testing flags per position per tick is expensive, and for a region the server deliberately opens up, `protection.exempt-locations` is already the answer.
 - **Performance**: the question is asked thousands of times per second and sits in front of a reflective call, so answers are memoised per world and position in a `ConcurrentHashMap` and dropped every `protection.cache-ticks` (100 by default, minimum 20). A claim change therefore applies within 5 s without a restart.
-- **Escape hatch for your own base**: since any claimed land is off limits to a network, `protection.exempt-worlds` and `protection.exempt-locations` (`world;x;y;z;radius`, radius defaults to 16) are how a network you deliberately built inside a claim keeps working. The `multiversenets.protection.bypass` permission (a child of `multiversenets.admin`) still allows opening and configuring devices by hand.
+- **Diagnosing the cut**: `Network.scan()` counts the links it refused for protection (`linksBlockedByProtection()`) and appends them to `Network.error`, so `/mvnets doctor`, `/mvnets repair` and the probe say "N link(s) stopped at protected land" instead of leaving a silently incomplete network. That is the answer to "everything is connected and it detects no blocks".
+- **Escape hatch for the rest**: for somebody else's land you genuinely want a network to reach, `protection.exempt-worlds` and `protection.exempt-locations` (`world;x;y;z;radius`, radius defaults to 16) remain the way. The `multiversenets.protection.bypass` permission (a child of `multiversenets.admin`) still allows opening and configuring devices by hand.
 
 ## 16. Configuration (`util/Settings`)
 
@@ -292,7 +299,7 @@ All reads go through `Settings` over `plugin.getConfig()` (refreshed in `onEnabl
 | `transferIntervalTicks()` | `network.op-interval-ticks.transfer` | 5 | ≥ 1 |
 | `vacuumIntervalTicks()` | `network.op-interval-ticks.vacuum` | 10 | ≥ 1 |
 | `craftIntervalTicks()` | `network.op-interval-ticks.craft` | 20 | ≥ 1 |
-| `itemsPerOp()` | `transfer.items-per-op` | 64 | ≥ 1 |
+| `itemsPerOp()` | `transfer.items-per-op` | 128 | ≥ 1 |
 | `htMultiplier()` | `transfer.ht-multiplier` | 8 | ≥ 1 |
 | `greedyCapacity()` | `greedy.capacity` | 262,144 | ≥ 1 |
 | `barrelCapacity()` | `barrel.capacity` | 2,000,000,000 | ≥ 1 |
