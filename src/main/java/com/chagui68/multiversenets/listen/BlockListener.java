@@ -346,6 +346,9 @@ public class BlockListener implements Listener {
         }
 
         if (blob == null) {
+            // Bloque que no es un dispositivo registrado. Agachado no se cancela nada: en vanilla
+            // agachado + click derecho con un bloque en la mano lo coloca contra la cara, y con la
+            // mano vacia simplemente no pasa nada. Aqui no hay interfaz que abrir en ningun caso.
             if (heldType == DeviceType.MVN_WIRELESS_TERMINAL && !event.getPlayer().isSneaking()) {
                 useWirelessInAir(event);
             }
@@ -377,6 +380,13 @@ public class BlockListener implements Listener {
             event.setCancelled(true);
             Items.linkReceiver(held, block.getLocation());
             player.sendMessage(Text.msg("Receiver linked to this transmitter.", NamedTextColor.GREEN));
+            return;
+        }
+
+        // Agachado + click derecho no abre ninguna interfaz, igual que en vanilla. Se cortan
+        // aqui las acciones que dependen de la orientacion (modulo de cache, celda de liquido)
+        // para que un agachado no abra el menu del dispositivo ni por accidente.
+        if (player.isSneaking()) {
             return;
         }
 
