@@ -123,7 +123,7 @@ API principal:
 - `registerController(Block)` / `removeController(Block)` — crean/eliminan la red y actualizan `NodeStore`.
 - `networkAt(Block)` — búsqueda lineal entre las redes del mundo que contienen el bloque; `networkByController(Location)` — acceso directo por controlador (terminal inalámbrica).
 - `invalidateNear(Block)` — reescanea la red del bloque y las de sus **6 vecinos** (para cuando un bloque cambia la conectividad). Se llama desde `BlockListener` al colocar/romper/rastrillar/pintar.
-- Helpers de filtros: `filterPredicate(blob)` (whitelist/blacklist), `matchesFilter(template, item)` (ordena: DeviceType → ID Slimefun → nombre mostrado → material), `extractFirst(Inventory,…)`, `insertInto(Inventory,…)`.
+- Helpers de filtros: `filterPredicate(blob)` (whitelist/blacklist), `matchesFilter(template, item)` (ordena: DeviceType → ID Slimefun → nombre mostrado → material), `extractMatching(Inventory,…)` (acumula hasta `max` unidades fusionando las ranuras con el mismo ítem), `insertInto(Inventory,…)`.
 
 ## 7. Almacenamiento virtual: `NetworkStorage`
 
@@ -259,7 +259,19 @@ Subcomandos: `help`, `info`, `guide`, `reload`, `give <id> [n]`, `devices`, `doc
 - **Por reflexión**: el plugin sigue siendo 100 % autónomo. Busca los paquetes `com.github.drakescraft_labs.slimefun4.legacy` y `io.github.thebusybiscuit.slimefun4.legacy`. Si `compat.slimefun=false` o Slimefun no está instalado, queda **inactivo** (`isAvailable()` = false) y solo se usan contenedores vanilla.
 - API: `isMachine(Block)` (menú propio), `getId(Block)` (`checkID`) e `getId(ItemStack)` (lee el tag PDC `slimefun_item`), `extract` (saca de los slots de salida respetando `getSlotsAccessedByItemTransport` + `WITHDRAW`), `insert` (empuja a slots de entrada + `INSERT`). Conserva alias legados en español: `disponible`, `esMaquina`, `idDe`, `esItemSlimefun`, `extraer`, `insertar`.
 
-## 15. Configuración (`util/Settings`)
+## 15. Protección de tierras (`compat/ProtectionBridge`)
+
+- **Por qué existe**: una red es un **actor anónimo**. No lleva identidad de jugador, así que un grabber sentado en tierra pública podía leer un cofre dentro de la región de ProtectionStones de otro jugador: dos jugadores acababan robándose entre sí a través de sus propios dispositivos.
+- **Dónde se aplica**: en `NetworkTicker` se comprueba el bloque destino antes de cada operación (grabber, pusher, distribución de la Greedy Cell, vacuum, bomba de líquidos y puente inalámbrico, comprobando los dos extremos), y en `Network.scan()` el BFS **deja de tenderse** al entrar en tierra protegida. Ese corte es lo que garantiza que dos redes a lados opuestos de una frontera nunca se fusionen en un mismo bus de ítems. `BlockListener.canAccessNetwork` añade la comprobación para cuando un jugador abre un dispositivo a mano.
+- **Por reflexión**: cada plugin es un `ProtectionBridge.Provider` independiente que resuelve su API una vez en `setup()`. Si el plugin falta, está desactivado, expone otro empaquetado o `setup()` lanza, ese provider **no se registra** y los demás siguen funcionando. Si un provider lanza en tiempo de ejecución, la posición se trata como **protegida** (nunca como "libre"), de modo que una API rota no abre una fuga.
+- **Providers**: `ProtectionStonesProvider` (`PSRegion.fromLocation`), `WorldGuardProvider` (pertenencia a cualquier región), `LandsProvider`, `TownyProvider` (todo lo que no sea desierto) y `GriefPreventionProvider`. Cada uno es una clase aparte, así que añadir otro es añadir un archivo.
+- **La API real de ProtectionStones**: la versión anterior del provider buscaba `PSProtectionManager.getProtectionFromLocation(Location)` devolviendo un `Optional`, más un `isRegion()` y un parámetro de claims. **Nada de eso existe**, ni en el fork de Drake ni en la API pública documentada: `setup()` devolvía `false`, el provider no se registraba y la tierra de ProtectionStones quedaba sin cubrir sin avisar. La única pregunta que la API hace es `PSRegion.fromLocation(Location)`, una factoría estática que devuelve la región más interna o `null`. Se prefiere `fromLocationUnsafe`, que además cubre regiones cuyo tipo de bloque protector no está en la config, mientras que `fromLocation` devolvería `null` y desprotegería tierra que el jugador sigue poseyendo. Al no existir `isRegion()`, `protection.allow-claims` **no se aplica a ProtectionStones**: todos sus reclamos quedan protegidos y la única salida es `exempt-locations`.
+- **Resolución por firma, no por nombre**: los providers enlazan sus métodos exigiendo el tipo estático o de instancia y la lista exacta de parámetros. Esto no es purismo: la forma de 4 argumentos de `GriefPrevention.getClaimAt` es `(Location, boolean ignoreHeight, boolean ignoreSubclaims, Claim)`, así que rellenarla contando argumentos pasa un `Boolean` donde va un `Claim` y lanza en cada llamada. En `GriefPrevention` `ignoreHeight` además siempre es `false`, porque `true` responde "¿está en la columna del reclamo?" y marcaría una cueva como tierra protegida.
+- **Solo contención, no flags**: una región que permite `BLOCK_BREAK` a sus miembros sigue siendo territorio del que MVN no debe entrar. Los flags por posición y tick son caros y, para una región que el servidor abre, `protection.exempt-locations` ya es la respuesta.
+- **Rendimiento**: la pregunta se hace miles de veces por segundo y detrás hay una llamada reflectiva, así que las respuestas se memorizan por mundo y posición en un `ConcurrentHashMap` y se vacían cada `protection.cache-ticks` (100 por defecto, mínimo 20). Un cambio de reclamo se aplica en ≤ 5 s sin reiniciar.
+- **Salida para bases propias**: como cualquier tierra reclamada es intocable para la red, `protection.exempt-worlds` y `protection.exempt-locations` (`mundo;x;y;z;radio`, radio por defecto 16) son la vía para que una red construida dentro de un reclamo siga funcionando. El permiso `multiversenets.protection.bypass` (hijo de `multiversenets.admin`) deja abrir y configurar dispositivos a mano.
+
+## 16. Configuración (`util/Settings`)
 
 Todas las lecturas pasan por `Settings` sobre `plugin.getConfig()` (se refresca en `onEnable` y `/mvnets reload`). Tabla completa:
 
@@ -278,6 +290,15 @@ Todas las lecturas pasan por `Settings` sobre `plugin.getConfig()` (se refresca 
 | `vacuumRadius()` | `vacuum.radius` | 4.0 | ≥ 1.0 |
 | `cellCapacity(tier)` | `cells.capacities` | lista por defecto (ver abajo) | clamping a última tier |
 | `compatSlimefun()` | `compat.slimefun` | `true` | — |
+| `protectionEnabled()` | `protection.enabled` | `true` | — |
+| `protectionProviderEnabled(id)` | `protection.providers` | lista vacía = todos | comparación sin distinguir mayúsculas |
+| `protectionAllowClaims()` | `protection.allow-claims` | `false` | `cfg` ausente = `false` (¡no `true`!) |
+| `protectionBlocksNetworkLinking()` | `protection.block-network-linking` | `true` | — |
+| `protectionBlocksPlayerInteraction()` | `protection.deny-player-interaction` | `true` | — |
+| `protectionBypassPermission()` | `protection.bypass-permission` | `multiversenets.protection.bypass` | vacío desactiva el bypass |
+| `protectionCacheTicks()` | `protection.cache-ticks` | 100 | ≥ 20 |
+| `protectionExemptWorlds()` | `protection.exempt-worlds` | `[]` | — |
+| `protectionExemptLocations()` | `protection.exempt-locations` | `[]` | entradas inválidas se descartan en silencio |
 | `debug()` | `debug` | `false` | — |
 | `rakeUses()` | `rake.uses` | 250 | ≥ 1 |
 

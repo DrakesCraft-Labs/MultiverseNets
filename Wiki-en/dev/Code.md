@@ -132,7 +132,7 @@ from this registry at startup.
 - `registerController(Block)` / `removeController(Block)` — create/destroy the network and update `NodeStore`.
 - `networkAt(Block)` — linear lookup over the world's networks containing the block; `networkByController(Location)` — direct controller lookup (wireless terminal).
 - `invalidateNear(Block)` — rescans the block's network plus those of its **6 neighbors** (for connectivity changes). Called from `BlockListener` on place/break/rake/crayon.
-- Filter helpers: `filterPredicate(blob)` (whitelist/blacklist), `matchesFilter(template, item)` (decision order: DeviceType → Slimefun ID → display name → material), `extractFirst(Inventory,…)`, `insertInto(Inventory,…)`.
+- Filter helpers: `filterPredicate(blob)` (whitelist/blacklist), `matchesFilter(template, item)` (decision order: DeviceType → Slimefun ID → display name → material), `extractMatching(Inventory,…)` (accumulates up to `max` units, merging every slot holding the same item), `insertInto(Inventory,…)`.
 
 ## 7. Virtual storage: `NetworkStorage`
 
@@ -269,7 +269,19 @@ Subcommands: `help`, `info`, `guide`, `reload`, `give <id> [n]`, `devices`, `doc
 - **Via reflection**: the plugin stays fully standalone. It probes the packages `com.github.drakescraft_labs.slimefun4.legacy` and `io.github.thebusybiscuit.slimefun4.legacy`. If `compat.slimefun=false` or Slimefun is absent, it stays **dormant** (`isAvailable()` = false) and only vanilla containers are used.
 - API: `isMachine(Block)` (own menu), `getId(Block)` (`checkID`) and `getId(ItemStack)` (reads the PDC tag `slimefun_item`), `extract` (pulls from output slots honoring `getSlotsAccessedByItemTransport` + `WITHDRAW`), `insert` (pushes to input slots + `INSERT`). Keeps Spanish legacy aliases: `disponible`, `esMaquina`, `idDe`, `esItemSlimefun`, `extraer`, `insertar`.
 
-## 15. Configuration (`util/Settings`)
+## 15. Land protection (`compat/ProtectionBridge`)
+
+- **Why it exists**: a network is an **anonymous actor**. It carries no player identity, so a grabber sitting in public land could read a chest inside somebody else's ProtectionStones region: two players ended up robbing each other through their own devices.
+- **Where it is applied**: `NetworkTicker` checks the destination block before every operation (grabber, pusher, Greedy Cell distribution, vacuum, liquid pump and the wireless bridge, which checks both ends), and in `Network.scan()` the BFS **stops expanding** on entering protected land. That cut is what guarantees networks on opposite sides of a border never merge into one item bus. `BlockListener.canAccessNetwork` adds the same check for when a player opens a device by hand.
+- **Via reflection**: each plugin is an independent `ProtectionBridge.Provider` that resolves its API once in `setup()`. If the plugin is missing, disabled, packaged differently, or `setup()` throws, that provider **never registers** and the others keep working. If a provider throws at runtime the position is treated as **protected** (never as "free"), so a broken API cannot open a leak.
+- **Providers**: `ProtectionStonesProvider` (`PSRegion.fromLocation`), `WorldGuardProvider` (membership of any region), `LandsProvider`, `TownyProvider` (anything that is not wilderness) and `GriefPreventionProvider`. Each one is a separate file, so adding another plugin means adding a file.
+- **The real ProtectionStones API**: an earlier draft of that provider looked for `PSProtectionManager.getProtectionFromLocation(Location)` returning an `Optional`, plus an `isRegion()` and a claims flag. **None of it exists**, in the Drake fork or in the documented public API: `setup()` returned `false`, the provider never registered, and ProtectionStones land was left uncovered without a word of warning. The only question the API answers is `PSRegion.fromLocation(Location)`, a static factory returning the innermost region or `null`. `fromLocationUnsafe` is preferred because it also reports regions whose protect block type is missing from the config, where `fromLocation` would return `null` and un-protect land the player still owns. With no `isRegion()` available, `protection.allow-claims` **does not apply to ProtectionStones**: every claim there stays protected and `exempt-locations` is the only way out.
+- **Resolved by signature, not by name**: providers bind their methods demanding the right static-or-instance kind and the exact parameter list. That is not fussiness: GriefPrevention's 4-argument `getClaimAt` is `(Location, boolean ignoreHeight, boolean ignoreSubclaims, Claim)`, so filling it by argument count passes a `Boolean` where a `Claim` belongs and throws on every single call. GriefPrevention's `ignoreHeight` is also always `false`, because `true` answers "is this in the claim's column?" and would mark a cave as claim land.
+- **Containment only, never flags**: a region that allows `BLOCK_BREAK` to its members is still territory MVN must not reach into. Testing flags per position per tick is expensive, and for a region the server deliberately opens up, `protection.exempt-locations` is already the answer.
+- **Performance**: the question is asked thousands of times per second and sits in front of a reflective call, so answers are memoised per world and position in a `ConcurrentHashMap` and dropped every `protection.cache-ticks` (100 by default, minimum 20). A claim change therefore applies within 5 s without a restart.
+- **Escape hatch for your own base**: since any claimed land is off limits to a network, `protection.exempt-worlds` and `protection.exempt-locations` (`world;x;y;z;radius`, radius defaults to 16) are how a network you deliberately built inside a claim keeps working. The `multiversenets.protection.bypass` permission (a child of `multiversenets.admin`) still allows opening and configuring devices by hand.
+
+## 16. Configuration (`util/Settings`)
 
 All reads go through `Settings` over `plugin.getConfig()` (refreshed in `onEnable` and `/mvnets reload`). Full table:
 
@@ -288,6 +300,15 @@ All reads go through `Settings` over `plugin.getConfig()` (refreshed in `onEnabl
 | `vacuumRadius()` | `vacuum.radius` | 4.0 | ≥ 1.0 |
 | `cellCapacity(tier)` | `cells.capacities` | default list (below) | clamped to last tier |
 | `compatSlimefun()` | `compat.slimefun` | `true` | — |
+| `protectionEnabled()` | `protection.enabled` | `true` | — |
+| `protectionProviderEnabled(id)` | `protection.providers` | empty list = all | case-insensitive |
+| `protectionAllowClaims()` | `protection.allow-claims` | `false` | absent config = `false` (not `true`!) |
+| `protectionBlocksNetworkLinking()` | `protection.block-network-linking` | `true` | — |
+| `protectionBlocksPlayerInteraction()` | `protection.deny-player-interaction` | `true` | — |
+| `protectionBypassPermission()` | `protection.bypass-permission` | `multiversenets.protection.bypass` | empty removes the bypass |
+| `protectionCacheTicks()` | `protection.cache-ticks` | 100 | ≥ 20 |
+| `protectionExemptWorlds()` | `protection.exempt-worlds` | `[]` | — |
+| `protectionExemptLocations()` | `protection.exempt-locations` | `[]` | unparseable entries are dropped silently |
 | `debug()` | `debug` | `false` | — |
 | `rakeUses()` | `rake.uses` | 250 | ≥ 1 |
 
