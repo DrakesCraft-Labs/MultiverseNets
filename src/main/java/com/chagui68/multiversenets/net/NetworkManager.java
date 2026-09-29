@@ -300,27 +300,46 @@ public class NetworkManager {
     }
 
     /**
-     * EN: Extracts the first matching item from an inventory up to {@code max} units.
- *
-     * ES: Extrae el primer ítem coincidente de un inventario hasta {@code max} unidades.
+     * EN: Extracts up to {@code max} units of a single matching item from an inventory, merging
+     * every slot that holds an equivalent stack. Stops early once the quota is reached.
+     * Slots holding a different item are left untouched, so a filter that allows several items
+     * still only drains one of them per call.
+     *
+     * ES: Extrae hasta {@code max} unidades de un mismo ítem coincidente de un inventario,
+     * fusionando todas las ranuras que tengan un stack equivalente. Se detiene al alcanzar la
+     * cuota. Las ranuras con otro ítem no se tocan, así que un filtro que permita varios ítems
+     * sigue vaciando solo uno de ellos por llamada.
      */
-    public static ItemStack extractFirst(Inventory inv, Predicate<ItemStack> pred, int max) {
-        for (int i = 0; i < inv.getSize(); i++) {
+    public static ItemStack extractMatching(Inventory inv, Predicate<ItemStack> pred, int max) {
+        if (inv == null || max <= 0) {
+            return null;
+        }
+        ItemStack result = null;
+        int got = 0;
+        for (int i = 0; i < inv.getSize() && got < max; i++) {
             ItemStack it = inv.getItem(i);
-            if (it == null || !pred.test(it)) {
+            if (it == null || it.getType().isAir() || !pred.test(it)) {
                 continue;
             }
-            int take = Math.min(it.getAmount(), max);
-            ItemStack out = it.clone();
-            out.setAmount(take);
-            if (take >= it.getAmount()) {
+            if (result == null) {
+                result = it.clone();
+            } else if (!StackUtils.itemsMatch(result, it)) {
+                continue;
+            }
+            int take = Math.min(it.getAmount(), max - got);
+            int left = it.getAmount() - take;
+            if (left <= 0) {
                 inv.setItem(i, null);
             } else {
-                it.setAmount(it.getAmount() - take);
+                it.setAmount(left);
             }
-            return out;
+            got += take;
         }
-        return null;
+        if (result == null || got <= 0) {
+            return null;
+        }
+        result.setAmount(got);
+        return result;
     }
 
     /**

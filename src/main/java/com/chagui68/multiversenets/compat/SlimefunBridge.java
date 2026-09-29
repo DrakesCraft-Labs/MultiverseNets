@@ -298,8 +298,12 @@ public final class SlimefunBridge {
 
     /**
      * EN: Extracts up to {@code max} items matching {@code filter} from the machine's output slots.
- *
+     * Every output slot holding an equivalent stack is drained into the result, so the per-cycle
+     * quota is fully honoured. Slots holding a different item are left untouched.
+     *
      * ES: Extrae hasta {@code max} ítems que cumplan {@code filter} de los huecos de salida de la máquina.
+     * Vacia en el resultado todos los huecos de salida que tengan un stack equivalente, de modo que la
+     * cuota por ciclo se respeta por completo. Los huecos con otro ítem no se tocan.
      *
      * @param block  The block containing the Slimefun machine / ES: Bloque de la máquina.
      * @param filter Predicate filtering allowed items / ES: Predicado que filtra los ítems válidos.
@@ -310,15 +314,20 @@ public final class SlimefunBridge {
         Object menu = menuOf(block);
         if (menu == null || max <= 0) return null;
         try {
+            ItemStack result = null;
+            int got = 0;
             for (int slot : getTransportSlots(menu, flowWithdraw, null)) {
+                if (got >= max) break;
                 Object raw = mGetItemInSlot.invoke(menu, slot);
                 if (!(raw instanceof ItemStack current) || current.getType().isAir()) continue;
                 if (filter != null && !filter.test(current)) continue;
+                if (result == null) {
+                    result = current.clone();
+                } else if (!StackUtils.itemsMatch(result, current)) {
+                    continue;
+                }
 
-                int amount = Math.min(max, current.getAmount());
-                ItemStack extracted = current.clone();
-                extracted.setAmount(amount);
-
+                int amount = Math.min(max - got, current.getAmount());
                 int remaining = current.getAmount() - amount;
                 ItemStack remainingStack = null;
                 if (remaining > 0) {
@@ -326,8 +335,13 @@ public final class SlimefunBridge {
                     remainingStack.setAmount(remaining);
                 }
                 mReplaceExistingItem.invoke(menu, slot, remainingStack);
-                return extracted;
+                got += amount;
             }
+            if (result == null || got <= 0) {
+                return null;
+            }
+            result.setAmount(got);
+            return result;
         } catch (ReflectiveOperationException | RuntimeException error) {
             logError(block, error);
         }
