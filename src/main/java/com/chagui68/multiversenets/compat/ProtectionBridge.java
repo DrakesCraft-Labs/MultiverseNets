@@ -264,8 +264,13 @@ public final class ProtectionBridge {
             memo = CACHE.computeIfAbsent(world.getUID(), ignored -> new ConcurrentHashMap<>());
         }
         memo.put(key, result);
+        // Cada tick el bucle de red pregunta por miles de posiciones, asi que un limite global
+        // se dispara de continuo y un clear() completo aqui dejaria la cache inservible: se
+        // memorizaria una entrada y se borraria en la misma llamada. Se descarta el mapa entero
+        // de este mundo, que es la unidad de invalidacion natural, y se reinicia el contador.
         if (CACHE_ENTRIES.incrementAndGet() > CACHE_LIMIT) {
-            invalidate();
+            CACHE.remove(world.getUID());
+            CACHE_ENTRIES.set(0);
         }
         return result;
     }

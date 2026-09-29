@@ -383,13 +383,15 @@ public class BlockListener implements Listener {
             return;
         }
 
-        // Agachado + click derecho no abre ninguna interfaz, igual que en vanilla. Se cortan
-        // aqui las acciones que dependen de la orientacion (modulo de cache, celda de liquido)
-        // para que un agachado no abra el menu del dispositivo ni por accidente.
+        // Agachado + click derecho no abre ninguna interfaz, igual que en vanilla: se devuelve
+        // antes de tocar nada mas, asi que ningun camino de aqui abajo puede abrir un GUI.
         if (player.isSneaking()) {
             return;
         }
 
+        // Con un bloque en la mano no se abre el menu de un cable ni de un controlador, para que
+        // el clic placement-place en vez de entrar al GUI. Un cable no tiene menu, pero el
+        // controlador si, y ahi este corte es el que evita el conflicto.
         if (held != null && held.getType().isBlock() && (type == DeviceType.MVN_CABLE || type == DeviceType.MVN_CONTROLLER)) {
             return;
         }
@@ -400,7 +402,7 @@ public class BlockListener implements Listener {
             return;
         }
 
-        if (type == DeviceType.MVN_FLUID_CELL && held != null && !player.isSneaking()) {
+        if (type == DeviceType.MVN_FLUID_CELL && held != null) {
             if (handleFluidCellQuickInteract(player, block, blob, held)) {
                 event.setCancelled(true);
                 return;

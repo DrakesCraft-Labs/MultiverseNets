@@ -537,10 +537,15 @@ class BlockFlowsTest {
     }
 
     /**
-     * [EN] Shift + Right-Clicking a network device accesses the interface of the targeted adjacent block.
+     * [EN] Shift + Right-Clicking a network device does nothing, like vanilla. Sneaking is the
+     * vanilla way to place a block against a face without using the target, so it must never open
+     * a menu, neither the device's own nor an adjacent block's. This test previously asserted the
+     * opposite (that the adjacent interface opened) and was removed with that feature in 1c58b5b;
+     * it is kept here as the behavioural counterpart of SneakingRightClickTest, which guards the
+     * source-level ordering that this cannot see.
      */
     @Test
-    void shiftRightClickAccessesAdjacentChestInterface() {
+    void shiftRightClickOnADeviceDoesNothing() {
         Block chest = world.getBlockAt(10, 64, 11);
         chest.setType(Material.CHEST);
         Block grabber = place(10, 64, 10, DeviceType.MVN_GRABBER_HT);
@@ -553,6 +558,24 @@ class BlockFlowsTest {
         PlayerInteractEvent event = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK, null, grabber, BlockFace.NORTH, EquipmentSlot.HAND);
         server.getPluginManager().callEvent(event);
 
-        assertTrue(event.isCancelled(), "shift+right click event should be cancelled when opening adjacent interface");
+        assertFalse(event.isCancelled(), "sneaking right-click must not be consumed");
+        assertNull(player.getOpenInventory().getTopInventory(),
+                "sneaking right-click must not open any menu, not the device's and not the chest's");
+    }
+
+    /**
+     * [EN] The counterpart: without sneaking, right-click still opens the device's own menu. The
+     * sneaking guard must not be over-broad and swallow the normal interaction.
+     */
+    @Test
+    void rightClickWithoutSneakingStillOpensTheDeviceMenu() {
+        Block grabber = place(10, 64, 10, DeviceType.MVN_GRABBER_HT);
+        player.setSneaking(false);
+        PlayerInteractEvent event = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK, null, grabber, BlockFace.NORTH, EquipmentSlot.HAND);
+        server.getPluginManager().callEvent(event);
+
+        assertTrue(event.isCancelled(), "a normal right-click must be handled and cancelled");
+        assertNotNull(player.getOpenInventory().getTopInventory(),
+                "a normal right-click must still open the grabber menu");
     }
 }
