@@ -105,6 +105,26 @@ public final class ProtectionBridge {
          *         treats any failure as "protected" so a broken API never leaks items.
          */
         boolean test(Location loc) throws Exception;
+
+        /**
+         * [EN] The player-aware question, for hand-held access like the wireless terminal.
+         * @return {@code Boolean.TRUE} when the plugin can certify that this player is the owner or
+         * a member of the land at that location; {@code null} when it cannot be certain. A null
+         * never unlocks anything: the anonymous {@link #test} still has the final word.
+         * <p>
+         * This third answer exists because {@code test} alone cannot tell "a network device sits in
+         * someone's claim" from "the very owner of that claim is holding the device". Claims in
+         * ProtectionStones are personal by design, so without this the owner herself is locked out
+         * of her own machines.
+         *
+         * [ES] La pregunta consciente del jugador, para acceso manual como la terminal inalámbrica.
+         * {@code Boolean.TRUE} si el plugin puede certificar que el jugador es dueño o miembro de la
+         * tierra en esa ubicación; {@code null} si no puede tener certeza. Un null nunca desbloquea
+         * nada: el {@link #test} anónimo sigue teniendo la última palabra.
+         */
+        default Boolean allowsPlayer(Player player, Location loc) {
+            return null;
+        }
     }
 
     /**
@@ -448,7 +468,40 @@ public final class ProtectionBridge {
         if (!bypass.isEmpty() && player.hasPermission(bypass)) {
             return true;
         }
-        return !isProtected(loc);
+        return mayPlayerAccess(ACTIVE, player, loc);
+    }
+
+    /**
+     * [EN] The provider loop, extracted so the owner/stranger rule is unit testable without a
+     * server running. First every provider gets to vouch for the player; if none does, the
+     * anonymous fail-closed rule answers the question instead.
+     *
+     * [ES] El bucle de providers, extraído para que la regla dueño/extraño sea testeable sin
+     * servidor. Primero cada provider puede certificar al jugador; si ninguno lo hace, contesta la
+     * regla anónima fail-closed.
+     */
+    static boolean mayPlayerAccess(List<Provider> providers, Player player, Location loc) {
+        for (Provider provider : providers) {
+            Boolean allowed;
+            try {
+                allowed = provider.allowsPlayer(player, loc);
+            } catch (Throwable ignored) {
+                continue;
+            }
+            if (Boolean.TRUE.equals(allowed)) {
+                return true;
+            }
+        }
+        for (Provider provider : providers) {
+            if (!supports(provider, loc.getWorld())) {
+                continue;
+            }
+            if (evaluate(provider, loc, "player " + player.getUniqueId() + " at "
+                    + loc.getBlockX() + "," + loc.getBlockY() + "," + loc.getBlockZ())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void loadExemptions() {

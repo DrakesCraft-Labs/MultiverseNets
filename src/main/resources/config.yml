@@ -217,8 +217,12 @@ protection:
   #      cruzando una región. Ponlo en false solo si tus redes cruzan tierra a propósito.
   block-network-linking: true
 
-  # [EN] true = players cannot open or configure network devices standing on protected land.
-  # [ES] true = los jugadores no pueden abrir ni configurar dispositivos en tierra protegida.
+  # [EN] true = players cannot open or configure network devices standing on protected land
+  #      they do not own. Owners and members of a ProtectionStones claim CAN always use their
+  #      terminal and their machines inside it; only strangers are blocked.
+  # [ES] true = los jugadores no pueden abrir ni configurar dispositivos en tierra protegida
+  #      que no sea suya. Dueños y miembros de un reclamo de ProtectionStones SIEMPRE pueden
+  #      usar su terminal y sus máquinas dentro de ella; solo se bloquea a los extraños.
   deny-player-interaction: true
 
   # [EN] Permission that skips the check for players. The multiversenets.admin permission

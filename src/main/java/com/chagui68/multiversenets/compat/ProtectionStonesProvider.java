@@ -22,19 +22,18 @@ import java.util.logging.Logger;
  * <p>
  * Two consequences of the real API are worth stating plainly:
  * <ul>
- *   <li>Every PS region is a personal claim. ProtectionStones has no "server region" concept to
- *       ask about, so {@code protection.allow-claims=true} cannot be honoured here. It is ignored
- *       and every claim stays protected, with a warning. {@code protection.exempt-locations} is
- *       the way to run a network inside your own claim.</li>
+ *   <li>Every PS region is a personal claim. For the <em>anonymous network loop</em> there is no
+ *       player identity, so {@code protection.allow-claims=true} cannot be honoured there: a
+ *       claimed cable stays untouchable either way, and a warning is logged.</li>
+ *   <li>For <em>hand-held player access</em> the region itself knows its owners and members
+ *       ({@code PSRegion.isOwner/isMember}), so {@link #allowsPlayer} lets the very players the
+ *       claim exists for use their own devices inside it, while every stranger stays locked out by
+ *       the anonymous rule.</li>
  *   <li>{@code fromLocationUnsafe} is preferred over {@code fromLocation} because the latter also
  *       returns null when a region's protect block type is missing from the config, which would
  *       silently un-protect land the player still owns. Failing closed is the right side to err
  *       on here.</li>
  * </ul>
- * <p>
- * Note that ProtectionStones regions are WorldGuard regions, so {@link WorldGuardProvider} already
- * covers this land as a side effect. This provider exists so the log tells the truth, so the claim
- * rule above is applied, and so the coverage does not depend on a second plugin's provider.
  *
  * [ES] Provider de ProtectionStones, construido sobre la API que existe de verdad.
  * <p>
@@ -45,9 +44,13 @@ import java.util.logging.Logger;
  * <p>
  * Dos consecuencias de la API real:
  * <ul>
- *   <li>Toda región de PS es un reclamo personal. ProtectionStones no tiene concepto de "región del
- *       servidor", así que {@code protection.allow-claims=true} no se puede honrar aquí: se ignora
- *       y todos los reclamos quedan protegidos, con un aviso.</li>
+ *   <li>En el <em>bucle anónimo de red</em> no hay identidad de jugador, así que
+ *       {@code protection.allow-claims=true} no se puede aplicar ahí: los cables dentro de un
+ *       reclamo quedan intocables igualmente, y se avisa en el log.</li>
+ *   <li>Para el <em>acceso manual de jugadores</em> la región sí conoce a sus dueños y miembros
+ *       ({@code PSRegion.isOwner/isMember}), así que {@link #allowsPlayer} deja a los legítimos
+ *       usar sus propios dispositivos dentro de su reclamo, mientras cualquier extraño sigue
+ *       bloqueado por la regla anónima.</li>
  *   <li>Se prefiere {@code fromLocationUnsafe} porque {@code fromLocation} además devuelve null
  *       cuando el tipo de bloque protector no está en la config, lo que desprotegería tierra que
  *       el jugador sigue poseyendo.</li>
@@ -65,6 +68,8 @@ public final class ProtectionStonesProvider implements ProtectionBridge.Provider
     static final String[] LOOKUPS = {"fromLocationUnsafe", "fromLocation"};
 
     private Method mFromLocation;
+    private Method mIsOwner;
+    private Method mIsMember;
 
     @Override
     public String id() {
@@ -82,6 +87,18 @@ public final class ProtectionStonesProvider implements ProtectionBridge.Provider
             return false;
         }
         mFromLocation = resolved;
+        try {
+            Class<?> regionClass = Class.forName(REGION_CLASS);
+            // Real API (Drake fork, PSRegion.java lines 661-669): claims are personal, and the
+            // region knows who its owner and members are. If these ever vanish, allowsPlayer just
+            // returns null and the anonymous rule keeps the land closed, so nothing unlocks by
+            // accident.
+            mIsOwner = regionClass.getMethod("isOwner", java.util.UUID.class);
+            mIsMember = regionClass.getMethod("isMember", java.util.UUID.class);
+        } catch (Throwable ignored) {
+            mIsOwner = null;
+            mIsMember = null;
+        }
         logger.info("Protection: ProtectionStones hooked via " + REGION_CLASS + "." + resolved.getName() + "().");
         if (Settings.protectionAllowClaims()) {
             logger.warning("Protection: protection.allow-claims=true is ignored for ProtectionStones. "
@@ -125,6 +142,37 @@ public final class ProtectionStonesProvider implements ProtectionBridge.Provider
     @Override
     public boolean supports(World world) {
         return WorldGuardRegions.manages(world);
+    }
+
+    /**
+     * [EN] A ProtectionStones claim always belongs to actual players, so the region itself can say
+     * whether the person asking is one of them. TRUE only when the owner or member list holds the
+     * UUID; null for everyone else, which leaves the anonymous fail-closed check in charge.
+     */
+    @Override
+    public Boolean allowsPlayer(org.bukkit.entity.Player player, Location loc) {
+        try {
+            return allowsPlayer(mFromLocation, mIsOwner, mIsMember, player.getUniqueId(), loc);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    /**
+     * Static and parameter-injected so the rule can run against the test stub without a server.
+     */
+    static Boolean allowsPlayer(Method lookup, Method isOwner, Method isMember,
+                                java.util.UUID who, Location loc) throws Exception {
+        if (lookup == null || isOwner == null || isMember == null) {
+            return null;
+        }
+        Object region = lookup.invoke(null, loc);
+        if (region == null) {
+            return null;
+        }
+        boolean their = Boolean.TRUE.equals(isOwner.invoke(region, who))
+                || Boolean.TRUE.equals(isMember.invoke(region, who));
+        return their ? Boolean.TRUE : null;
     }
 
     /**

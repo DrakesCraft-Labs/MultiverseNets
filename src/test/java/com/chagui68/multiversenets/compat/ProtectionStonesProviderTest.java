@@ -60,6 +60,27 @@ class ProtectionStonesProviderTest {
                 });
     }
 
+    /**
+     * [EN] A Player that answers only its UUID and has no permissions. Same proxy trick as
+     * {@link #world(String)}: the mayPlayerAccess logic reads nothing else from the player, so a
+     * full Bukkit player is dead weight here.
+     */
+    private static org.bukkit.entity.Player player(UUID id) {
+        return (org.bukkit.entity.Player) java.lang.reflect.Proxy.newProxyInstance(
+                org.bukkit.entity.Player.class.getClassLoader(),
+                new Class<?>[]{org.bukkit.entity.Player.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getUniqueId" -> id;
+                    case "hasPermission" -> false;
+                    case "getName" -> "Player[" + id + "]";
+                    case "toString" -> "Player[" + id + "]";
+                    case "hashCode" -> id.hashCode();
+                    case "equals" -> proxy == args[0];
+                    default -> throw new UnsupportedOperationException(
+                            "PlayerStub." + method.getName() + " is not stubbed");
+                });
+    }
+
     @BeforeEach
     void resetFakeWorld() {
         PSRegion.reset();
@@ -167,7 +188,85 @@ class ProtectionStonesProviderTest {
                         + "must not claim it");
     }
 
-    // ------------------------------------------------------------------ fail-closed rule
+    @Test
+    @DisplayName("an owner can use devices in her own claim, a stranger cannot")
+    void ownerAccessInsideAClaim() throws Exception {
+        // Bug report: the wireless terminal refused to open in protected zones because the bridge
+        // only knew how to answer anonymously, and ProtectionStones claims are always personal.
+        // The real PSRegion API (Drake fork, lines 661-669) exposes isOwner/isMember(UUID), which
+        // is exactly the distinction the anonymous check cannot make.
+        Method lookup = PSRegion.class.getMethod("fromLocationUnsafe", Location.class);
+        Method isOwner = PSRegion.class.getMethod("isOwner", UUID.class);
+        Method isMember = PSRegion.class.getMethod("isMember", UUID.class);
+
+        PSRegion.INSIDE.add("?:7,64,7");
+        Location claim = at(7, 64, 7);
+        UUID owner = UUID.randomUUID();
+        UUID member = UUID.randomUUID();
+        UUID stranger = UUID.randomUUID();
+        PSRegion.OWNERS.add(owner);
+        PSRegion.MEMBERS.add(member);
+
+        assertEquals(Boolean.TRUE,
+                ProtectionStonesProvider.allowsPlayer(lookup, isOwner, isMember, owner, claim),
+                "the region's owner must be told apart from its land: she can use her terminal");
+        assertEquals(Boolean.TRUE,
+                ProtectionStonesProvider.allowsPlayer(lookup, isOwner, isMember, member, claim),
+                "members are also the people the claim exists for");
+        assertNull(ProtectionStonesProvider.allowsPlayer(lookup, isOwner, isMember, stranger, claim),
+                "a stranger gets no opinion: the anonymous fail-closed rule still blocks him");
+    }
+
+    @Test
+    @DisplayName("outside any claim the provider has nothing to say")
+    void outsideClaimsThereIsNoOpinion() throws Exception {
+        Method lookup = PSRegion.class.getMethod("fromLocationUnsafe", Location.class);
+        Method isOwner = PSRegion.class.getMethod("isOwner", UUID.class);
+        Method isMember = PSRegion.class.getMethod("isMember", UUID.class);
+
+        assertNull(ProtectionStonesProvider.allowsPlayer(
+                        lookup, isOwner, isMember, UUID.randomUUID(), at(30, 64, 30)),
+                "unclaimed land is decided by the anonymous rule, not by player identity");
+    }
+
+    @Test
+    @DisplayName("the bridge lets the owner in, keeps the stranger out of someone's claim")
+    void bridgeSeparatesOwnerFromStranger() {
+        UUID owner = UUID.randomUUID();
+        World claimWorld = world("world");
+        Location claimSpot = new Location(claimWorld, 7, 64, 7);
+        ProtectionBridge.Provider ps = new ProtectionBridge.Provider() {
+            @Override
+            public String id() {
+                return "ProtectionStones";
+            }
+
+            @Override
+            public boolean setup(java.util.logging.Logger logger) {
+                return true;
+            }
+
+            @Override
+            public boolean test(Location loc) {
+                return loc.equals(claimSpot);
+            }
+
+            @Override
+            public Boolean allowsPlayer(org.bukkit.entity.Player player, Location loc) {
+                return loc.equals(claimSpot) && player.getUniqueId().equals(owner)
+                        ? Boolean.TRUE : null;
+            }
+        };
+        List<ProtectionBridge.Provider> providers = List.of(ps);
+
+        assertTrue(ProtectionBridge.mayPlayerAccess(providers, player(owner), claimSpot),
+                "the terminal bug: the owner inside her own protected claim must get through");
+        assertFalse(ProtectionBridge.mayPlayerAccess(providers, player(UUID.randomUUID()), claimSpot),
+                "a stranger inside someone else's claim still cannot touch the devices");
+        assertTrue(ProtectionBridge.mayPlayerAccess(providers, player(UUID.randomUUID()),
+                        new Location(claimWorld, 99, 64, 99)),
+                "unclaimed land answers the same way regardless of who is asking");
+    }
 
     @Test
     @DisplayName("a provider that throws protects the block instead of unprotecting it")

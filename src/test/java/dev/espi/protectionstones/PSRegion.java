@@ -44,6 +44,12 @@ public abstract class PSRegion {
     /** Blocks this fake world considers claimed. Cleared and set by each test. */
     public static final Set<String> INSIDE = new HashSet<>();
 
+    /** UUIDs that own the region in a claimed block. Mirrors the real isOwner(UUID). */
+    public static final Set<java.util.UUID> OWNERS = new HashSet<>();
+
+    /** UUIDs that are members of the region in a claimed block. Mirrors isMember(UUID). */
+    public static final Set<java.util.UUID> MEMBERS = new HashSet<>();
+
     public static int lastUnsafeCalls;
     public static int lastSafeCalls;
 
@@ -54,8 +60,22 @@ public abstract class PSRegion {
 
     public static void reset() {
         INSIDE.clear();
+        OWNERS.clear();
+        MEMBERS.clear();
         lastUnsafeCalls = 0;
         lastSafeCalls = 0;
+    }
+
+    /**
+     * Copied from the real class (ProtectionStones-Drake lines 661-669): a region is owned by a
+     * player when its WG owner list holds the UUID, and members work the same way.
+     */
+    public boolean isOwner(java.util.UUID uuid) {
+        return OWNERS.contains(uuid);
+    }
+
+    public boolean isMember(java.util.UUID uuid) {
+        return MEMBERS.contains(uuid);
     }
 
     /**
