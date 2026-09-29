@@ -25,6 +25,7 @@ public class MultiverseNets extends JavaPlugin {
     private NetworkManager networks;
     private NetworkTicker ticker;
     private BlockListener blockListener;
+    private org.bukkit.scheduler.BukkitTask protectionTask;
 
     /**
      * @return Global singleton plugin instance / Instancia singleton global del plugin
@@ -64,6 +65,9 @@ public class MultiverseNets extends JavaPlugin {
         com.chagui68.multiversenets.compat.SlimefunBridge.registerSerializationAliases();
         // Slimefun integration initialization: active if present, dormant otherwise.
         com.chagui68.multiversenets.compat.SlimefunBridge.init(getLogger());
+        // Land protection: resolves ProtectionStones/WorldGuard/Lands/Towny/GriefPrevention
+        // and memoises their answers. Dormant when no protection plugin is installed.
+        com.chagui68.multiversenets.compat.ProtectionBridge.init(getLogger());
         Items.registerRecipes(this);
         NodeStore.init(this);
 
@@ -85,6 +89,13 @@ public class MultiverseNets extends JavaPlugin {
         }, 100L);
 
         com.chagui68.multiversenets.net.NetworkHologramManager.init(this);
+        // Drops the memoised protection answers so claiming or releasing land is honoured
+        // within protection.cache-ticks. Synchronous on purpose: it is a map clear, and the
+        // provider lookups themselves must stay on the main thread.
+        protectionTask = getServer().getScheduler().runTaskTimer(
+                this,
+                () -> com.chagui68.multiversenets.compat.ProtectionBridge.invalidate(),
+                Settings.protectionCacheTicks(), Settings.protectionCacheTicks());
         ticker = new NetworkTicker(this, networks);
         ticker.start();
 
@@ -102,6 +113,10 @@ public class MultiverseNets extends JavaPlugin {
     public void onDisable() {
         if (ticker != null) {
             ticker.stop();
+        }
+        if (protectionTask != null) {
+            protectionTask.cancel();
+            protectionTask = null;
         }
         com.chagui68.multiversenets.net.NetworkHologramManager.clearAll(this);
         if (networks != null) {

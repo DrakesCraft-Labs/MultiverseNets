@@ -247,11 +247,112 @@ public final class Settings {
 
     /**
      * EN: Maximum durability uses for a freshly crafted Network Rake.
- *
+     *
      * ES: Usos máximos de durabilidad para un Network Rake recién crafteado.
      */
     public static int rakeUses() {
         return cfg != null ? Math.max(1, cfg.getInt("rake.uses", 250)) : 250;
+    }
+
+    // ------------------------------------------------------------------ protection
+
+    /**
+     * EN: True when networks must refuse to touch blocks inside protected land.
+     *
+     * ES: True si las redes deben negarse a tocar bloques dentro de tierra protegida.
+     */
+    public static boolean protectionEnabled() {
+        return cfg == null || cfg.getBoolean("protection.enabled", true);
+    }
+
+    /**
+     * EN: True when the named provider id is allowed in {@code protection.providers}.
+     * An empty or missing list enables everything, so adding a new provider does not
+     * require a config edit on existing servers.
+     *
+     * ES: True si el id del provider está permitido en {@code protection.providers}.
+     */
+    public static boolean protectionProviderEnabled(String id) {
+        if (cfg == null) {
+            return true;
+        }
+        List<String> allowed = cfg.getStringList("protection.providers");
+        if (allowed == null || allowed.isEmpty()) {
+            return true;
+        }
+        for (String entry : allowed) {
+            if (entry != null && entry.trim().equalsIgnoreCase(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * EN: True when personal claims (not just server regions) also count as protected.
+     * This one defaults to false, so an absent config must NOT be read as "yes".
+     *
+     * ES: True si los reclamos personales (no solo las regiones del servidor) cuentan como protegidos.
+     * Este valor por defecto es false, así que una config ausente NO debe leerse como "sí".
+     */
+    public static boolean protectionAllowClaims() {
+        return cfg != null && cfg.getBoolean("protection.allow-claims", false);
+    }
+
+    /**
+     * EN: True when the topology scan must stop at protected borders, so two networks on
+     * opposite sides of a region never merge into one item bus.
+     *
+     * ES: True si el escaneo debe detenerse en las fronteras protegidas, para que dos redes a
+     * lados opuestos de una región nunca se fusionen.
+     */
+    public static boolean protectionBlocksNetworkLinking() {
+        return cfg == null || cfg.getBoolean("protection.block-network-linking", true);
+    }
+
+    /**
+     * EN: True when players may not open network devices standing inside protected land.
+     *
+     * ES: True si los jugadores no pueden abrir dispositivos de red dentro de tierra protegida.
+     */
+    public static boolean protectionBlocksPlayerInteraction() {
+        return cfg == null || cfg.getBoolean("protection.deny-player-interaction", true);
+    }
+
+    /**
+     * EN: Permission that skips the protection check. Empty disables the bypass.
+     *
+     * ES: Permiso que omite la comprobación de protección. Vacío desactiva el bypass.
+     */
+    public static String protectionBypassPermission() {
+        return cfg != null ? cfg.getString("protection.bypass-permission", "multiversenets.protection.bypass") : "multiversenets.protection.bypass";
+    }
+
+    /**
+     * EN: Ticks between full cache drops. Lower means protection changes apply faster.
+     *
+     * ES: Ticks entre vaciados completos de la caché. Menos significa cambios más rápidos.
+     */
+    public static int protectionCacheTicks() {
+        return cfg != null ? (int) Math.max(20L, cfg.getLong("protection.cache-ticks", 100L)) : 100;
+    }
+
+    /**
+     * EN: Worlds where networks operate normally even if they are fully claimed.
+     *
+     * ES: Mundos donde las redes funcionan normal aunque estén totalmente reclamados.
+     */
+    public static List<String> protectionExemptWorlds() {
+        return cfg != null ? cfg.getStringList("protection.exempt-worlds") : List.of();
+    }
+
+    /**
+     * EN: Spheres where networks operate normally, formatted {@code world;x;y;z;radius}.
+     *
+     * ES: Esferas donde las redes funcionan normal, con formato {@code world;x;y;z;radio}.
+     */
+    public static List<String> protectionExemptLocations() {
+        return cfg != null ? cfg.getStringList("protection.exempt-locations") : List.of();
     }
 
     /**

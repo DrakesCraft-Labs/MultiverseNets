@@ -1,6 +1,7 @@
 package com.chagui68.multiversenets.net;
 
 import com.chagui68.multiversenets.MultiverseNets;
+import com.chagui68.multiversenets.compat.ProtectionBridge;
 import com.chagui68.multiversenets.compat.SlimefunBridge;
 import com.chagui68.multiversenets.craft.Blueprints;
 import com.chagui68.multiversenets.craft.CraftingSupport;
@@ -196,6 +197,30 @@ public class NetworkTicker {
         return stack.getAmount() > 0 ? stack : null;
     }
 
+    /**
+     * [EN] Land protection gate for every block the network loop is about to touch.
+     * <p>
+     * A network is an anonymous actor: it carries no player identity, so it cannot be judged
+     * "trusted" the way a ProtectionStones member or a GriefPrevention trusted player would be.
+     * Any claimed land is therefore off limits in both directions, which is what stops two
+     * players from robbing each other through their own devices. Deliberately silent: this runs
+     * thousands of times per second, and a denied transfer is the expected outcome, not an event.
+     *
+     * [ES] Puerta de protección de tierras para cada bloque que va a tocar el bucle de red.
+     * <p>
+     * Una red es un actor anónimo: no lleva identidad de jugador, así que no se puede juzgar
+     * "de confianza" como a un miembro de ProtectionStones o a un jugador de confianza de
+     * GriefPrevention. Por eso cualquier tierra reclamada queda intocable en ambos sentidos, que
+     * es lo que evita que dos jugadores se roben entre sí a través de sus dispositivos.
+     */
+    private static boolean denied(Block block) {
+        return block != null && ProtectionBridge.isProtected(block);
+    }
+
+    private static boolean denied(org.bukkit.entity.Entity entity) {
+        return entity != null && ProtectionBridge.isProtected(entity.getLocation());
+    }
+
     private void grabOnce(Network net, long pos, int rate) {
         NodeBlob blob = blobOf(net, pos);
         if (blob == null) {
@@ -227,6 +252,12 @@ public class NetworkTicker {
         for (BlockFace face : facesFor(blob)) {
             Block target = self.getRelative(face);
             Material mat = target.getType();
+            // Tierra ajena=intocable: la red es un actor sin identidad de jugador, asi que si un
+            // cofre esta dentro de una region protegida aqui no se toca. Se sigue con la siguiente
+            // cara, igual que con un bloque que no sea contenedor.
+            if (denied(target)) {
+                continue;
+            }
 
             // 1. Slimefun machine compatibility FIRST (machines like Dispensers must not be hijacked by raw container logic)
             if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
@@ -260,7 +291,7 @@ public class NetworkTicker {
             // 2. Vanilla container fallback
             if (isPotentialContainer(mat) && target.getState() instanceof InventoryHolder holder) {
                 Inventory inv = holder.getInventory();
-                ItemStack extracted = NetworkManager.extractFirst(inv, pred, rate);
+                ItemStack extracted = NetworkManager.extractMatching(inv, pred, rate);
                 if (extracted == null) {
                     // Inventario vacio para este filtro: se mira la siguiente cara.
                     continue;
@@ -321,6 +352,11 @@ public class NetworkTicker {
         for (BlockFace face : facesFor(blob)) {
             Block target = self.getRelative(face);
             Material mat = target.getType();
+            // Tambien a la inversa: meter items dentro de una region ajena es el mismo robo con
+            // el signo cambiado, y si el destino es una maquina con salida puede duplicar.
+            if (denied(target)) {
+                continue;
+            }
 
             // 1. Slimefun machine compatibility FIRST (ensures items go to BlockMenu input slots instead of raw dispenser inventory)
             if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
@@ -435,6 +471,9 @@ public class NetworkTicker {
                     if (NodeStore.hasNode(target)) {
                         continue;
                     }
+                    if (denied(target)) {
+                        continue;
+                    }
                     Material targetMat = target.getType();
                     if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
                         ItemStack out = sample.clone();
@@ -507,6 +546,11 @@ public class NetworkTicker {
             return;
         }
         Block txBlock = world.getBlockAt(blob.txX, blob.txY, blob.txZ);
+        // El enlace es el unico punto donde dos redes se tocan aunque no sean la misma, asi que
+        // se comprueban los dos extremos.
+        if (denied(txBlock) || denied(net.block(pos))) {
+            return;
+        }
         NodeBlob txBlob = NodeStore.get(txBlock);
         if (txBlob == null || DeviceType.parse(txBlob.typeName) != DeviceType.MVN_TRANSMITTER) {
             return;
@@ -551,6 +595,11 @@ public class NetworkTicker {
                 }
                 ItemStack stack = item.getItemStack();
                 if (!pred.test(stack)) {
+                    continue;
+                }
+                // Suctionar el suelo de una region ajena tambien es robar: los drops de un
+                // segundo no salen de su base.
+                if (denied(item)) {
                     continue;
                 }
                 int leftover = net.storage().deposit(stack);
@@ -607,6 +656,9 @@ public class NetworkTicker {
 
         Block target = pumpBlock.getRelative(BlockFace.DOWN);
         if (target == null) return;
+        // Drenar la lava o el agua de otro es lo mismo que vaciarle la base: ademas deja el
+        // bloque en aire, asi que el grief es visible y no recuperable.
+        if (denied(target)) return;
 
         String filter = blob.pumpFluid != null ? blob.pumpFluid.toUpperCase(java.util.Locale.ROOT) : null;
 

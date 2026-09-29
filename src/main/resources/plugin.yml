@@ -7,7 +7,7 @@ description: Standalone digital logistics networks and massive storage, no Slime
 website: https://github.com/DrakesCraft-Labs
 # Blanda a proposito: el plugin funciona sin Slimefun. Si esta, se pide que cargue antes para
 # que su registro de bloques este listo cuando el ticker empiece a mover items.
-softdepend: [Slimefun]
+softdepend: [Slimefun, ProtectionStones, WorldGuard, WorldEdit, Lands, Towny, GriefPrevention]
 
 commands:
   mvnets:
@@ -24,3 +24,7 @@ permissions:
     default: op
     children:
       multiversenets.use: true
+      multiversenets.protection.bypass: true
+  multiversenets.protection.bypass:
+    description: Allows opening and configuring network devices inside land protected by another plugin.
+    default: false

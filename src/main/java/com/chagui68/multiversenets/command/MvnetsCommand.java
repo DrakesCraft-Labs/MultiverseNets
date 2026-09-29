@@ -169,11 +169,16 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
         }
         plugin.reloadConfig();
         com.chagui68.multiversenets.util.Settings.refresh(plugin);
+        // Re-resolves the providers and re-reads the whitelist, so a /mvnets reload is enough
+        // after editing protection.exempt-locations.
+        com.chagui68.multiversenets.compat.ProtectionBridge.init(plugin.getLogger());
         Items.registerRecipes(plugin);
         for (Player p : org.bukkit.Bukkit.getOnlinePlayers()) {
             Items.discoverRecipes(p);
         }
         sender.sendMessage(Text.msg("Configuration and " + Items.recipeCount() + " recipes reloaded.", NamedTextColor.GREEN));
+        sender.sendMessage(Text.msg("Protection: " + com.chagui68.multiversenets.compat.ProtectionBridge.providerSummary()
+                + ".", NamedTextColor.GRAY));
     }
 
     private void recipes(CommandSender sender) {

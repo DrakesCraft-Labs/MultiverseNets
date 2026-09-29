@@ -166,6 +166,85 @@ virtual-cache:
   tier-5: 524288
 
 # -------------------------------------------------------------------------------------
+#  Land Protection / Protección de Tierras
+# -------------------------------------------------------------------------------------
+# [EN] Without this, a grabber sitting in public land can read a chest inside somebody's
+#      region, so two players end up robbing each other through their own networks.
+#      Every block a network reads from or writes to is checked, and the topology scan
+#      refuses to route cables through protected land, so networks on opposite sides of a
+#      border never merge into one item bus.
+#      A network has no player identity, so ANY claimed land counts as off limits to it.
+#      If you legitimately build MVN inside a claim, whitelist that spot below.
+# [ES] Sin esto, un grabber en tierra pública puede leer un cofre dentro de la región de
+#      otro jugador, así que dos jugadores acaban robándose entre sí a través de sus redes.
+#      Cada bloque del que la red lee o en el que escribe se comprueba, y el escaneo se niega
+#      a tender cable por tierra protegida, así que dos redes a lados opuestos de una
+#      frontera nunca se fusionan en un mismo bus de ítems.
+#      Una red no tiene identidad de jugador, así que CUALQUIER tierra reclamada cuenta como
+#      intocable. Si construyes MVN legítimamente dentro de un reclamo, añádelo abajo.
+protection:
+  # [EN] Master switch. false = MultiverseNets ignores every protection plugin.
+  # [ES] Interruptor maestro. false = MultiverseNets ignora todos los plugins de protección.
+  enabled: true
+
+  # [EN] Which protection plugins to bridge into. Remove ids you do not use.
+  #      An empty list enables all of them, so new providers work without editing this.
+  # [ES] Con qué plugins de protección integrarse. Quita los ids que no uses.
+  #      Una lista vacía los activa todos, así que los nuevos providers funcionan sin editar esto.
+  providers:
+    - PROTECTIONSTONES
+    - WORLDGUARD
+    - LANDS
+    - TOWNY
+    - GRIEFPREVENTION
+
+  # [EN] true  = server regions AND personal claims are off limits.
+  #      false = only server regions block networks; claims are treated as public.
+  #      Ignored by ProtectionStones: its API cannot tell a claim from a server region, so
+  #      every claim there stays protected either way. Use exempt-worlds / exempt-locations
+  #      for land you own.
+  # [ES] true  = regiones del servidor Y reclamos personales son intocables.
+  #      false = solo las regiones bloquean las redes; los reclamos se tratan como públicos.
+  #      ProtectionStones ignora esta opción: su API no distingue un reclamo de una región del
+  #      servidor, así que todos sus reclamos quedan protegidos igual. Usa exempt-worlds /
+  #      exempt-locations para la tierra que te pertenezca.
+  allow-claims: false
+
+  # [EN] true = the topology scan stops at protected borders, so a cable cannot bridge two
+  #      networks across a region. Set false only if your networks legitimately cross land
+  #      and you prefer the old behaviour of a single merged bus.
+  # [ES] true = el escaneo se detiene en las fronteras, así un cable no puede unir dos redes
+  #      cruzando una región. Ponlo en false solo si tus redes cruzan tierra a propósito.
+  block-network-linking: true
+
+  # [EN] true = players cannot open or configure network devices standing on protected land.
+  # [ES] true = los jugadores no pueden abrir ni configurar dispositivos en tierra protegida.
+  deny-player-interaction: true
+
+  # [EN] Permission that skips the check for players. The multiversenets.admin permission
+  #      always bypasses too. Leave empty to remove the non-admin bypass.
+  # [ES] Permiso que omite la comprobación a los jugadores. multiversenets.admin siempre
+  #      pasa también. Déjalo vacío para quitar el bypass a los no-admin.
+  bypass-permission: multiversenets.protection.bypass
+
+  # [EN] Ticks between full cache drops. Lower = protection edits and claim changes apply
+  #      faster, at the cost of more protection-plugin lookups.
+  # [ES] Ticks entre vaciados de caché. Menos = los cambios se aplican más rápido, a costa
+  #      de más consultas a los plugins de protección.
+  cache-ticks: 100
+
+  # [EN] Worlds where networks work normally even if fully claimed.
+  # [ES] Mundos donde las redes funcionan normal aunque estén totalmente reclamados.
+  exempt-worlds: []
+
+  # [EN] Spheres where networks work normally, as world;x;y;z;radius. Radius defaults to 16.
+  #      This is the escape hatch for bases you legitimately built MVN inside.
+  # [ES] Esferas donde las redes funcionan normal, como mundo;x;y;z;radio. El radio por
+  #      defecto es 16. Esta es la salida para las bases donde sí construiste MVN.
+  exempt-locations: []
+  #  - "world;120;64;-340;48"
+
+# -------------------------------------------------------------------------------------
 #  Wireless Terminal & Router / Terminal Inalámbrica y Enrutador
 # -------------------------------------------------------------------------------------
 wireless:

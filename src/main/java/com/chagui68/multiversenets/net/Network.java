@@ -1,5 +1,6 @@
 package com.chagui68.multiversenets.net;
 
+import com.chagui68.multiversenets.compat.ProtectionBridge;
 import com.chagui68.multiversenets.compat.SlimefunBridge;
 import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.persist.NodeBlob;
@@ -172,6 +173,15 @@ public class Network {
                     continue;
                 }
                 if (!world.isChunkLoaded(PosUtil.unpackX(next) >> 4, PosUtil.unpackZ(next) >> 4)) {
+                    continue;
+                }
+                // No tender cable por tierra ajena: cortar aqui es lo que impide que dos redes a
+                // lados opuestos de una region protegida acaben fusionadas en un mismo bus de
+                // items. El controlador es la semilla y no se comprueba; sus transferencias si
+                // pasan por el chequeo de bloque de NetworkTicker.
+                if (Settings.protectionBlocksNetworkLinking()
+                        && ProtectionBridge.isProtected(world, PosUtil.unpackX(next), PosUtil.unpackY(next),
+                                PosUtil.unpackZ(next))) {
                     continue;
                 }
                 Block block = block(next);
