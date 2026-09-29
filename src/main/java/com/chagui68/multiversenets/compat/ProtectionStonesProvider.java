@@ -3,6 +3,7 @@ package com.chagui68.multiversenets.compat;
 import com.chagui68.multiversenets.util.Settings;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 
 import java.lang.reflect.Method;
@@ -105,6 +106,25 @@ public final class ProtectionStonesProvider implements ProtectionBridge.Provider
     @Override
     public boolean test(Location loc) throws Exception {
         return isInside(mFromLocation, loc);
+    }
+
+    /**
+     * [EN] A ProtectionStones region is a WorldGuard region with a player attached, so a world with
+     * no WorldGuard region manager holds no ProtectionStones region either. Asking anyway makes
+     * {@code fromLocation} throw in the nether and the end, and a throw reads as "protected", which
+     * stopped every network in those dimensions dead.
+     * <p>
+     * This is not a relaxation of the rule above: a world that WorldGuard does manage is still
+     * queried, and a genuine failure inside a managed world is still treated as protected.
+     *
+     * [ES] Una región de ProtectionStones es una región de WorldGuard con un jugador asociado, así
+     * que un mundo sin region manager de WorldGuard tampoco puede tener regiones de PS. Preguntar de
+     * todos modos hace que {@code fromLocation} lance en el Nether y el End, y una excepción se lee
+     * como "protegido", lo que dejó muertas todas las redes de esas dimensiones.
+     */
+    @Override
+    public boolean supports(World world) {
+        return WorldGuardRegions.manages(world);
     }
 
     /**

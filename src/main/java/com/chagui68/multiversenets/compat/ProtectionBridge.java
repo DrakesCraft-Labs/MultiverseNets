@@ -66,6 +66,40 @@ public final class ProtectionBridge {
         boolean setup(Logger logger);
 
         /**
+         * [EN] Whether the backing plugin keeps any data model for this world at all. This is the
+         * third answer, and it is the one that keeps networks alive outside the overworld.
+         * <p>
+         * Protection plugins are configured world by world. WorldGuard only has a
+         * {@code RegionManager} for worlds an admin actually configured, GriefPrevention and Towny
+         * likewise only track the worlds they were pointed at, so a query in the nether or the end
+         * raises {@code NullPointerException} or returns a query object with nothing behind it.
+         * That is not a failed protection check, it is the plugin saying "I have never heard of
+         * this dimension".
+         * <p>
+         * The default is true, which keeps the old fail-closed behaviour for every provider that
+         * cannot tell the difference. A provider must only return false when it is <em>certain</em>
+         * it has no data for the world: a wrong false silently un-protects a player's land, which
+         * is the one failure this whole bridge exists to prevent.
+         *
+         * [ES] Si el plugin de detrás mantiene algún modelo de datos para este mundo. Es la tercera
+         * respuesta, y la que mantiene vivas las redes fuera del mundo normal.
+         * <p>
+         * Los plugins de protección se configuran mundo por mundo. WorldGuard solo tiene
+         * {@code RegionManager} para los mundos que un admin configuró, y GriefPrevention y Towny
+         * solo siguen los mundos que se les indicó, así que una consulta en el Nether o en el End
+         * lanza excepción. Eso no es una comprobación fallida: es el plugin diciendo "no conozco
+         * esta dimensión".
+         * <p>
+         * El valor por defecto es true, que conserva el comportamiento fail-closed para todo
+         * provider que no distinga el caso. Solo debe devolverse false cuando se tiene
+         * <em>certeza</em> de que no hay datos: un false erróneo desprotegería tierra de un jugador,
+         * que es justo el fallo que este bridge existe para evitar.
+         */
+        default boolean supports(World world) {
+            return true;
+        }
+
+        /**
          * @return true when the location sits inside land claimed or owned by somebody.
          * @throws Exception Reflective calls into another plugin's API can fail; the caller
          *         treats any failure as "protected" so a broken API never leaks items.
@@ -107,6 +141,7 @@ public final class ProtectionBridge {
     private static final List<Provider> ACTIVE = new ArrayList<>();
     private static final List<ExemptZone> EXEMPT = new ArrayList<>();
     private static final Map<UUID, Map<Long, Boolean>> CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, Boolean> UNMANAGED = new ConcurrentHashMap<>();
     private static final AtomicInteger CACHE_ENTRIES = new AtomicInteger();
     private static final int CACHE_LIMIT = 60_000;
 
@@ -125,6 +160,7 @@ public final class ProtectionBridge {
     public static void init(Logger logger) {
         ACTIVE.clear();
         CACHE.clear();
+        UNMANAGED.clear();
         CACHE_ENTRIES.set(0);
         initialised = false;
         loadExemptions();
@@ -214,6 +250,7 @@ public final class ProtectionBridge {
      * reclamos, cesiones y cambios de flags se apliquen sin reiniciar.
      */
     public static void invalidate() {
+        UNMANAGED.clear();
         if (!CACHE.isEmpty()) {
             CACHE.clear();
             CACHE_ENTRIES.set(0);
@@ -284,13 +321,72 @@ public final class ProtectionBridge {
     }
 
     private static boolean query(World world, int x, int y, int z) {
+        return query(ACTIVE, world, x, y, z);
+    }
+
+    /**
+     * [EN] Runs the provider list against one position. Takes the list as a parameter so the
+     * unmanaged-world rule is unit testable without a server or a real protection plugin installed.
+     * <p>
+     * A provider that does not manage the world is skipped before it is ever called. That is what
+     * keeps the nether and the end usable: their queries fail, a failure means "protected", and
+     * without this filter every single block of those dimensions reads as somebody's claim.
+     *
+     * [ES] Ejecuta la lista de providers contra una posición. Recibe la lista por parámetro para que
+     * la regla de mundo no gestionado se pueda testear sin servidor ni plugin de protección real.
+     */
+    static boolean query(List<Provider> providers, World world, int x, int y, int z) {
         Location loc = new Location(world, x, y, z);
-        for (Provider provider : ACTIVE) {
+        for (Provider provider : providers) {
+            if (!supports(provider, world)) {
+                continue;
+            }
             if (evaluate(provider, loc, world.getName() + " " + x + "," + y + "," + z)) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * [EN] A provider gets one chance to say it has no data for a world, and the answer is cached
+     * per provider and world so the reflective call is not repeated on every block of a chunk.
+     * <p>
+     * {@code supports} itself is called inside a try/catch for the same reason {@code test} is: a
+     * provider that cannot even answer this question has no business being consulted at all, and
+     * treating that as "not supported" would be the un-protecting direction. So a failure here falls
+     * back to true and lets {@code test} decide, which is fail-closed as before.
+     *
+     * [ES] Cada provider tiene una oportunidad de decir que no tiene datos de un mundo, y la
+     * respuesta se cachea por provider y mundo para no repetir la llamada reflectiva en cada bloque.
+     */
+    private static boolean supports(Provider provider, World world) {
+        String key = provider.id() + ' ' + world.getUID();
+        Boolean cached = UNMANAGED.get(key);
+        if (cached != null) {
+            return !cached;
+        }
+        boolean supported;
+        try {
+            supported = provider.supports(world);
+        } catch (Throwable error) {
+            java.util.logging.Logger logger = logger();
+            if (logger != null && Settings.debug()) {
+                logger.warning("Protection: " + provider.id() + " could not report whether it manages "
+                        + world.getName() + "; assuming it does. " + error);
+            }
+            return true;
+        }
+        if (!supported) {
+            UNMANAGED.putIfAbsent(key, Boolean.TRUE);
+            java.util.logging.Logger logger = logger();
+            if (logger != null) {
+                logger.info("Protection: " + provider.id() + " does not manage '" + world.getName()
+                        + "', so networks run there unchecked. Configure that world in the plugin, or list it "
+                        + "under protection.exempt-worlds to silence this.");
+            }
+        }
+        return supported;
     }
 
     /**

@@ -2,6 +2,7 @@ package com.chagui68.multiversenets.compat;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 
 import java.lang.reflect.Method;
@@ -77,6 +78,22 @@ public final class WorldGuardProvider implements ProtectionBridge.Provider {
         } catch (Throwable ignored) {
             return false;
         }
+    }
+
+    /**
+     * [EN] WorldGuard only manages a world once an admin has given it a region manager, so a world
+     * without one is simply not WorldGuard's business. This is what keeps networks alive in the
+     * nether and the end, where every query would otherwise throw and the fail-closed rule would
+     * freeze the whole dimension.
+     *
+     * [ES] WorldGuard solo gestiona un mundo cuando un admin le ha dado un region manager, así que
+     * un mundo sin él sencillamente no es asunto suyo. Esto es lo que mantiene vivas las redes en el
+     * Nether y el End, donde toda consulta lanzaría excepción y la regla fail-closed congelaría la
+     * dimensión entera.
+     */
+    @Override
+    public boolean supports(World world) {
+        return WorldGuardRegions.manages(world);
     }
 
     @Override

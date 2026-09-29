@@ -2,11 +2,14 @@ package com.chagui68.multiversenets.compat;
 
 import dev.espi.protectionstones.PSRegion;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
+import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,6 +37,27 @@ class ProtectionStonesProviderTest {
     private static Location at(int x, int y, int z) {
         // El mundo es irrelevante para estos tests: la clase real solo lo usa para buscar la región.
         return new Location(null, x, y, z);
+    }
+
+    /**
+     * [EN] A World that answers only its name and uid. Implementing the interface by hand would
+     * mean two hundred methods nobody calls, so a dynamic proxy keeps the fixture down to the two
+     * the bridge actually reads. Anything else fails loudly instead of returning a default.
+     */
+    private static World world(String name) {
+        UUID uid = UUID.nameUUIDFromBytes(name.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return (World) java.lang.reflect.Proxy.newProxyInstance(
+                World.class.getClassLoader(),
+                new Class<?>[]{World.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getName" -> name;
+                    case "getUID" -> uid;
+                    case "toString" -> "World[" + name + "]";
+                    case "hashCode" -> name.hashCode();
+                    case "equals" -> proxy == args[0];
+                    default -> throw new UnsupportedOperationException(
+                            "WorldStub." + method.getName() + " is not stubbed");
+                });
     }
 
     @BeforeEach
@@ -166,6 +190,54 @@ class ProtectionStonesProviderTest {
         };
         assertTrue(ProtectionBridge.evaluate(broken, at(0, 0, 0), "test"),
                 "reading a crash as 'no claim here' is what lets a network run inside someone's land");
+    }
+
+    @Test
+    @DisplayName("a provider that does not manage a world is skipped, not treated as protecting it")
+    void aWorldTheProviderDoesNotManageIsNotProtected() {
+        // Reproduce the real nether/end bug: WorldGuard has no RegionManager for a world it was
+        // never configured for, so getApplicableRegions throws there. The bridge used to read that
+        // crash as "protected", which froze every network in that dimension.
+        ProtectionBridge.Provider worldGuard = new ProtectionBridge.Provider() {
+            @Override
+            public String id() {
+                return "WorldGuard";
+            }
+
+            @Override
+            public boolean setup(java.util.logging.Logger logger) {
+                return true;
+            }
+
+            @Override
+            public boolean supports(org.bukkit.World candidate) {
+                return "world".equals(candidate.getName());
+            }
+
+            @Override
+            public boolean test(Location loc) {
+                throw new IllegalStateException("no RegionManager for this world");
+            }
+        };
+        List<ProtectionBridge.Provider> providers = List.of(worldGuard);
+
+        assertFalse(ProtectionBridge.query(providers, world("world_nether"), 10, 64, 10),
+                "a world the provider does not manage must not be reported as protected, or every "
+                        + "network in the nether is frozen solid by a provider that has no data there");
+        assertTrue(ProtectionBridge.query(providers, world("world"), 10, 64, 10),
+                "fail-closed still applies to a world the provider does manage");
+    }
+
+    @Test
+    @DisplayName("an unresolvable WorldGuard keeps the fail-closed default")
+    void worldGuardRegionLookupFailsSafe() {
+        WorldGuardRegions.reset();
+        // No WorldGuard on the test classpath, so the container cannot resolve. "I cannot tell"
+        // must read as "managed", not as "no regions anywhere".
+        assertTrue(WorldGuardRegions.manages(world("world")),
+                "if the region manager lookup is unavailable the provider must stay fail-closed");
+        assertTrue(new ProtectionStonesProvider().supports(world("world_nether")),
+                "same for ProtectionStones, which is backed by the same WorldGuard data");
     }
 
     @Test

@@ -564,6 +564,62 @@ class BlockFlowsTest {
     }
 
     /**
+     * [EN] A network must extract items in the nether, exactly as it does in the overworld.
+     * Reported symptom: networks were dead in the nether and the end. This proves the tick, scan and
+     * storage paths carry no dimension check of their own, so whatever blocks a dimension at
+     * runtime is {@link ProtectionBridge} alone. With no protection plugin installed here the
+     * bridge is dormant, which is the control that makes the other two meaningful.
+     */
+    @Test
+    void networkExtractsInsideTheNether() {
+        assertExtractsFromChest("world_nether", Material.DIAMOND, 10, "nether");
+    }
+
+    /**
+     * [EN] Same for the end. The two dimensions differ only in that WorldGuard is never given a
+     * region manager for either, so both are the interesting case.
+     */
+    @Test
+    void networkExtractsInsideTheEnd() {
+        assertExtractsFromChest("world_the_end", Material.EMERALD, 10, "end");
+    }
+
+    /**
+     * [EN] The control case: the overworld, same assertions and same payload size. If this ever
+     * fails, the three dimension tests are not measuring the dimension at all.
+     */
+    @Test
+    void networkExtractsInsideTheOverworld() {
+        assertExtractsFromChest("world", Material.GOLD_INGOT, 10, "overworld");
+    }
+
+    private void assertExtractsFromChest(String worldName, Material payload, int amount, String label) {
+        WorldMock dimension = server.addSimpleWorld(worldName);
+        Block ctrl = dimension.getBlockAt(0, 64, 0);
+        ctrl.setType(DeviceType.MVN_CONTROLLER.material());
+        plugin.networks().registerController(ctrl);
+        Block cell = dimension.getBlockAt(1, 64, 0);
+        cell.setType(DeviceType.MVN_CELL_T1.material());
+        plugin.networks().invalidateNear(cell);
+        Block grabber = dimension.getBlockAt(0, 64, 1);
+        grabber.setType(DeviceType.MVN_GRABBER_HT.material());
+        NodeStore.put(grabber, NodeBlob.create(DeviceType.MVN_GRABBER_HT.name()));
+        plugin.networks().invalidateNear(grabber);
+
+        Block chest = dimension.getBlockAt(0, 64, 2);
+        chest.setType(Material.CHEST);
+        ((org.bukkit.block.Chest) chest.getState()).getInventory().addItem(new ItemStack(payload, amount));
+
+        server.getScheduler().performOneTick();
+        server.getScheduler().performTicks(20);
+
+        Network net = plugin.networks().networkByController(ctrl.getLocation());
+        assertNotNull(net, "a network in the " + label + " must be built like any other");
+        assertEquals(amount, net.storage().count(i -> i.getType() == payload),
+                "the grabber must extract from a chest in the " + label);
+    }
+
+    /**
      * [EN] The counterpart: without sneaking, right-click still opens the device's own menu. The
      * sneaking guard must not be over-broad and swallow the normal interaction.
      */

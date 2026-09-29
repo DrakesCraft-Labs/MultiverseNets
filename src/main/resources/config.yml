@@ -234,8 +234,17 @@ protection:
   cache-ticks: 100
 
   # [EN] Worlds where networks work normally even if fully claimed.
-  # [ES] Mundos donde las redes funcionan normal aunque estén totalmente reclamados.
+  #      MultiverseNets already detects a world that no protection plugin manages and skips the
+  #      check there, which is why the nether and the end work out of the box. Listing a world here
+  #      is still worth it if you DID configure WorldGuard or Towny there, because then the check
+  #      does run and this is how you switch it off. Exact world names, e.g. world_nether.
+  # [ES] Mundos donde las redes funcionan normal aunque esten totalmente reclamados.
+  #      MultiverseNets ya detecta los mundos que ningun plugin de proteccion gestiona y ahi se
+  #      salta la comprobacion, por eso el Nether y el End funcionan de serie. Anadir un mundo aqui
+  #      sigue sirviendo si tu SI configuraste WorldGuard o Towny ahi, porque entonces la
+  #      comprobacion si se ejecuta y esta es la forma de desactivarla. Nombres exactos.
   exempt-worlds: []
+
 
   # [EN] Spheres where networks work normally, as world;x;y;z;radius. Radius defaults to 16.
   #      This is the escape hatch for bases you legitimately built MVN inside.
