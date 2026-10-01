@@ -193,7 +193,7 @@ public class DeviceInteractions {
                 new ControllerMenu(plugin, player, net, block).openMenu();
                 return true;
             }
-            case MVN_TERMINAL, MVN_TRANSMITTER -> {
+            case MVN_TERMINAL -> {
                 openTerminal(player, block);
                 return true;
             }
@@ -206,8 +206,8 @@ public class DeviceInteractions {
                 new MonitorMenu(plugin, player, net, block).openMenu();
                 return true;
             }
-            case MVN_RECEIVER -> {
-                openReceiver(player, block);
+            case MVN_TRANSMITTER, MVN_RECEIVER -> {
+                new FilterMenu(plugin, player, block, type).openMenu();
                 return true;
             }
             case MVN_CELL_T1, MVN_CELL_T2, MVN_CELL_T3, MVN_CELL_T4, MVN_CELL_T5, MVN_CELL_T6 -> {

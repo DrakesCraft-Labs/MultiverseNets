@@ -46,6 +46,8 @@ import java.util.List;
  * uso de herramientas e interacción con dispositivos de red.
  */
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.inventory.InventoryMoveItemEvent;
+import com.chagui68.multiversenets.util.StackUtils;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -101,10 +103,10 @@ public class BlockListener implements Listener {
 
         restoreCargo(event);
 
-        if (type == DeviceType.MVN_RECEIVER) {
+        if (type == DeviceType.MVN_RECEIVER || type == DeviceType.MVN_TRANSMITTER) {
             NodeBlob blob = NodeStore.get(event.getBlockPlaced());
             Location bind = Items.readReceiverBind(event.getItemInHand());
-            if (bind != null) {
+            if (bind != null && blob != null) {
                 blob.txWorld = bind.getWorld().getUID().toString();
                 blob.txX = bind.getBlockX();
                 blob.txY = bind.getBlockY();
@@ -148,6 +150,14 @@ public class BlockListener implements Listener {
             if (Settings.compatSlimefun() && SlimefunBridge.isAvailable()) {
                 SlimefunBridge.unregisterCell(block);
             }
+        }
+        if (blob.encoderBlank != null && !blob.encoderBlank.getType().isAir()) {
+            block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), blob.encoderBlank);
+            blob.encoderBlank = null;
+        }
+        if (blob.encoderOutput != null && !blob.encoderOutput.getType().isAir()) {
+            block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), blob.encoderOutput);
+            blob.encoderOutput = null;
         }
         if (event.getPlayer().getGameMode() != org.bukkit.GameMode.CREATIVE) {
             block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), createDropItem(type, blob));
@@ -377,6 +387,12 @@ public class BlockListener implements Listener {
             player.sendMessage(Text.msg("Receiver linked to this transmitter.", NamedTextColor.GREEN));
             return;
         }
+        if (type == DeviceType.MVN_RECEIVER && heldType == DeviceType.MVN_TRANSMITTER && player.isSneaking()) {
+            event.setCancelled(true);
+            Items.linkReceiver(held, block.getLocation());
+            player.sendMessage(Text.msg("Transmitter linked to this receiver.", NamedTextColor.GREEN));
+            return;
+        }
 
         // Agachado + click derecho no abre ninguna interfaz, igual que en vanilla: se devuelve
         // antes de tocar nada mas, asi que ningun camino de aqui abajo puede abrir un GUI.
@@ -388,6 +404,17 @@ public class BlockListener implements Listener {
         // el clic placement-place en vez de entrar al GUI. Un cable no tiene menu, pero el
         // controlador si, y ahi este corte es el que evita el conflicto.
         if (held != null && held.getType().isBlock() && (type == DeviceType.MVN_CABLE || type == DeviceType.MVN_CONTROLLER)) {
+            return;
+        }
+
+        if (type == DeviceType.MVN_CABLE) {
+            Network net = manager.networkAt(block);
+            if (net == null) {
+                player.sendActionBar(Component.text("⚠ MultiverseNets: Disconnected (No Controller reached)", NamedTextColor.RED));
+                player.sendMessage(Text.msg("MultiverseNets Cable: Disconnected! No controller reached. Ensure continuous connection to an active Controller.", NamedTextColor.RED));
+            } else {
+                player.sendActionBar(Component.text("✔ MultiverseNets: Connected (" + net.size() + " nodes)", NamedTextColor.GREEN));
+            }
             return;
         }
 
@@ -552,13 +579,7 @@ public class BlockListener implements Listener {
             return;
         }
 
-        // 2. Modality restriction: Cross-world boundary
-        if (!player.getWorld().equals(bind.getWorld())) {
-            player.sendMessage(Text.msg("Wireless terminal out of range: Network is in world '" + bind.getWorld().getName() + "'.", NamedTextColor.RED));
-            return;
-        }
-
-        // 3. Combat restriction
+        // 2. Combat restriction
         long lastDmg = LAST_COMBAT.getOrDefault(player.getUniqueId(), 0L);
         long combatCooldownMs = Settings.wirelessCombatCooldownSeconds() * 1000L;
         if (System.currentTimeMillis() - lastDmg < combatCooldownMs) {
@@ -566,7 +587,7 @@ public class BlockListener implements Listener {
             return;
         }
 
-        // 4. Modality restriction: BentoBox / Skyblock Island ownership check
+        // 3. Modality restriction: BentoBox / Skyblock Island ownership check
         if (!interactions.canAccessNetwork(player, bind)) {
             player.sendMessage(Text.msg("You do not have permission to access network devices in this protected area.", NamedTextColor.RED));
             return;
@@ -581,13 +602,19 @@ public class BlockListener implements Listener {
             }
         }
 
-        // 5. Router Antenna check
+        // 4. Router Antenna check: Router allows global and cross-dimension access
         boolean hasRouter = net.count(DeviceType.MVN_ROUTER) > 0;
-        int maxLocalDist = Settings.wirelessLocalRange();
-        double distSq = player.getLocation().distanceSquared(bind);
-        if (!hasRouter && distSq > ((double) maxLocalDist * maxLocalDist)) {
-            player.sendMessage(Text.msg("Signal lost! Install a Network Router antenna to access globally.", NamedTextColor.RED));
-            return;
+        if (!hasRouter) {
+            if (!player.getWorld().equals(bind.getWorld())) {
+                player.sendMessage(Text.msg("Wireless terminal out of range: Network is in world '" + bind.getWorld().getName() + "'. Install a Network Router antenna to access across dimensions.", NamedTextColor.RED));
+                return;
+            }
+            int maxLocalDist = Settings.wirelessLocalRange();
+            double distSq = player.getLocation().distanceSquared(bind);
+            if (distSq > ((double) maxLocalDist * maxLocalDist)) {
+                player.sendMessage(Text.msg("Signal lost! Install a Network Router antenna to access globally.", NamedTextColor.RED));
+                return;
+            }
         }
 
         event.setCancelled(true);
@@ -622,5 +649,66 @@ public class BlockListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onBlockExplode(BlockExplodeEvent event) {
         event.blockList().removeIf(block -> NodeStore.chunkHasNodes(block.getChunk()) && NodeStore.hasNode(block));
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onInventoryMoveItem(InventoryMoveItemEvent event) {
+        org.bukkit.inventory.Inventory dest = event.getDestination();
+        org.bukkit.inventory.Inventory src = event.getSource();
+
+        // 1. Hopper pushing into MultiverseNets node
+        if (dest.getHolder() instanceof org.bukkit.block.BlockState state) {
+            Block block = state.getBlock();
+            if (NodeStore.hasNode(block)) {
+                NodeBlob blob = NodeStore.get(block);
+                if (blob != null && DeviceType.parse(blob.typeName) == DeviceType.MVN_INFINITY_BARREL) {
+                    event.setCancelled(true);
+                    ItemStack moving = event.getItem();
+                    if (moving != null && !moving.getType().isAir()) {
+                        if (blob.cellSample == null || StackUtils.itemsMatch(blob.cellSample, moving)) {
+                            var leftover = src.removeItem(moving);
+                            int taken = moving.getAmount() - (leftover.isEmpty() ? 0 : leftover.values().stream().mapToInt(ItemStack::getAmount).sum());
+                            if (taken > 0) {
+                                if (blob.cellSample == null) {
+                                    blob.cellSample = moving.clone();
+                                    blob.cellSample.setAmount(1);
+                                    blob.cellAmount = taken;
+                                } else {
+                                    blob.cellAmount += taken;
+                                }
+                                NodeStore.put(block, blob);
+                            }
+                        }
+                    }
+                    return;
+                }
+                // Block hopper from injecting items into any other MultiverseNets block state
+                event.setCancelled(true);
+                return;
+            }
+        }
+
+        // 2. Hopper pulling from MultiverseNets node
+        if (src.getHolder() instanceof org.bukkit.block.BlockState state) {
+            Block block = state.getBlock();
+            if (NodeStore.hasNode(block)) {
+                NodeBlob blob = NodeStore.get(block);
+                if (blob != null && DeviceType.parse(blob.typeName) == DeviceType.MVN_INFINITY_BARREL) {
+                    event.setCancelled(true);
+                    if (blob.cellSample != null && blob.cellAmount > 0) {
+                        ItemStack one = blob.cellSample.clone();
+                        one.setAmount(1);
+                        var unhoused = dest.addItem(one);
+                        if (unhoused.isEmpty()) {
+                            blob.cellAmount--;
+                            NodeStore.put(block, blob);
+                        }
+                    }
+                    return;
+                }
+                // Block hopper from extracting items from any other MultiverseNets block state
+                event.setCancelled(true);
+            }
+        }
     }
 }

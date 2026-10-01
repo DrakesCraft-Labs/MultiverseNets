@@ -202,7 +202,7 @@ public enum DeviceType {
      */
     public boolean filterable() {
         return switch (this) {
-            case MVN_GRABBER, MVN_GRABBER_HT, MVN_PUSHER, MVN_PUSHER_HT, MVN_VACUUM, MVN_GREEDY_CELL, MVN_PURGER, MVN_RECEIVER -> true;
+            case MVN_GRABBER, MVN_GRABBER_HT, MVN_PUSHER, MVN_PUSHER_HT, MVN_VACUUM, MVN_GREEDY_CELL, MVN_PURGER, MVN_RECEIVER, MVN_TRANSMITTER -> true;
             default -> false;
         };
     }

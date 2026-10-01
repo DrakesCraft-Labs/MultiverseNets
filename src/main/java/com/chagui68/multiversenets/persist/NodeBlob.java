@@ -87,6 +87,10 @@ public class NodeBlob implements Serializable {
      * la construyó, en vez de quedar bloqueada por tierra que no puede demostrar que es suya.
      */
     public String ownerUuid;
+    /** EN: Retained blank blueprints inside Recipe Encoder / ES: Planos en blanco guardados en el codificador. */
+    public ItemStack encoderBlank;
+    /** EN: Retained encoded blueprint output inside Recipe Encoder / ES: Plano codificado guardado en la salida. */
+    public ItemStack encoderOutput;
 
     /**
      * EN: Returns the combined sum of all items stored in the Greedy Cell.

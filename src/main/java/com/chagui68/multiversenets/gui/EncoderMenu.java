@@ -45,6 +45,13 @@ public class EncoderMenu extends MenuHolder {
     public void openMenu() {
         open(45, Component.text("Recipe Encoder", NamedTextColor.DARK_AQUA)
                 .decoration(TextDecoration.ITALIC, false));
+        NodeBlob blob = blob();
+        if (blob.encoderBlank != null && !blob.encoderBlank.getType().isAir()) {
+            inv.setItem(BLANK_SLOT, blob.encoderBlank.clone());
+        }
+        if (blob.encoderOutput != null && !blob.encoderOutput.getType().isAir()) {
+            inv.setItem(OUTPUT_SLOT, blob.encoderOutput.clone());
+        }
     }
 
     @Override
@@ -76,15 +83,15 @@ public class EncoderMenu extends MenuHolder {
             }
         }
 
-        inv.setItem(BLANK_SLOT - 9, panel(Material.BLUE_STAINED_GLASS_PANE, "Blank Blueprints below"));
-        inv.setItem(BLANK_SLOT + 9, panel(Material.BLUE_STAINED_GLASS_PANE, "Blank Blueprints above"));
+        inv.setItem(BLANK_SLOT - 9, panel(Material.BLUE_STAINED_GLASS_PANE, "Blueprint below"));
+        inv.setItem(BLANK_SLOT + 9, panel(Material.BLUE_STAINED_GLASS_PANE, "Click to load recipe"));
 
         ItemStack encode = new ItemStack(Material.LIME_STAINED_GLASS_PANE);
         var em = encode.getItemMeta();
         em.displayName(Component.text("Encode Recipe", NamedTextColor.GREEN)
                 .decoration(TextDecoration.ITALIC, false));
         em.lore(List.of(
-                Component.text("Fills a Blank Blueprint with the recipe on the left", NamedTextColor.GRAY)
+                Component.text("Encodes the recipe on the left onto a Blueprint", NamedTextColor.GRAY)
                         .decoration(TextDecoration.ITALIC, false)));
         encode.setItemMeta(em);
         inv.setItem(ENCODE_SLOT, encode);
@@ -105,7 +112,7 @@ public class EncoderMenu extends MenuHolder {
 
     /**
      * Resolves the crafting recipe for the current matrix pattern, or null if none matches.
- *
+     *
      * Resuelve la receta de crafteo para la matriz actual, o null si ninguna coincide.
      */
     private RecipeData currentRecipe() {
@@ -133,9 +140,40 @@ public class EncoderMenu extends MenuHolder {
             encodeBlueprint();
             return;
         }
+        if (raw == PREVIEW_SLOT || raw == BLANK_SLOT - 9 || raw == BLANK_SLOT + 9) {
+            ItemStack candidate = (raw == PREVIEW_SLOT) ? event.getView().getCursor() : inv.getItem(BLANK_SLOT);
+            if (candidate != null && Items.typeOf(candidate) == DeviceType.MVN_BLUEPRINT) {
+                RecipeData data = Blueprints.read(candidate);
+                if (data != null && data.inputs != null) {
+                    NodeBlob blob = blob();
+                    for (int i = 0; i < 9; i++) {
+                        blob.craftingMatrix[i] = (i < data.inputs.length && data.inputs[i] != null)
+                                ? StackUtils.getAsQuantity(data.inputs[i], 1) : null;
+                    }
+                    NodeStore.put(block, blob);
+                    player.sendMessage(Text.msg("Loaded recipe into matrix: " + Blueprints.readableName(data.output),
+                            NamedTextColor.GREEN));
+                    refresh();
+                    return;
+                }
+            }
+        }
         if (raw >= inv.getSize()) {
             ItemStack moving = event.getCurrentItem();
-            if (moving == null || Items.typeOf(moving) != DeviceType.MVN_BLUEPRINT || Blueprints.read(moving) != null) {
+            if (moving == null || Items.typeOf(moving) != DeviceType.MVN_BLUEPRINT) {
+                return;
+            }
+            RecipeData encodedData = Blueprints.read(moving);
+            if (encodedData != null && encodedData.inputs != null) {
+                NodeBlob blob = blob();
+                for (int i = 0; i < 9; i++) {
+                    blob.craftingMatrix[i] = (i < encodedData.inputs.length && encodedData.inputs[i] != null)
+                            ? StackUtils.getAsQuantity(encodedData.inputs[i], 1) : null;
+                }
+                NodeStore.put(block, blob);
+                player.sendMessage(Text.msg("Loaded recipe into matrix: " + Blueprints.readableName(encodedData.output),
+                        NamedTextColor.GREEN));
+                refresh();
                 return;
             }
             int playerSlot = playerInventorySlot(event);
@@ -183,9 +221,8 @@ public class EncoderMenu extends MenuHolder {
             return;
         }
         ItemStack blank = inv.getItem(BLANK_SLOT);
-        if (blank == null || Items.typeOf(blank) != DeviceType.MVN_BLUEPRINT
-                || Blueprints.read(blank) != null) {
-            player.sendMessage(Text.msg("Put a Blank Blueprint in the blue slot first.",
+        if (blank == null || Items.typeOf(blank) != DeviceType.MVN_BLUEPRINT) {
+            player.sendMessage(Text.msg("Put a Blueprint in the blue slot first.",
                     NamedTextColor.RED));
             return;
         }
@@ -204,6 +241,12 @@ public class EncoderMenu extends MenuHolder {
         if (blank.getAmount() <= 0) {
             inv.setItem(BLANK_SLOT, null);
         }
+        NodeBlob blob = blob();
+        ItemStack b = inv.getItem(BLANK_SLOT);
+        ItemStack o = inv.getItem(OUTPUT_SLOT);
+        blob.encoderBlank = (b != null && !b.getType().isAir()) ? b.clone() : null;
+        blob.encoderOutput = (o != null && !o.getType().isAir()) ? o.clone() : null;
+        NodeStore.put(block, blob);
         player.sendMessage(Text.msg("Blueprint encoded: " + Blueprints.readableName(data.output),
                 NamedTextColor.GREEN));
         refresh();
@@ -211,13 +254,12 @@ public class EncoderMenu extends MenuHolder {
 
     @Override
     protected void onClose(InventoryCloseEvent event) {
-        for (int slot : new int[]{BLANK_SLOT, OUTPUT_SLOT}) {
-            ItemStack content = inv.getItem(slot);
-            if (content != null && !content.getType().isAir()) {
-                inv.setItem(slot, null);
-                giveOrDrop(content);
-            }
-        }
+        NodeBlob blob = blob();
+        ItemStack b = inv.getItem(BLANK_SLOT);
+        ItemStack o = inv.getItem(OUTPUT_SLOT);
+        blob.encoderBlank = (b != null && !b.getType().isAir()) ? b.clone() : null;
+        blob.encoderOutput = (o != null && !o.getType().isAir()) ? o.clone() : null;
+        NodeStore.put(block, blob);
     }
 
     private ItemStack panel(Material material, String name) {

@@ -634,4 +634,34 @@ class BlockFlowsTest {
         assertNotNull(player.getOpenInventory().getTopInventory(),
                 "a normal right-click must still open the grabber menu");
     }
+
+    @Test
+    void reverseTransmitterReceiverLinking() {
+        Block receiver = place(15, 64, 15, DeviceType.MVN_RECEIVER);
+        ItemStack transmitterItem = Items.create(DeviceType.MVN_TRANSMITTER);
+        player.getInventory().setItemInMainHand(transmitterItem);
+        player.setSneaking(true);
+
+        PlayerInteractEvent event = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK, transmitterItem, receiver, BlockFace.UP, EquipmentSlot.HAND);
+        server.getPluginManager().callEvent(event);
+
+        assertTrue(event.isCancelled(), "Sneak-clicking transmitter on receiver must be handled");
+        Location bind = Items.readReceiverBind(transmitterItem);
+        assertNotNull(bind, "Transmitter item must have receiver bind location stored");
+        assertEquals(receiver.getLocation(), bind, "Bound location must match placed receiver");
+    }
+
+    @Test
+    void cableClickWarnsWhenNoController() {
+        Block cable = place(20, 64, 20, DeviceType.MVN_CABLE);
+        player.setSneaking(false);
+        player.getInventory().setItemInMainHand(null);
+
+        PlayerInteractEvent event = new PlayerInteractEvent(player, Action.RIGHT_CLICK_BLOCK, null, cable, BlockFace.UP, EquipmentSlot.HAND);
+        server.getPluginManager().callEvent(event);
+
+        String msg = player.nextMessage();
+        assertNotNull(msg, "Clicking disconnected cable should send warning message");
+        assertTrue(msg.contains("No controller reached"), "Message must mention no controller reached");
+    }
 }

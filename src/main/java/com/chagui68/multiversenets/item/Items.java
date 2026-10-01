@@ -478,11 +478,17 @@ public final class Items {
      * @return Total capacity in items / Capacidad total en ítems
      */
     public static long capacityOf(DeviceType type) {
+        if (type == null) {
+            return 0L;
+        }
         if (type == DeviceType.MVN_INFINITY_BARREL) {
             return com.chagui68.multiversenets.util.Settings.barrelCapacity();
         }
         if (type == DeviceType.MVN_GREEDY_CELL) {
             return com.chagui68.multiversenets.util.Settings.greedyCapacity();
+        }
+        if (type.isCacheModule()) {
+            return com.chagui68.multiversenets.util.Settings.virtualCacheCapacity(type.cacheTier());
         }
         return com.chagui68.multiversenets.util.Settings.cellCapacity(type.cellTier());
     }

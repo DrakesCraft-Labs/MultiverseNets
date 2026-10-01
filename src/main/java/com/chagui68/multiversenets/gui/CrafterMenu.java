@@ -327,10 +327,17 @@ public class CrafterMenu extends MenuHolder {
                     if (data != null) {
                         String encoded = Blueprints.encode(data);
                         if (raw < blob.blueprintData.size()) {
+                            String oldB64 = blob.blueprintData.get(raw);
+                            RecipeData oldData = Blueprints.decode(oldB64);
+                            if (oldData != null) {
+                                giveOrDrop(Blueprints.toItem(oldData));
+                            }
                             blob.blueprintData.set(raw, encoded);
                         } else {
                             blob.blueprintData.add(encoded);
                         }
+                        cursor.setAmount(cursor.getAmount() - 1);
+                        event.getView().setCursor(cursor.getAmount() > 0 ? cursor : null);
                         NodeStore.put(block, blob);
                         player.sendMessage(Text.msg("Updated blueprint to: " + Blueprints.readableName(data.output), NamedTextColor.GREEN));
                         draw();
@@ -349,6 +356,8 @@ public class CrafterMenu extends MenuHolder {
                             return;
                         }
                         blob.blueprintData.add(encoded);
+                        cursor.setAmount(cursor.getAmount() - 1);
+                        event.getView().setCursor(cursor.getAmount() > 0 ? cursor : null);
                         NodeStore.put(block, blob);
                         player.sendMessage(Text.msg("Blueprint installed: " + Blueprints.readableName(data.output), NamedTextColor.GREEN));
                         draw();
@@ -367,6 +376,9 @@ public class CrafterMenu extends MenuHolder {
                     if (raw < blob.blueprintData.size()) {
                         String removedB64 = blob.blueprintData.remove(raw);
                         RecipeData data = Blueprints.decode(removedB64);
+                        if (data != null) {
+                            giveOrDrop(Blueprints.toItem(data));
+                        }
                         String name = data != null && data.output != null ? Blueprints.readableName(data.output) : "Blueprint";
                         player.sendMessage(Text.msg("Uninstalled blueprint: " + name, NamedTextColor.YELLOW));
                     } else {

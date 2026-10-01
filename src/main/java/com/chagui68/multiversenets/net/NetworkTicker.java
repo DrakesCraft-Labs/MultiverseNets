@@ -123,6 +123,7 @@ public class NetworkTicker {
         net.forEach(DeviceType.MVN_GREEDY_CELL, (pos, type) -> greedyTick(net, pos));
         net.forEach(DeviceType.MVN_PURGER, (pos, type) -> purgeOnce(net, pos, base));
         net.forEach(DeviceType.MVN_RECEIVER, (pos, type) -> bridgeOnce(net, pos, base));
+        net.forEach(DeviceType.MVN_TRANSMITTER, (pos, type) -> transmitOnce(net, pos, base));
         net.forEach(DeviceType.MVN_LIQUID_PUMP, (pos, type) -> pumpTick(net, pos));
     }
 
@@ -176,6 +177,11 @@ public class NetworkTicker {
                 if (currentStack.getAmount() <= 0) return;
                 NodeBlob pBlob = blobOf(net, pos);
                 if (pBlob == null) return;
+                boolean hasItems = pBlob.filterItems != null && !pBlob.filterItems.isEmpty();
+                boolean hasMats = pBlob.filterMaterials != null && !pBlob.filterMaterials.isEmpty();
+                if (!pBlob.filterBlacklist && !hasItems && !hasMats) {
+                    return; // In whitelist mode, empty filter must not push items
+                }
                 Predicate<ItemStack> pPred = NetworkManager.filterPredicate(pBlob);
                 if (!pPred.test(currentStack)) return;
                 Block pBlock = net.block(pos);
@@ -341,9 +347,38 @@ public class NetworkTicker {
             return;
         }
 
+        boolean hasItems = blob.filterItems != null && !blob.filterItems.isEmpty();
+        boolean hasMats = blob.filterMaterials != null && !blob.filterMaterials.isEmpty();
+        // In whitelist mode (filterBlacklist == false), an empty filter must never export anything
+        if (!blob.filterBlacklist && !hasItems && !hasMats) {
+            return;
+        }
+
         int backoff = backoffCycles.getOrDefault(pos, 0);
         if (backoff > 0 && (backoff % 3 != 0)) {
             backoffCycles.put(pos, backoff + 1);
+            return;
+        }
+
+        Block self = net.block(pos);
+        // Pre-check: Ensure at least one adjacent face has a container before withdrawing items
+        boolean hasTargetContainer = false;
+        for (BlockFace face : facesFor(blob)) {
+            Block target = self.getRelative(face);
+            if (denied(net, target)) {
+                continue;
+            }
+            if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
+                hasTargetContainer = true;
+                break;
+            }
+            if (isPotentialContainer(target.getType()) && target.getState() instanceof InventoryHolder) {
+                hasTargetContainer = true;
+                break;
+            }
+        }
+        if (!hasTargetContainer) {
+            backoffCycles.put(pos, Math.min(30, backoff + 1));
             return;
         }
 
@@ -354,17 +389,14 @@ public class NetworkTicker {
             return;
         }
         int initialAmount = stack.getAmount();
-        Block self = net.block(pos);
         for (BlockFace face : facesFor(blob)) {
             Block target = self.getRelative(face);
             Material mat = target.getType();
-            // Tambien a la inversa: meter items dentro de una region ajena es el mismo robo con
-            // el signo cambiado, y si el destino es una maquina con salida puede duplicar.
             if (denied(net, target)) {
                 continue;
             }
 
-            // 1. Slimefun machine compatibility FIRST (ensures items go to BlockMenu input slots instead of raw dispenser inventory)
+            // 1. Slimefun machine compatibility FIRST
             if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
                 int before = stack.getAmount();
                 int unhoused = SlimefunBridge.insert(target, stack);
@@ -396,7 +428,16 @@ public class NetworkTicker {
             int leftover = net.storage().deposit(stack);
             if (leftover > 0) {
                 stack.setAmount(leftover);
-                dropAt(self, stack);
+                // Safe buffer: do not drop items on ground if transitBuffer can hold them
+                if (blob.transitBuffer == null || blob.transitBuffer.getType().isAir()) {
+                    blob.transitBuffer = stack.clone();
+                    NodeStore.put(self, blob);
+                } else if (StackUtils.itemsMatch(blob.transitBuffer, stack)) {
+                    blob.transitBuffer.setAmount(blob.transitBuffer.getAmount() + stack.getAmount());
+                    NodeStore.put(self, blob);
+                } else {
+                    dropAt(self, stack);
+                }
             }
         }
     }
@@ -533,12 +574,17 @@ public class NetworkTicker {
      */
     /**
      * EN: Wireless Bridge: pulls matching filtered items from the linked Transmitter network into this Receiver's network.
- *
+     *
      * ES: Puente inalámbrico: el Receptor extrae ítems filtrados de la red del Transmisor vinculado hacia la suya.
      */
     private void bridgeOnce(Network net, long pos, int rate) {
         NodeBlob blob = blobOf(net, pos);
-        if (blob == null || blob.txWorld == null || blob.filterMaterials.isEmpty()) {
+        if (blob == null || blob.txWorld == null) {
+            return;
+        }
+        boolean hasItems = blob.filterItems != null && !blob.filterItems.isEmpty();
+        boolean hasMats = blob.filterMaterials != null && !blob.filterMaterials.isEmpty();
+        if (!blob.filterBlacklist && !hasItems && !hasMats) {
             return;
         }
         UUID worldId;
@@ -578,6 +624,58 @@ public class NetworkTicker {
         if (leftover > 0) {
             stack.setAmount(leftover);
             remote.storage().deposit(stack);
+        }
+    }
+
+    /**
+     * EN: Wireless Transmitter: pushes matching filtered items from this network into the linked Receiver's network.
+     *
+     * ES: Transmisor inalámbrico: envía ítems filtrados desde esta red hacia la red del Receptor vinculado.
+     */
+    private void transmitOnce(Network net, long pos, int rate) {
+        NodeBlob blob = blobOf(net, pos);
+        if (blob == null || blob.txWorld == null) {
+            return;
+        }
+        boolean hasItems = blob.filterItems != null && !blob.filterItems.isEmpty();
+        boolean hasMats = blob.filterMaterials != null && !blob.filterMaterials.isEmpty();
+        if (!blob.filterBlacklist && !hasItems && !hasMats) {
+            return;
+        }
+        UUID worldId;
+        try {
+            worldId = UUID.fromString(blob.txWorld);
+        } catch (IllegalArgumentException e) {
+            return;
+        }
+        World world = plugin.getServer().getWorld(worldId);
+        if (world == null || !world.isChunkLoaded(blob.txX >> 4, blob.txZ >> 4)) {
+            return;
+        }
+        Block rxBlock = world.getBlockAt(blob.txX, blob.txY, blob.txZ);
+        if (denied(net, net.block(pos))) {
+            return;
+        }
+        NodeBlob rxBlob = NodeStore.get(rxBlock);
+        if (rxBlob == null || DeviceType.parse(rxBlob.typeName) != DeviceType.MVN_RECEIVER) {
+            return;
+        }
+        Network remote = manager.networkAt(rxBlock);
+        if (remote == null || remote == net) {
+            return;
+        }
+        if (denied(remote, rxBlock)) {
+            return;
+        }
+        Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
+        ItemStack stack = net.storage().withdraw(pred, rate);
+        if (stack == null) {
+            return;
+        }
+        int leftover = remote.storage().deposit(stack);
+        if (leftover > 0) {
+            stack.setAmount(leftover);
+            net.storage().deposit(stack);
         }
     }
 

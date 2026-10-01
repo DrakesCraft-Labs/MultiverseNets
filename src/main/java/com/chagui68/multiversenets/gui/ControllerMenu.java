@@ -113,7 +113,7 @@ public class ControllerMenu extends MenuHolder {
         meta.displayName(Component.text("Router Antenna", active ? NamedTextColor.GREEN : NamedTextColor.RED).decoration(TextDecoration.ITALIC, false));
         meta.lore(List.of(
                 Component.text("Status: " + (active ? "ONLINE (" + routers + " active)" : "OFFLINE"), active ? NamedTextColor.GREEN : NamedTextColor.RED).decoration(TextDecoration.ITALIC, false),
-                Component.text(active ? "Broadcasting global wireless signal across chunks." : "Wireless Terminal restricted to 64 blocks.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)
+                Component.text(active ? "Broadcasting global wireless signal across chunks and dimensions." : "Wireless Terminal restricted to 64 blocks in local world.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)
         ));
         item.setItemMeta(meta);
         return item;

@@ -72,7 +72,7 @@ public class BarrelMenu extends MenuHolder {
         metaSet.displayName(Component.text("Set Item", NamedTextColor.GREEN).decoration(TextDecoration.ITALIC, false));
         metaSet.lore(List.of(
                 passiveText("Click with an item on your cursor to register it."),
-                passiveText("Only works while the barrel is empty."),
+                passiveText("Right-Click (empty cursor): Clear registered item."),
                 Component.empty(),
                 Component.text("Shift+Click: Toggle void excess", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false)));
         setItem.setItemMeta(metaSet);
@@ -108,7 +108,7 @@ public class BarrelMenu extends MenuHolder {
         NodeBlob blob = NodeStore.get(block);
         ItemStack icon;
         long cap = capacity();
-        if (blob == null || blob.cellSample == null || blob.cellAmount <= 0) {
+        if (blob == null || blob.cellSample == null) {
             icon = new ItemStack(Material.RED_STAINED_GLASS_PANE);
             var meta = icon.getItemMeta();
             meta.displayName(Component.text("No Registered Item", NamedTextColor.RED)
@@ -118,6 +118,17 @@ public class BarrelMenu extends MenuHolder {
                     Component.text("Stores up to " + Items.formatAmount(cap) + " of a single item", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
                     Component.empty(),
                     Component.text("Click with item on cursor to set", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false)));
+            icon.setItemMeta(meta);
+        } else if (blob.cellAmount <= 0) {
+            icon = blob.cellSample.clone();
+            icon.setAmount(1);
+            var meta = icon.getItemMeta();
+            meta.lore(List.of(
+                    Component.empty(),
+                    Component.text("Status: Empty (Registered)", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false),
+                    Component.text("Amount: 0 / " + Items.formatAmount(cap), NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.empty(),
+                    Component.text("Click with new item or Right-click Set Item to clear", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
             icon.setItemMeta(meta);
         } else {
             icon = blob.cellSample.clone();
@@ -185,6 +196,12 @@ public class BarrelMenu extends MenuHolder {
             }
             ItemStack cursor = event.getView().getCursor();
             if (cursor == null || cursor.getType().isAir()) {
+                if (event.getClick() == ClickType.RIGHT && blob.cellAmount <= 0) {
+                    blob.cellSample = null;
+                    NodeStore.put(block, blob);
+                    updateDisplay();
+                    player.sendMessage(Text.msg("Cleared registered item from barrel.", NamedTextColor.YELLOW));
+                }
                 return;
             }
             blob.cellSample = StackUtils.getAsQuantity(cursor, 1);
@@ -207,14 +224,20 @@ public class BarrelMenu extends MenuHolder {
         }
 
         if (raw == ITEM_SLOT) {
-            if (blob.cellSample == null || blob.cellAmount <= 0) {
-                ItemStack cursor = event.getView().getCursor();
-                if (cursor != null && !cursor.getType().isAir()) {
-                    blob.cellSample = StackUtils.getAsQuantity(cursor, 1);
-                    NodeStore.put(block, blob);
-                    updateDisplay();
-                    player.sendMessage(Text.msg("Stored item set to: " + blob.cellSample.getType().name(), NamedTextColor.GREEN));
-                }
+            ItemStack cursor = event.getView().getCursor();
+            boolean hasCursor = cursor != null && !cursor.getType().isAir();
+            if (hasCursor && blob.cellAmount <= 0) {
+                blob.cellSample = StackUtils.getAsQuantity(cursor, 1);
+                NodeStore.put(block, blob);
+                updateDisplay();
+                player.sendMessage(Text.msg("Stored item set to: " + blob.cellSample.getType().name(), NamedTextColor.GREEN));
+                return;
+            }
+            if (blob.cellSample == null) {
+                return;
+            }
+            if (blob.cellAmount <= 0) {
+                player.sendMessage(Text.msg("The barrel is empty. Registered item: " + blob.cellSample.getType().name(), NamedTextColor.YELLOW));
                 return;
             }
             ClickType click = event.getClick();
@@ -328,7 +351,6 @@ public class BarrelMenu extends MenuHolder {
 
         if (blob.cellAmount <= 0) {
             blob.cellAmount = 0;
-            blob.cellSample = null;
         }
         NodeStore.put(block, blob);
         player.updateInventory();
@@ -360,7 +382,6 @@ public class BarrelMenu extends MenuHolder {
 
         if (blob.cellAmount <= 0) {
             blob.cellAmount = 0;
-            blob.cellSample = null;
         }
         NodeStore.put(block, blob);
         player.updateInventory();

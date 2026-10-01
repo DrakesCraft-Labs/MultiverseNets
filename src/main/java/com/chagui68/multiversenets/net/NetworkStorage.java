@@ -451,7 +451,9 @@ public class NetworkStorage {
                 got += take;
                 if (state.blob.cellAmount <= 0) {
                     state.blob.cellAmount = 0;
-                    state.blob.cellSample = null;
+                    if (!state.barrel) {
+                        state.blob.cellSample = null;
+                    }
                 }
                 state.dirty = true;
                 if (got >= want) break;

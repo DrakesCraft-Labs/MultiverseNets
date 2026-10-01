@@ -4,7 +4,9 @@ import com.chagui68.multiversenets.MultiverseNets;
 import com.chagui68.multiversenets.compat.SlimefunBridge;
 import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.item.Items;
+import com.chagui68.multiversenets.net.Network;
 import com.chagui68.multiversenets.net.NetworkManager;
+import org.bukkit.World;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
 import com.chagui68.multiversenets.util.Settings;
@@ -215,18 +217,40 @@ public class FilterMenu extends MenuHolder {
                 }
                 inv.setItem(slot, border);
             }
-            ItemStack borderAll = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
-            var metaAll = borderAll.getItemMeta();
-            if (metaAll != null) {
-                metaAll.displayName(Component.text("All Sides (Simple Mode)", NamedTextColor.GRAY)
-                        .decoration(TextDecoration.ITALIC, false));
-                metaAll.lore(List.of(
-                        Component.text("Simple Grabbers and Pushers interact with all sides.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false),
-                        Component.text("Shift-Click / Right-Click: Open First Adjacent GUI", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false)
-                ));
-                borderAll.setItemMeta(metaAll);
+            if (type == DeviceType.MVN_RECEIVER || type == DeviceType.MVN_TRANSMITTER) {
+                boolean isRx = type == DeviceType.MVN_RECEIVER;
+                ItemStack termIcon = new ItemStack(isRx ? Material.ENDER_EYE : Material.CONDUIT);
+                var metaTerm = termIcon.getItemMeta();
+                if (metaTerm != null) {
+                    metaTerm.displayName(Component.text(isRx ? "Open Remote Terminal" : "Open Network Terminal",
+                            NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
+                    List<Component> lore = new ArrayList<>();
+                    if (blob.txWorld != null) {
+                        lore.add(Component.text("Linked to " + (isRx ? "Transmitter" : "Receiver") + ":", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
+                        lore.add(Component.text("X: " + blob.txX + " Y: " + blob.txY + " Z: " + blob.txZ, NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+                    } else {
+                        lore.add(Component.text("Status: Unlinked (Sneak+Click on " + (isRx ? "Transmitter" : "Receiver") + " to link)", NamedTextColor.RED).decoration(TextDecoration.ITALIC, false));
+                    }
+                    lore.add(Component.empty());
+                    lore.add(Component.text("Click to open terminal", NamedTextColor.GREEN).decoration(TextDecoration.ITALIC, false));
+                    metaTerm.lore(lore);
+                    termIcon.setItemMeta(metaTerm);
+                }
+                inv.setItem(ALL_DIRECTIONS_SLOT, termIcon);
+            } else {
+                ItemStack borderAll = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+                var metaAll = borderAll.getItemMeta();
+                if (metaAll != null) {
+                    metaAll.displayName(Component.text("All Sides (Simple Mode)", NamedTextColor.GRAY)
+                            .decoration(TextDecoration.ITALIC, false));
+                    metaAll.lore(List.of(
+                            Component.text("Simple Grabbers and Pushers interact with all sides.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false),
+                            Component.text("Shift-Click / Right-Click: Open First Adjacent GUI", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false)
+                    ));
+                    borderAll.setItemMeta(metaAll);
+                }
+                inv.setItem(ALL_DIRECTIONS_SLOT, borderAll);
             }
-            inv.setItem(ALL_DIRECTIONS_SLOT, borderAll);
         }
 
         ItemStack clear = new ItemStack(Material.BARRIER);
@@ -244,10 +268,11 @@ public class FilterMenu extends MenuHolder {
         metaHelp.displayName(Component.text("How Filter Works", NamedTextColor.GOLD)
                 .decoration(TextDecoration.ITALIC, false));
         metaHelp.lore(List.of(
-                Component.text("• Shift-Click an item in your inventory to register it.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                Component.text("• Click any registered item above to remove it.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                Component.text("• Toggle Whitelist / Blacklist with the mode button.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                Component.text("• If filter is empty, Whitelist transfers everything.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
+                Component.text("• Whitelist: Transfers only the registered items.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                Component.text("• Blacklist: Transfers everything except the listed items.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                Component.text("• Empty Whitelist: Idle (prevents clearing the network).", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                Component.text("• Clear: Click the barrier to wipe all filter items.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                Component.text("• Shift-Click an item in your inventory to register it.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
         help.setItemMeta(metaHelp);
         inv.setItem(HELP_SLOT, help);
     }
@@ -278,6 +303,38 @@ public class FilterMenu extends MenuHolder {
         boolean isActionOpen = event.isShiftClick() || event.isRightClick();
         if (raw >= 18 && raw <= 24) {
             if (raw == ALL_DIRECTIONS_SLOT) {
+                if (type == DeviceType.MVN_RECEIVER || type == DeviceType.MVN_TRANSMITTER) {
+                    if (type == DeviceType.MVN_RECEIVER) {
+                        if (blob.txWorld == null) {
+                            player.sendMessage(Text.msg("Unlinked: sneak+click this item on a Transmitter first.", NamedTextColor.YELLOW));
+                            return;
+                        }
+                        try {
+                            java.util.UUID worldId = java.util.UUID.fromString(blob.txWorld);
+                            org.bukkit.World world = plugin.getServer().getWorld(worldId);
+                            if (world == null) {
+                                player.sendMessage(Text.msg("The transmitter's world is not loaded.", NamedTextColor.RED));
+                                return;
+                            }
+                            Network net = plugin.networks().networkAt(world.getBlockAt(blob.txX, blob.txY, blob.txZ));
+                            if (net == null) {
+                                player.sendMessage(Text.msg("The linked transmitter has no active network.", NamedTextColor.RED));
+                                return;
+                            }
+                            new TerminalMenu(plugin, player, net).openMenu();
+                        } catch (IllegalArgumentException e) {
+                            player.sendMessage(Text.msg("Invalid transmitter binding.", NamedTextColor.RED));
+                        }
+                    } else {
+                        Network net = plugin.networks().networkAt(block);
+                        if (net == null) {
+                            player.sendMessage(Text.msg("No network found for this transmitter.", NamedTextColor.RED));
+                            return;
+                        }
+                        new TerminalMenu(plugin, player, net).openMenu();
+                    }
+                    return;
+                }
                 if (isActionOpen) {
                     openFirstAdjacentBlock();
                     return;
