@@ -9,176 +9,98 @@ who want to run them, understand them or extend them.
 
 ## 1. Running the tests
 
-The tests are **JUnit 5 (Jupiter)** and do not require a real Minecraft server. To run them:
+The tests are **JUnit 5 (Jupiter)** and do not need a real Minecraft server:
 
 ```
 mvn test
 ```
 
-Or a full build with packaging (also runs the tests):
-
-```
-mvn clean package
-```
-
-Requirements: a JDK compatible with the project (Paper 1.21 / `api-version: '1.21'`) and Maven.
+A full build (`mvn clean package`) runs them too. Requirements: JDK 21 and Maven.
 
 ## 2. Test infrastructure: MockBukkit
 
-Most tests use **[MockBukkit](https://github.com/MockBukkit/MockBukkit)**, which simulates a Bukkit
-server in memory. The typical pattern is:
+Most tests use **[MockBukkit](https://github.com/MockBukkit/MockBukkit)**, an in-memory Bukkit server:
 
 ```java
 @BeforeEach void setUp() {
-    server = MockBukkit.mock();                    // create the fake server
-    plugin = MockBukkit.load(MultiverseNets.class); // load the plugin (onEnable)
-    world = server.addSimpleWorld("world");        // fake world
-    player = server.addPlayer();                   // fake player
+    server = MockBukkit.mock();                     // fake server
+    plugin = MockBukkit.load(MultiverseNets.class); // runs onEnable
+    world = server.addSimpleWorld("world");
+    player = server.addPlayer();
 }
 
 @AfterEach void tearDown() {
-    MockBukkit.unmock();                            // cleanup between tests
+    MockBukkit.unmock();
 }
 ```
 
-This makes it possible to: place blocks, fire events (`server.getPluginManager().callEvent(...)`),
-simulate inventory clicks, interactions, explosions and pistons, and verify the state persisted in
-the chunk PDCs.
+That allows placing blocks, firing events (`server.getPluginManager().callEvent(...)`), simulating
+inventory clicks, explosions and pistons, running the ticker
+(`new NetworkTicker(plugin, plugin.networks()).tick()`) and reading the state stored in chunk PDCs.
 
-**Pure unit tests** (no MockBukkit): `PosUtilTest`, `SettingsCellCapacityTest`, `DeviceTypeTest`,
-`NetworksCoexistenceTest`, `PluginResourcesTest`, `NewDevicesTest`, `ToolsTest` and `SlimefunBridgeTest`.
+Things to know:
+- A test that places a device by hand must also store its blob
+  (`NodeStore.put(block, NodeBlob.create(type.name()))`); without it the block is not a node.
+- MockBukkit does not implement `Display.setBillboard` or `HumanEntity.openWorkbench`. The ticker
+  catches hologram failures, so ticker tests run normally; the two tests that call those APIs
+  directly (`FluidAndRequesterTest.testHologramRedesignNoFlowOrRouted`,
+  `RecipeTest.prepareCraftUpgradesCellWithCargoSeamlessly`) are reported as **skipped**.
+- `src/test/java/dev/espi/protectionstones/PSRegion.java` is a stub of the ProtectionStones API that
+  the provider tests load by reflection.
 
-## 3. Overview of the 17 tests
+## 3. Overview: 30 classes, 232 tests
 
-| File (under `src/test/java/com/chagui68/multiversenets/`) | Type | Covers |
+| Class (package `com.chagui68.multiversenets` unless stated) | Tests | Covers |
 | --- | --- | --- |
-| `BlockFlowsTest` | Integration | Block flows: break/place, pistons, explosions and interaction; node protection and persistence. |
-| `CellGuiTest` | Integration | Quantum Cell GUI: item template, quick deposit, withdrawal and capacity safety. |
-| `CrafterGuiTest` | Integration | Auto-Crafter GUI: installing/uninstalling blueprints and clearing recipes. |
-| `DeviceTypeTest` | Unit | `DeviceType` classification and properties (filterable, cells, hand vs. placeable). |
-| `FilterGuiTest` | Integration | Filter GUI: adding/removing items, whitelist/blacklist mode, shift-click and directional faces. |
-| `GreedyCellTest` | Integration | Greedy Cell: multi-item storage, shared capacity, its menu and terminal enhancements. |
-| `GuiDupeGuardTest` | Integration | Anti-duplication guards of the menus against dangerous clicks. |
-| `GuiFlowsTest` | Integration | Integration of all network GUIs: terminal, encoder, crafter, crafting grid and monitor. |
-| `InfinityBarrelTest` | Integration | Infinity Barrel: 2×10⁹ capacity, deposits/withdrawals and break/place persistence. |
-| `NetworksCoexistenceTest` | Unit | Coexistence with the legacy Networks plugin: name, main class, commands, permissions and Slimefun soft dependency. |
-| `NewDevicesTest` | Unit | Recent devices (Purger, Probe): placeable, filterable and never cells. |
-| `PluginResourcesTest` | Unit | Essential resources (`plugin.yml`, `config.yml`) present on the classpath. |
-| `PosUtilTest` | Unit | Packing/unpacking 3D coordinates into a 64-bit `long`. |
-| `QuantumWorkbenchTest` | Integration | Quantum Workbench: cell upgrades preserving cargo and ingredient return. |
-| `SettingsCellCapacityTest` | Unit | Capacity calculations against empty/missing/edge-case configs; defaults. |
-| `SlimefunBridgeTest` | Unit | Safe bridge behavior when Slimefun is not present. |
-| `ToolsTest` | Unit | Hand tools (Configurator, Rake, Crayon) and Receiver filtering. |
+| `BlockFlowsTest` | 24 | Break/place with embedded state, pistons, explosions, wireless binding, rake, wrench, sneaking guard, dimensions, bridge linking from the Transmitter item, cable status. |
+| `BlueprintDupeTest` | 3 | Encoder Blueprints are never duplicated (two viewers, breaking with the menu open); installing a Blueprint consumes it and *Clear All* returns it. |
+| `CellGuiTest` | 9 | Quantum Cell menu: template, quick deposit, withdrawal, capacity, no duplication when the ticker runs. |
+| `CrafterGuiTest` | 10 | Crafter menu: install/uninstall/clear, Slimefun crafters accept only Slimefun Blueprints. |
+| `DeviceTypeTest` | 7 | `DeviceType` classification: filterable devices, Greedy Cell is not a cell, hand items, directional devices, request and Slimefun crafters. |
+| `FilterGuiTest` | 15 | Filter menu: add/remove templates, whitelist/blacklist, shift-click, faces, clear. |
+| `FluidAndRequesterTest` | 16 | Fluid storage and fluid cell quick interaction, Liquid Pump, terminal fluid page, Request Terminal (orders, chat amount, recursive chains, ignores Auto-Crafters, Slimefun Request Crafter), Slimefun Auto-Crafter, guide book command. |
+| `GrabberQuotaTest` | 8 | `extractMatching`: honours the full per-cycle quota (including HT), merges slots of one item, leaves other items alone. |
+| `GreedyCellTest` | 8 | Greedy Cell multi-item storage, shared capacity, menu and terminal integration. |
+| `GuiDupeGuardTest` | 3 | `GuiListener` cancels dangerous clicks (also in cell and barrel menus); shift-click deposits never duplicate. |
+| `GuiFlowsTest` | 10 | Terminal, Encoder, Auto-Crafter (atomic crafting), Crafting Grid and Monitor flows. |
+| `InfinityBarrelTest` | 4 | Barrel capacity, menu, network integration and break/place persistence. |
+| `NetworksCoexistenceTest` | 5 | Plugin name, main class, commands and permissions never collide with NetworksV6; Slimefun is a soft dependency. |
+| `NewDevicesTest` | 6 | Purger and Probe properties; every `DeviceType` has a material and a name. |
+| `PluginResourcesTest` | 3 | `plugin.yml` and `config.yml` on the classpath; version sanity check. |
+| `PosUtilTest` | 2 | Coordinate packing round-trips, including world borders and negative Y. |
+| `QuantumWorkbenchTest` | 2 | Cell upgrade keeps the cargo; ingredients are returned on close. |
+| `RecipeTest` | 7 | Every recipe registered once, cable and cell recipes craft, a cell with cargo is upgraded keeping it. |
+| `SettingsCellCapacityTest` | 9 | `Settings` defaults and edge cases (capacities, clamps, null config). |
+| `SlimefunBridgeTest` | 5 | The Slimefun bridge is inert and never throws without Slimefun. |
+| `ToolsTest` | 3 | Wrench and Rake are hand tools; the Receiver is filterable; filters default to whitelist. |
+| `TransmissionFixesTest` | 10 | Item and fluid transmission: all-or-nothing fluid deposits, the pump never duplicates fluid, bridge with template-only filter, bridge never drains Greedy Cells, a device shared by two controllers works once per cycle, partial crafting results are undone, wrench pastes exact templates, rake returns the device, filters/face/transit buffer survive break and place. |
+| `UpgradedFeaturesTest` | 6 | CPU Virtual Cache, Router, per-chunk node limit, grabber transit buffer, cache kept on break, creative breaking drops nothing. |
+| `compat.NetworkOwnershipTest` | 9 | A network runs inside its owner's claim; other networks and a null owner are strangers; public land stays open; broken or unwired providers grant nothing; owner answers never leak between networks. |
+| `compat.ProtectionStonesProviderTest` | 18 | The ProtectionStones provider against the real API shape (`PSRegion.fromLocation*`, exact signatures), owner/member certification, fail-closed behaviour; WorldGuard region lookup fails safe. |
+| `compat.ProtectionWhitelistTest` | 15 | Protection defaults and `exempt-locations` parsing and geometry; the bridge is inert without providers. |
+| `listen.SneakingRightClickTest` | 3 | Sneaking + right-click never opens a device menu and still allows vanilla placement. |
+| `net.ScanCostTest` | 2 | The BFS neighbour walk allocates nothing per node and a large scan stays linear. |
+| `persist.NodeStoreCanonicalTest` | 5 | The shared decoded blob is never older than the last write. |
+| `persist.NodeStoreCorruptionTest` | 5 | Corrupt PDC entries read as missing, silently and cheaply, and can be overwritten. |
 
-## 4. Per-test details
+## 4. Notes on some suites
+
+### `TransmissionFixesTest` and `BlueprintDupeTest`
+Each test reproduces a loss or duplication that existed in the code and was fixed. They were checked
+to **fail** against the code before the fix, so they guard against regressions rather than restate
+the implementation. Examples: a purger shared by two controllers deleted 256 items per cycle instead
+of 128; a nearly full fluid network kept part of a bucket and the bucket; two players opening the
+same Recipe Encoder turned 16 stored Blueprints into 32.
 
 ### `BlockFlowsTest`
-Covers the "block flows" governed by `BlockListener`: the `BlockBreakEvent`, `BlockPlaceEvent`,
-`BlockPistonExtendEvent`, `EntityExplodeEvent` and `PlayerInteractEvent` handlers. Verifies that
-nodes cannot be pushed by pistons nor destroyed by explosions, that breaking a device drops the
-proper item (with its preserved state) and that placing/breaking nodes correctly update the network
-(controller registration, neighbor invalidation).
+The three dimension tests (`networkExtractsInsideTheNether/End/Overworld`) build a real network with
+a grabber and a chest and run the scheduler. They prove the scan, ticker and storage carry no
+dimension check of their own, so whatever blocks a dimension at runtime is the protection bridge.
 
-### `CellGuiTest`
-Tests the Quantum Cell GUI (`CellMenu`, 18 slots): setting the item template, the **quick deposit**
-from the cursor into the player's inventory, withdrawing items, and ensuring the cell's capacity is
-never exceeded.
-
-### `CrafterGuiTest`
-Tests the Auto-Crafter GUI (`CrafterMenu`, 27 slots): **installing** a blueprint into a free slot,
-**uninstalling** it and **clearing** the recipe list.
-
-### `DeviceTypeTest`
-Unit tests on the `DeviceType` enum: the **filterable** devices include the newer types; the
-**Greedy Cell is not a storage cell** (it has no tier); and hand items (blueprint, wireless
-terminal) are not placeable.
-
-### `FilterGuiTest`
-Tests `FilterMenu` (27 slots): adding items to the filter, removing filters, toggling
-**whitelist/blacklist**, **shift-clicking** on the player inventory and configuring **directional
-faces**.
-
-### `GreedyCellTest`
-Tests the Greedy Cell: **multi-item** storage (several templates at once) with **shared capacity**
-(`greedy.capacity`), its dedicated menu (`GreedyMenu`, 54 slots with 36 storage slots) and the
-purger/greedy enhancements over the terminal menu.
-
-### `GuiDupeGuardTest`
-Validates the **`GuiListener`**: dangerous clicks (double-click, middle, number keys, drop, hotbar,
-collect-to-cursor, etc.) are cancelled inside custom menus to prevent item duplication or cloning.
-
-### `GuiFlowsTest`
-Integration of every network GUI:
-- **Terminal**: opening it by right-clicking the block, withdrawing 1 item on left-click or a full
-  stack on shift-click, saving input-slot items on close, depositing via shift-click from the player
-  inventory, and withdrawing **custom items** (with PDC ID and lore) preserving their metadata.
-- **Encoder**: encodes a 3×3 matrix into a Blueprint item (embedded `RecipeData`) and persists the
-  matrix on the block.
-- **Auto-Crafter**: crafts from the network **atomically** (insufficient ingredients → nothing is
-  consumed; sufficient → ingredients are consumed and the result deposited).
-- **Network Crafting Grid**: consumes 8 of 9 ingredients from the network and hands the result to
-  the player.
-- **Monitor**: opens its GUI when connected to a network; grabber/vacuum open `FilterMenu` and the
-  crafter opens its `CrafterMenu`.
-
-### `InfinityBarrelTest`
-Tests the Infinity Barrel: **2,000,000,000 item capacity**, opening the menu and quick-depositing
-with a set template, network-storage integration (bulk deposit/withdraw) and **break/place
-persistence** (the embedded `CELL_CARGO` keeps both amount and type).
-
-### `NetworksCoexistenceTest`
-**Coexistence with the legacy Networks plugin** so both can run on the same server:
-- The plugin name is not `NetworksV6-Drake`.
-- The main class is not `io.github.sefiraat.networks.Networks`.
-- The plugin's commands and aliases do not collide with the `networks` command.
-- Permissions live under the `multiversenets.` prefix and never invade `networks.`.
-- The Slimefun dependency is a **soft dependency** (the plugin works standalone).
-
-It reads these values directly from `plugin.yml` with SnakeYAML.
-
-### `NewDevicesTest`
-Tests the recent utility devices:
-- The **Purger** is placeable and **filterable** (so it does not delete items indiscriminately).
-- The **Probe** is a hand tool: not placeable, not filterable, never a cell.
-- Purger and Probe **never count as storage cells**.
-- Every `DeviceType.values()` entry has a non-null material and a non-blank display name.
-
-### `PluginResourcesTest`
-Checks that `plugin.yml` and `config.yml` exist on the classpath (essential for startup) plus a
-basic build-version sanity check.
-
-### `PosUtilTest`
-Pins the binary format of `PosUtil.pack/unpack`: positive and negative/world-boundary coordinates
-(±30,000,000 in X/Z, negative Y) round-trip losslessly in a single `long`.
-
-### `QuantumWorkbenchTest`
-Tests `QuantumWorkbenchMenu` (45 slots):
-- **Cell upgrade**: a Quantum Cell T1 with cargo (500 iron ingots) + diamonds around it → craft
-  button → output **T2 with the cargo preserved** in `CELL_CARGO`, and the matrix consumed.
-- **Closing**: uncrafted ingredients are **returned to the player**.
-
-### `SettingsCellCapacityTest`
-Tests `Settings` by reflectively injecting mock configurations:
-- Uses capacities declared in `cells.capacities`.
-- Empty list or missing key → **geometric fallback** without throwing.
-- Undeclared tier → clamps to the **last** configured capacity.
-- Invalid/negative tier → safe positive capacity.
-- Barrel: 2,000,000,000 by default or the custom `barrel.capacity`.
-- `crafter.max-recipes` clamps between 1 and 18.
-- `long` capacities up to 2×10⁹ without 32-bit overflow.
-- With `cfg == null` every getter returns its **default** (scan 20, max nodes 16,384, transfer 5,
-  vacuum 10, craft 20, 64 items/op, HT multiplier 8, greedy 262,144, barrel 2×10⁹, blueprints 18,
-  radius 4.0, `compat.slimefun` true, `debug` false, rake 250, cell 65,536).
-
-### `SlimefunBridgeTest`
-Without Slimefun present: the bridge reports `isAvailable()`/`disponible()` = false; querying null
-blocks/items does not throw (`isMachine`, `getId`, `isSlimefunItem` and their Spanish aliases);
-`extract`/`extraer` return null and `insert`/`insertar` return 0 safely.
-
-### `ToolsTest`
-Tests the hand tools: **Configurator and Rake** are not placeable, do not store and do not
-filter; the **Receiver is filterable** (controlled wireless transport); and filters default to
-**whitelist** mode (`filterBlacklist = false`).
+### `compat.*`
+Protection plugins are not on the test classpath. What is tested is everything that does not need
+them (defaults, whitelist geometry, inert bridge) plus the ProtectionStones provider against a stub of
+its API; each provider's live decision is verified on a real server.
 
 ---
 

@@ -1,12 +1,15 @@
 # ⚙️ Cómo funciona el código de MultiverseNets
 
-Este documento explica el funcionamiento interno del plugin: cómo se representa una red, dónde y cómo se guarda el estado, cómo fluyen los ítems y cómo se organiza el código por capas. Está pensado para desarrolladores que quieran leer o modificar el código.
+Este documento explica el funcionamiento interno del plugin: cómo se representa una red, dónde y cómo
+se persiste el estado, cómo fluyen ítems y fluidos, y cómo se organiza el código por capas. Está
+pensado para quien quiera leer o modificar el código. Para el comportamiento de cada máquina desde el
+punto de vista del jugador, ver el [README de la wiki](../README.md).
 
 > Zona de desarrollo: [Estructura](Structure.md) · **Cómo funciona el código** · [Tests](Tests.md)
 
 ---
 
-## 1. Vista de conjunto (capas)
+## 1. Visión general (capas)
 
 ```
 ┌───────────────────────────────┐
@@ -15,144 +18,217 @@ Este documento explica el funcionamiento interno del plugin: cómo se representa
 │  Capa de eventos (listeners)  │  com.chagui68.multiversenets.listen
 ├───────────────────────────────┤
 │  Capa de servicio (núcleo)    │  com.chagui68.multiversenets.net
-│   + crafteo  (compat/craft)   │
+│   + crafteo                   │  com.chagui68.multiversenets.craft
 ├───────────────────────────────┤
 │  Capa de persistencia         │  com.chagui68.multiversenets.persist
 │   (NodeBlob / NodeStore)      │
 ├───────────────────────────────┤
-│  Capa base (util + item +     │  util / item / command / compat
-│   command + compat)           │
+│  Base                         │  util / item / command / compat / api
 └───────────────────────────────┘
 ```
 
-Toda la lógica de red vive en el hilo principal del servidor (síncrona), lo que evita condiciones de carrera con el mundo.
+Toda la lógica de red corre en el hilo principal del servidor (síncrona), sin carreras con el mundo.
+Por eso el plugin **no es compatible con Folia**.
 
 ## 2. Ciclo de vida del plugin
 
-Clase principal: `MultiverseNets extends JavaPlugin` (singleton accesible mediante `MultiverseNets.instance()`; expone el gestor de redes con `networks()`).
+Clase principal: `MultiverseNets extends JavaPlugin` (singleton con `MultiverseNets.instance()`;
+expone `networks()`, `ticker()` y `blockListener()`).
 
 **`onEnable()`**, en orden:
-1. `saveDefaultConfig()` — copia `config.yml` si no existe.
-2. `Keys.init(this)` — inicializa las `NamespacedKey` persistentes.
-3. `Settings.refresh(this)` — carga la configuración.
-4. `SlimefunBridge.init(getLogger())` — activa la integración con Slimefun solo si está instalado.
-5. `Items.registerRecipes(this)` — registra las recetas de todos los dispositivos.
-6. `NodeStore.init(this)` — prepara la persistencia por chunk y carga el registro de controladores.
-7. `new NetworkManager(this); networks.load()` — recrea las redes a partir de los controladores guardados.
-8. Registra `BlockListener`, `GuiListener` y `ChatPrompts`.
-9. Arranca `NetworkTicker` y registra el comando `/mvnets` (alias `/mvn`).
+1. `saveDefaultConfig()`, `Keys.init(this)`, `Settings.refresh(this)`.
+2. `SlimefunBridge.registerSerializationAliases()` y `SlimefunBridge.init(...)` — la integración con
+   Slimefun solo se activa si Slimefun está instalado.
+3. `ProtectionBridge.init(...)` — registra cada provider de protección cuyo plugin esté presente.
+4. `Items.registerRecipes(this)` y `NodeStore.init(this)` (registro de controladores).
+5. `new NetworkManager(this); networks.load()` — recrea las redes a partir de los controladores
+   guardados.
+6. Registra `BlockListener`, `GuiListener`, `ChatPrompts` y `CraftingListener`.
+7. Vuelve a registrar las recetas un tick después y otra vez a los 100 ticks (para que un recargo de
+   datapacks no las borre) y las desbloquea a los jugadores conectados.
+8. `NetworkHologramManager.init`, una tarea periódica que vacía la caché de protección cada
+   `protection.cache-ticks`, y por último arranca `NetworkTicker` y registra `/mvnets`.
 
-**`onDisable()`**: detiene el `NetworkTicker`, ejecuta `networks.saveAll()` (guarda el registro de controladores) y loguea el apagado.
+**`onDisable()`**: detiene el ticker y la tarea de protección, borra todos los hologramas y ejecuta
+`networks.saveAll()` (registro de controladores).
 
 ## 3. Claves persistentes (`util/Keys`)
 
-Registro único de todos los `NamespacedKey` usados en los `PersistentDataContainer` (PDC) de chunks e ítems:
+Registro único de todas las `NamespacedKey` usadas en el `PersistentDataContainer` (PDC) de chunks e
+ítems (namespace `multiversenets:`):
 
-| Constante | Clave (namespace `multiversenets:`) | Uso |
+| Constante | Clave | Uso |
 | --- | --- | --- |
-| `DEVICE_TYPE` | `device_type` | Tipo de dispositivo en ítems (Nombre del enum `DeviceType`). |
-| `WIRELESS_BIND` | `wireless_bind` | Coordenadas del controlador vinculado a la terminal inalámbrica. |
-| `RECEIVER_BIND` | `receiver_bind` | Coordenadas del transmisor vinculado a un receptor. |
-| `BLUEPRINT_RECIPE` | `blueprint_recipe` | Receta legada guardada en un blueprint antiguo. |
-| `CHUNK_HAS_NODES` | `chunk_has_nodes` | Marca rápida «este chunk puede tener nodos». |
-| `TERMINAL_DISPLAY` | `terminal_display` | Ajustes de búsqueda/orden de la terminal. |
-| `CELL_CARGO` | `cell_cargo` | Estado serializado (Base64) de la carga de una celda/nodo. |
-| `BLUEPRINT_DATA` | `blueprint_data` | Receta codificada en Base64 dentro del ítem Blueprint. |
-| `CONFIG_DATA` | `config_data` | Configuración de filtros copiada en la llave inglesa. |
+| `DEVICE_TYPE` | `device_type` | Tipo de dispositivo en los ítems (nombre del enum `DeviceType`). |
+| `WIRELESS_BIND` | `wireless_bind` | Coordenadas del controlador vinculado a un Terminal Inalámbrico. |
+| `RECEIVER_BIND` | `receiver_bind` | Enlace del puente en un ítem Receptor o Transmisor (`mundo;x;y;z` del otro extremo). |
+| `BLUEPRINT_RECIPE` | `blueprint_recipe` | Clave de receta antigua de un blueprint viejo. |
+| `CHUNK_HAS_NODES` | `chunk_has_nodes` | Marca rápida de "este chunk puede tener nodos". |
+| `TERMINAL_DISPLAY` | `terminal_display` | Ajustes de búsqueda/orden del terminal. |
+| `CELL_CARGO` | `cell_cargo` | `NodeBlob` serializado (Base64) dentro del ítem de un dispositivo roto. |
+| `BLUEPRINT_DATA` | `blueprint_data` | `RecipeData` codificado en Base64 en un Blueprint. |
+| `CONFIG_DATA` | `config_data` | Llave: materiales copiados y modo `WL:`/`BL:`. |
+| `CONFIG_ITEMS` | `config_items` | Llave: plantillas exactas del filtro (un `NodeBlob` codificado con `filterItems`). |
 | `RAKE_USES` | `rake_uses` | Usos restantes del Network Rake. |
+| `SF_BLUEPRINT` | `sf_blueprint` | Marca un Blueprint codificado desde una receta de Slimefun. |
 
 ## 4. Coordenadas (`util/PosUtil`)
 
-Una posición 3D de bloque se compacta en **un solo `long`** de 64 bits (clave de mapa muy eficiente):
+Una posición 3D se empaqueta en un **único `long` de 64 bits**:
 
-- **X → 26 bits** (bits 38–63), máscara `0x3FFFFFF`, rango ±33 554 431.
-- **Z → 26 bits** (bits 12–37), igual rango.
-- **Y → 12 bits** (bits 0–11), rango −2048 … +2047 (toda la altura del mundo).
+- **X → 26 bits** (bits 38–63), máscara `0x3FFFFFF`, rango ±33.554.431.
+- **Z → 26 bits** (bits 12–37), mismo rango.
+- **Y → 12 bits** (bits 0–11), rango −2048 … +2047.
 
-`pack(x, y, z) = (x & 0x3FFFFFF) << 38 | (z & 0x3FFFFFF) << 12 | (y & 0xFFF)`. Los negativos se manejan con desplazamientos aritméticos (signo) en los `unpack`. Las coordenadas empaquetadas se usan como claves en `Network.nodes`, `NetworkStorage.CellRef` y para localizar chunks (`PosUtil.unpackX(pos) >> 4`).
-El test `PosUtilTest` fija este formato (positivos y límites de mundo negativos).
+`pack(x, y, z) = (x & 0x3FFFFFF) << 38 | (z & 0x3FFFFFF) << 12 | (y & 0xFFF)`. Los negativos se
+resuelven con desplazamientos aritméticos en `unpack`. Las posiciones empaquetadas son las claves de
+`Network.nodes` y sirven para localizar chunks (`PosUtil.unpackX(pos) >> 4`). `PosUtilTest` fija el
+formato.
 
 ## 5. Persistencia (`persist/NodeBlob` y `persist/NodeStore`)
 
 ### 5.1 Estado de un nodo: `NodeBlob`
-Clase `Serializable` (UID fijo `1L`) con **campos públicos** que describen el estado persistente de un bloque de la red:
+`Serializable` (UID fijo en `1L`, así los campos nuevos se leen con su valor por defecto en blobs
+antiguos) con campos públicos:
 
-| Campo | Tipo | Descripción |
+| Campo | Tipo | Lo usa |
 | --- | --- | --- |
-| `typeName` | `String` | Nombre del enum `DeviceType`. |
-| `cellSample` | `ItemStack` | Plantilla del ítem guardado en una Quantum Cell / Barrica. |
-| `cellAmount` | `long` | Cantidad total almacenada. |
-| `filterMaterials` | `List<String>` | Materiales/IDs del filtro. |
-| `filterItems` | `List<ItemStack>` | Plantillas exactas del filtro. |
-| `filterBlacklist` | `boolean` | `true` = blacklist, `false` = whitelist. |
-| `recipes` | `List<String>` | Claves de recetas legadas (Auto-Crafter). |
-| `blueprintData` | `List<String>` | `RecipeData` en Base64 instalados en el Auto-Crafter. |
-| `craftingMatrix` | `ItemStack[9]` | Plantilla de crafteo 3×3 persistente. |
-| `crayon` | `boolean` | Efecto de partículas del controlador. |
-| `txWorld` / `txX` / `txY` / `txZ` | `String` / `int` | Vinculación del Receptor al Transmisor. |
-| `targetFace` | `String` | Cara direccional (`NORTH`… o `ALL`). |
-| `greedySamples` | `List<ItemStack>` | Plantillas multi-ítem de la Greedy Cell. |
-| `greedyAmounts` | `List<Long>` | Cantidades por muestra de la Greedy Cell. |
+| `typeName` | `String` | Todo nodo (nombre del `DeviceType`). |
+| `cellSample` / `cellAmount` | `ItemStack` / `long` | Celdas Cuánticas e Infinity Barrel (el barril conserva `cellSample` al vaciarse). |
+| `filterMaterials` / `filterItems` / `filterBlacklist` | `List<String>` / `List<ItemStack>` / `boolean` | Dispositivos con filtro. `filterItems` (plantillas exactas) manda sobre `filterMaterials` cuando no está vacío. |
+| `targetFace` | `String` | Cara del Advanced Grabber/Pusher (`NORTH`… o `ALL`). |
+| `transitBuffer` | `ItemStack` | Grabbers y Pushers: ítems en espera porque ni la red ni el origen los aceptaron. |
+| `recipes` / `blueprintData` | `List<String>` | Crafters: claves de receta antiguas / `RecipeData` instalados (Base64). |
+| `craftingMatrix` | `ItemStack[9]` | Plantilla del Encoder y de la Crafting Grid. |
+| `encoderBlank` / `encoderOutput` | `ItemStack` | Blueprints dejados en las ranuras del Recipe Encoder. |
+| `txWorld` / `txX` / `txY` / `txZ` | `String` / `int` | Enlace del puente de un Receptor o Transmisor (el otro extremo). |
+| `greedySamples` / `greedyAmounts` | `List<ItemStack>` / `List<Long>` | Búfer multi-ítem de la Greedy Cell. |
+| `virtualCacheTier` / `virtualSamples` / `virtualAmounts` | `int` / listas | Caché Virtual de CPU del controlador. |
+| `quotaSample` / `quotaLimit` / `quotaActive` | `ItemStack` / `long` / `boolean` | Quota Limiter. |
+| `fluidType` / `fluidAmount` | `String` / `long` | Quantum Fluid Cell (mB). |
+| `pumpFluid` (`pumpMode` heredado) | `String` | Filtro de la Liquid Pump (`WATER`, `LAVA`, null = cualquiera). |
+| `ownerUuid` | `String` | Solo el controlador: el dueño de la red. |
+| `crayon` | `boolean` | Campo heredado, sin uso. |
 
 ### 5.2 Lectura/escritura por chunk: `NodeStore`
-El estado no se guarda en la entidad del bloque, sino en el **PDC del chunk**, con claves por bloque:
-- `"n" + x + "_" + y + "_" + z` → **blob** completo (Base64).
-- `"t" + x + "_" + y + "_" + z` → solo el **nombre del tipo**, para clasificar un bloque sin deserializar (camino rápido del escáner).
+El estado vive en el **PDC del chunk**, por bloque:
+- `"n" + x + "_" + y + "_" + z` → blob completo (Base64).
+- `"t" + x + "_" + y + "_" + z` → solo el nombre del tipo, para que el escaneo clasifique un bloque
+  sin deserializar.
 
-Además cada `put()` sella la marca `CHUNK_HAS_NODES` (byte 1) en el chunk; el escáner la usa para saltar chunks vacíos sin leer PDCs.
+Cada `put()` marca además `CHUNK_HAS_NODES` en el chunk.
 
-API principal:
-- `put(Block, NodeBlob)` / `get(Block)` (null si el chunk no está cargado) / `getType(Block)` / `hasNode(Block)` / `remove(Block)`.
-- `encode(NodeBlob)` / `decode(String)` — serialización Java vía `BukkitObjectOutputStream`/`BukkitObjectInputStream` + Base64.
-- `normalize()` — repara blobs antiguos (listas/null a valores por defecto) y **migra Greedy Cells legadas**: si una Greedy tenía carga de ítem único en `cellSample`/`cellAmount`, se mueve a `greedySamples`/`greedyAmounts`.
+API: `put` / `get` (copia en cada lectura; null si el chunk no está cargado) / `canonical` /
+`getType` / `hasNode` / `remove` / `countNodesInChunk` / `encode` / `decode`.
+- **`canonical(Block)`** devuelve una instancia compartida ya decodificada. `NetworkStorage` lee cada
+  celda en cada depósito y retirada, y decodificar Base64 + `BukkitObjectInputStream` ahí era el coste
+  más alto del plugin. Cada `put` reemplaza la instancia compartida, así nunca es más vieja que la
+  última escritura (`NodeStoreCanonicalTest`). La caché se vacía entera al pasar de 8.192 entradas.
+- **`decode`** trata una entrada corrupta como ausente, en silencio y barato
+  (`NodeStoreCorruptionTest`); también migra blobs antiguos (listas null, Greedy Cells de un ítem).
 
 ### 5.3 Registro de controladores (`networks.yml`)
-`NodeStore` mantiene en memoria `Map<UUID, List<String>> CONTROLLERS` (mundo → `"x,y,z"`). Se guarda en `<dataFolder>/networks.yml` bajo `controllers.<world-uuid>`. El `save()` se ejecuta **asíncronamente** si se llama desde el hilo principal (no bloquea el tick). `NetworkManager.load()` recrea las redes desde este registro al arrancar.
+`Map<UUID, List<String>>` (mundo → `"x,y,z"`) persistido en `<dataFolder>/networks.yml`. `save()`
+escribe de forma asíncrona si se llama desde el hilo principal. `NetworkManager.load()` reconstruye
+las redes a partir de él al arrancar.
 
 ## 6. La red (`net/Network` y `net/NetworkManager`)
 
 ### 6.1 Topología: `Network`
-- Identificada por la posición empaquetada (long) del **controlador** (`controllerPos`).
-- `nodes: Map<Long, DeviceType>` = conjunto de miembros; `byType: Map<DeviceType, Set<Long>>` = índice inverso por tipo (para iterar solo grabbers/pushers/etc. con miles de nodos).
-- `version` (long, volatile) — se incrementa en cada `scan()`; `NetworkStorage` la usa para detectar topologías obsoletas.
-- `scan()` — **BFS de relleno** desde el controlador sobre los 6 vecinos adyacentes (±X/±Y/±Z). Poda por: chunk sin cargar, chunk sin marca `CHUNK_HAS_NODES`, bloque sin tipo, y **segundo controlador** (se rechaza con `error = "foreign controller"`); respeta `network.max-nodes`. Nunca fuerza cargas de chunk. Expone `error` (aviso legible), `markDirty()` y `needsScan(intervalMs)`.
-- Queries: `contains(pos)`, `typeAt(pos)`, `forEach(type, consumer)` (copia defensiva para poder romper/poner bloques durante la iteración), `count(type)`, `block(pos)`.
+- Se identifica por la posición empaquetada del controlador. `nodes: Map<Long, DeviceType>` más el
+  índice inverso `byType: Map<DeviceType, Set<Long>>`, para que el ticker solo recorra los tipos que
+  necesita.
+- `scan()` — **BFS** desde el controlador por los 6 vecinos ortogonales. El escaneo:
+  - nunca carga chunks (salta vecinos sin cargar; con el controlador sin cargar deja la red como
+    estaba);
+  - vacía la red si el bloque del controlador ya no tiene blob (`controller missing`);
+  - toma el dueño del blob del controlador y no se expande por terreno que ese dueño no pueda usar
+    (`ProtectionBridge.mayActorUse`), contando los rechazos (`linksBlockedByProtection()`);
+  - se detiene en otro controlador (`foreign controller at x,y,z`) y activa
+    `touchesForeignController()`;
+  - con Slimefun, trata como cables los bloques de Slimefun cuyo id contiene `CABLE`/`BRIDGE` y anota
+    los barriles de Slimefun que toque (`slimefunBarrels()`);
+  - respeta `network.max-nodes`; incrementa `version` e invalida la caché del almacenamiento.
+- Consultas: `contains`, `typeAt`, `forEach(type, consumer)` (copia defensiva), `count(type)`,
+  `block(pos)`, `ownerUuid()`, `error`.
 
 ### 6.2 Gestor: `NetworkManager`
-- Mapa `networksByWorld: Map<UUID, Map<Long, Network>>` (mundo → controlador → red).
-- `registerController(Block)` / `removeController(Block)` — crean/eliminan la red y actualizan `NodeStore`.
-- `networkAt(Block)` — búsqueda lineal entre las redes del mundo que contienen el bloque; `networkByController(Location)` — acceso directo por controlador (terminal inalámbrica).
-- `invalidateNear(Block)` — reescanea la red del bloque y las de sus **6 vecinos** (para cuando un bloque cambia la conectividad). Se llama desde `BlockListener` al colocar/romper/rastrillar/pintar.
-- Helpers de filtros: `filterPredicate(blob)` (whitelist/blacklist), `matchesFilter(template, item)` (ordena: DeviceType → ID Slimefun → nombre mostrado → material), `extractMatching(Inventory,…)` (acumula hasta `max` unidades fusionando las ranuras con el mismo ítem), `insertInto(Inventory,…)`.
+- `networksByWorld: Map<UUID, Map<Long, Network>>`.
+- `registerController` / `removeController`, `networkAt(Block)` (búsqueda lineal entre las redes del
+  mundo), `networkByController(Location)`.
+- `invalidateNear(Block)` — reescanea la red del bloque y las de sus 6 vecinos (colocar/romper/rake).
+- Filtros: `filterPredicate(blob)` (filtro vacío → acepta todo; si no, whitelist o blacklist),
+  `matchesFilter(template, item)` (orden: DeviceType → id de Slimefun → nombre visible → material),
+  `extractMatching(Inventory, …)` (un tipo de ítem, juntando todas las ranuras hasta la cuota),
+  `insertInto(Inventory, …)`.
 
-## 7. Almacenamiento virtual: `NetworkStorage`
+## 7. Almacenamiento de ítems: `NetworkStorage`
 
-Vista agregada de todos los bloques de almacenamiento de la red (Quantum Cells, Greedy Cells y Barriles Infinitos) como **una sola «bóveda»**. Los GUIs y el ticker interactúan con la red, no con celdas individuales.
+Una sola "bóveda" sobre todo el almacenamiento de la red: la **Caché Virtual de CPU** del
+controlador, las **Celdas Cuánticas**, los **Infinity Barrels**, las **Greedy Cells** y los
+**barriles de Slimefun**. Todos los métodos son `synchronized`; los blobs se leen con
+`NodeStore.canonical` y solo se reescriben los modificados.
 
-- `sync()` — reconstruye la lista de celdas `CellRef(pos, tier, greedy, barrel)` cuando `network.versionSnapshot() != boundVersion`; clasifica cada nodo (celda normal → `cellTier()`, greedy, barril).
-- `load()` / `flush()` — por operación descodifica los blobs de celdas cargadas (ignora chunks sin cargar o celdas cuyo tipo real ya no coincide) y reescribe los sucios.
-- **`deposit(ItemStack)` → leftover** — en tres pasadas: (1) **Greedy Cells** (sumidero preferido, si el ítem matchea una muestra o pasa el filtro); (2) **celdas con la misma plantilla** (`cellSample`); (3) **celdas vacías** (adoptan el tipo). Nunca muta el stack que recibe.
-- **`withdraw(matcher, amount[, excludePos])`** — dos pasadas: normales+barriles primero, **Greedy Cells después** (buffer de salida; `excludePos` evita que una Greedy se retire su propia carga). Resultado de un único tipo de ítem.
-- `count(predicate)` — suma total de ítems que cumplen el predicado.
-- `view()` — instantánea consolidada para GUIs con **caché de 500 ms**; agrupa por material y mezcla con `StackUtils.itemsMatch` (nunca con `hashCode`).
-- Capacidades: celda → `Settings.cellCapacity(tier)`; greedy → `Settings.greedyCapacity()`; barril → `Settings.barrelCapacity()`.
-- Utilidades: `getGreedyStoredAmount`, `isItemPurged`, `getPurgedItemsView`, `countActivePurgers`, `countActiveGreedyCells`, `isEmpty`.
+- **`deposit(ItemStack)` → sobrante**. Primero los **Quota Limiters** recortan la cantidad (gana el
+  límite más bajo), luego 8 pasadas: (1) Greedy Cells cuyo filtro coincide o que ya tienen el ítem →
+  (2) caché virtual con ese tipo → (3) barriles de Slimefun con ese tipo → (4) celdas/barriles con ese
+  tipo → (5) espacio libre de la caché virtual → (6) barriles de Slimefun vacíos → (7) celdas/barriles
+  vacíos (adoptan el tipo) → (8) Greedy Cells sin filtro. Nunca modifica el argumento.
+- **`withdraw(matcher, want, excludePos, includeGreedy)`** — caché virtual → celdas y barriles →
+  barriles de Slimefun → Greedy Cells (solo si `includeGreedy`). Devuelve un único tipo de ítem. Los
+  Pushers, la succión de la Greedy y las dos direcciones del puente pasan `includeGreedy = false`;
+  terminales, crafteo y la API usan la forma de 2 argumentos (Greedy incluida). Un Infinity Barrel
+  conserva su `cellSample` al llegar a 0; una celda lo olvida.
+- `count`, `remainingQuota`, `view()` (caché de 500 ms, agrupado con `StackUtils.itemsMatch`),
+  `getPurgedItemsView`, `isItemPurged`, contadores.
 
-## 8. El latido: `NetworkTicker`
+## 8. Almacenamiento de fluidos: `NetworkFluidStorage`
 
-- Sincrónico, `runTaskTimer(plugin, run, 20L, 5L)` — primer tick a los 20 ticks, después **cada 5 ticks**.
-- Contadores por familia (`scanIn`, `transferIn`, `vacuumIn`, `craftIn`) → cada familia se ejecuta según su intervalo configurado (múltiplos de 5).
-- Por red: si `dirty` o toca escaneo → `scan()`; si toca transferencia → `doTransfers`; si toca vacío → `doVacuum`; si toca crafteo → `doCrafting`.
-- **`doTransfers`** (batching por operación): `items-per-op` = 128 base; el HT (Grabber/Pusher avanzados) usa `128 × ht-multiplier (8) = 1024`. Orden de procesado por tipo:
-  1. `GRABBER` (importa 64) → `GRABBER_HT` (512) → `PUSHER` → `PUSHER_HT` → `GREEDY_CELL` → `PURGER` → `RECEIVER`.
-  2. **Grabber**: extrae de contenedores vanilla (o máquinas Slimefun si `compat.slimefun`) contra su filtro, deposita en la red; si el destino se llena, el sobrante se devuelve o **se suelta al mundo** (`dropItemNaturally`).
-  3. **Pusher**: retira de la red contra su filtro e inserta en contenedores/máquinas; si no caben, el sobrante **vuelve a la red**.
-  4. **Purger**: solo actúa si tiene **filtros no vacíos** (a salvo del borrado indiscriminado); retira y descarta.
-  5. **Greedy**: `greedyTick` = aspira (retira hasta `4 × items-per-op` con `excludePos` propio) si tiene filtro y espacio, y luego **distribuye** hasta `2 × items-per-op` a contenedores/máquinas adyacentes.
-  6. **Receiver** (puente inalámbrico): solo si el blob tiene `txWorld` y **filtro no vacío** (evita fusiones accidentales de redes); retira de la red remota y deposita en la propia.
-- **`doVacuum`**: radio `vacuum.radius`; recoge entidades `Item` del suelo (sin `pickupDelay`, y que pasen el filtro) hacia la red.
-- **`doCrafting`**: por Auto-Crafter, decodifica cada blueprint instalado (`craft/Blueprints.decode`) e intenta craftear (ver §10).
-- `DeviceType` — enum de **40 dispositivos y módulos**. Cada constante tiene `material`, `display`, `placeable` y `cellTier` (1–6). Propiedades derivadas: `isCell()` (tier > 0), `filterable()` (grabbers, pushers, vacuum, greedy, purger, receiver), `isImporter()`/`isExporter()`, `isDirectional()` (avanzados HT), `isRouter()`, `isCacheModule()`, `isFluidCell()`, `isLiquidPump()`, `isRequestTerminal()`. `parse(name)` acepta `MVN_…`, sin prefijo y `wireless`.
+Aparte de los ítems: la suma de todas las `MVN_FLUID_CELL` (un fluido por celda,
+`fluids.cell-capacity-mb` cada una). `deposit(fluid, mB)` es **todo o nada**: devuelve `0` si cupo
+todo y la cantidad completa (sin guardar nada) en caso contrario, porque cada llamante — bomba,
+terminal, ranura de entrada — solo consume un cubo, botella o bloque fuente entero cuando recibe `0`.
+`withdraw`, `count`, `getFluids`, `totalCapacity`, `totalStored`.
+
+## 9. El latido: `NetworkTicker`
+
+- `runTaskTimer(plugin, run, 20L, 5L)`; cuentas atrás por familia (`scanIn`, `transferIn`,
+  `vacuumIn`, `craftIn`) que disparan cada familia en su intervalo configurado.
+- En cada ejecución: las redes se ordenan por mundo y posición del controlador; se escanean las sucias
+  o a las que les toca; si toca alguna operación, `assignSharedNodes` entrega cada nodo compartido por
+  dos redes (`touchesForeignController`) a la primera, así **cada dispositivo trabaja una vez por
+  ciclo**; después transferencias, vacuum y crafteo corren con `forEachWorked`; por último se
+  actualiza el holograma dentro de un try/catch (un fallo del holograma se registra una vez y nunca
+  detiene el bucle).
+- **`doTransfers`** (`items-per-op` = 128, HT = ×`ht-multiplier`):
+  - **Grabber** (`grabOnce`): reintenta primero su búfer de tránsito; luego la primera cara que dé
+    algo — primero las ranuras de salida de máquinas de Slimefun, después contenedores vanilla.
+    Sobrante → Pushers que lo acepten (`streamToPushers`) → de vuelta al origen → búfer de tránsito.
+    Los grabbers inactivos se relajan (uno de cada tres ciclos tras uno vacío, hasta 30).
+  - **Pusher** (`pushOnce`): reintenta primero su búfer de tránsito; whitelist vacía = inactivo; no
+    hace nada sin un contenedor al lado; retira un tipo (sin Greedy) y lo inserta; el resto vuelve a la
+    red o al búfer de tránsito.
+  - **Greedy Cell** (`greedyTick`): succión hasta `4 × items-per-op`, reparto hasta
+    `2 × items-per-op` a contenedores vecinos que no son de la red.
+  - **Purger**: solo con filtro no vacío.
+  - **Receptor** (`bridgeOnce`) / **Transmisor** (`transmitOnce`): mueve ítems el extremo que guarda
+    el enlace. Regla de filtro `bridgeFilterSet`: whitelist no vacía o cualquier blacklist. Ambos
+    extremos pasan la protección con el dueño de su propia red; los sobrantes vuelven al origen y, si
+    no, caen junto al dispositivo.
+  - **Liquid Pump** (`pumpTick`): un bloque fuente debajo, solo si `deposit` devuelve 0.
+- **`doVacuum`**: entidades `Item` sin retardo de recogida dentro de `vacuum.radius`.
+- **`doCrafting`**: cada Auto-Crafter (y Slimefun Auto-Crafter si `sf-crafter.enabled`) intenta una
+  vez cada Blueprint instalado.
+- Cada bloque que se toca pasa `denied(net, block)` → `ProtectionBridge.mayActorUse(block, owner)`.
+
+## 10. Dispositivos e ítems (`item/DeviceType`, `item/Items`)
+
+`DeviceType` enumera los **43** dispositivos, módulos y herramientas; cada constante tiene `material`,
+`display`, `placeable` y `cellTier`. Propiedades derivadas: `isCell()`, `isBarrel()`, `isFluidCell()`,
+`isLiquidPump()`, `isRequestTerminal()`, `isAutoCrafter()`, `isRequestCrafter()`,
+`isSlimefunCrafter()`, `filterable()` (grabbers, pushers, vacuum, greedy cell, purger, receptor,
+transmisor), `isImporter()`/`isExporter()`, `isDirectional()`, `isRouter()`, `isCacheModule()`,
+`cacheTier()`. `parse(name)` acepta `MVN_…`, la forma sin prefijo y `wireless`.
 
 | Constante | Material | Nombre visible | Colocable |
 | --- | --- | --- | --- |
@@ -161,8 +237,8 @@ Vista agregada de todos los bloques de almacenamiento de la red (Quantum Cells, 
 | `MVN_TERMINAL` | BEACON | Network Terminal | ✔ |
 | `MVN_MONITOR` | RESPAWN_ANCHOR | Network Monitor | ✔ |
 | `MVN_ROUTER` | LIGHTNING_ROD | Network Router | ✔ |
-| `MVN_CACHE_L1`…`QUANTUM` | Varios | Módulos de Caché CPU (L1–Quantum) | ✘ (mano) |
-| `MVN_CELL_T1`…`T6` | Terracota por nivel | Quantum Cell T1…T6 | ✔ |
+| `MVN_CACHE_L1` … `MVN_CACHE_QUANTUM` | COPPER_INGOT, GOLD_INGOT, DIAMOND, NETHERITE_INGOT, NETHER_STAR | Módulos de Caché de CPU | ✘ (mano) |
+| `MVN_CELL_T1` … `MVN_CELL_T6` | Terracota por nivel | Quantum Cell T1…T6 | ✔ |
 | `MVN_GREEDY_CELL` | SLIME_BLOCK | Greedy Cell | ✔ |
 | `MVN_INFINITY_BARREL` | BARREL | Infinity Barrel | ✔ |
 | `MVN_GRABBER` / `MVN_GRABBER_HT` | OBSERVER / STICKY_PISTON | Simple / Advanced Grabber | ✔ |
@@ -171,9 +247,10 @@ Vista agregada de todos los bloques de almacenamiento de la red (Quantum Cells, 
 | `MVN_PURGER` | MAGMA_BLOCK | Network Purger | ✔ |
 | `MVN_LIMITER` | TARGET | Network Quota Limiter | ✔ |
 | `MVN_PROBE` | SPYGLASS | Network Probe | ✘ (mano) |
-| `MVN_CRAFTER` | CRAFTING_TABLE | Auto-Crafter | ✔ |
-| `MVN_ENCODER` | SMITHING_TABLE | Recipe Encoder | ✔ |
-| `MVN_SF_ENCODER` | ENCHANTING_TABLE | Slimefun Recipe Encoder | ✔ |
+| `MVN_CRAFTER` / `MVN_SF_CRAFTER` | CRAFTING_TABLE / CRYING_OBSIDIAN | Auto-Crafter / Slimefun Auto-Crafter | ✔ |
+| `MVN_REQUEST_CRAFTER` / `MVN_SF_REQUEST_CRAFTER` | FLETCHING_TABLE / PURPUR_PILLAR | Request Crafter / Slimefun Request Crafter | ✔ |
+| `MVN_REQUEST_TERMINAL` | LECTERN | Request Terminal | ✔ |
+| `MVN_ENCODER` / `MVN_SF_ENCODER` | SMITHING_TABLE / ENCHANTING_TABLE | Recipe Encoder / Slimefun Recipe Encoder | ✔ |
 | `MVN_CRAFTING_GRID` | CARTOGRAPHY_TABLE | Network Crafting Grid | ✔ |
 | `MVN_QUANTUM_WORKBENCH` | BRAIN_CORAL_BLOCK | Quantum Workbench | ✔ |
 | `MVN_TRANSMITTER` / `MVN_RECEIVER` | CONDUIT / REDSTONE_LAMP | Wireless Transmitter / Receiver | ✔ |
@@ -183,134 +260,179 @@ Vista agregada de todos los bloques de almacenamiento de la red (Quantum Cells, 
 | `MVN_RAKE` | DEAD_BUSH | Network Rake | ✘ (mano) |
 | `MVN_FLUID_CELL` | PRISMARINE_BRICKS | Quantum Fluid Cell | ✔ |
 | `MVN_LIQUID_PUMP` | BLUE_STAINED_GLASS | Liquid Pump | ✔ |
-| `MVN_REQUEST_TERMINAL` | LECTERN | Request Terminal | ✔ |
 
-- `Items.create(type)` — construye el `ItemStack` con su nombre mostrado y graba `Keys.DEVICE_TYPE = type.name()` en el PDC. `Items.typeOf(item)` lo recupera (distingue ítems del plugin de items vanilla).
-- `Items.capacityOf(type)` — capacidad declarada de un dispositivo (Barril 2 000 000 000; celdas según `Settings`).
-- Herramientas: `rake()` (graba `RAKE_USES`), `spendRakeUse` (gasta un uso, rompe al llegar a 0), `saveConfig`/`readConfig` (llave: `CONFIG_DATA` con materiales + `bl`/`wl`), `linkReceiver`/`readReceiverBind` (`RECEIVER_BIND`), `bindWireless`/`readWirelessBind` (`WIRELESS_BIND`), `blueprint`/`isBlueprint`/`readBlueprint` (recetas legadas por `BLUEPRINT_RECIPE`).
-- `registerRecipes(plugin)` — registra **todas** las recetas shaped del plugin. Los patrones 3×3 están documentados en [Recipes.md](../Recipes.md).
+`Items`:
+- `create(type)` construye el ítem (nombre, lore, `DEVICE_TYPE`); `typeOf(item)` lo lee.
+- `capacityOf(type)` — celdas, barril, greedy cell y módulos de caché desde `Settings`.
+- Herramientas: `rake()`/`rakeUses`/`spendRakeUse`; `saveConfig`/`readConfig` y
+  `saveConfigItems`/`readConfigItems` (llave); `linkReceiver`/`readReceiverBind` (enlace del puente,
+  usado tanto en ítems Receptor como Transmisor); `bindWireless`/`readWirelessBind`.
+- `registerRecipes(plugin)` — las **43** recetas con forma (40 siempre, más el codificador y los dos
+  crafters de Slimefun mientras sus `enabled` estén activos). Patrones: [Recipes.md](../Recipes.md).
+- `GuideBook` construye el libro guía (`/mvnets guide en|es|both`).
 
-## 10. Crafteo (`craft/Blueprints` y `craft/CraftingSupport`)
+## 11. Crafteo (`craft/Blueprints` y `craft/CraftingSupport`)
 
-- `RecipeData` — estructura `Serializable` con `inputs[9]` (cantidad 1, `null` = vacío) y `output`.
-- `Blueprints.encode/decode` — serialización Java + Base64. Un blueprint es un `ItemStack` BOOK con `Keys.BLUEPRINT_DATA`; `toItem` le pone nombre/lore legibles y `read` lo recupera.
-- `Blueprints.resolve(matrix, world)` — normaliza la matriz (quantity-1, aire→null) y la resuelve contra las recetas vanilla del servidor (`Bukkit.getCraftingRecipe`), con caché por matriz. `matchesOutput` exige que la receta actual del servidor siga produciendo la salida grabada (patrón NetworksV6): **si el servidor cambia la receta, el blueprint deja de funcionar**.
-- `CraftingSupport.tryCraftBlueprint(net, data)` — crafteo **atómico** desde el almacenamiento de la red:
-  1. Guardas: datos válidos y matriz no vacía.
-  2. `resolve` + `matchesOutput`.
-  3. Agrega necesidades por tipo (`Need(sample, amount)`) usando `StackUtils.itemsMatch`.
-  4. Pre-chequeo de disponibilidad (con `count`) → si falta algo, no toca nada.
-  5. Consume con `withdraw`; si algo falla a mitad, **reintegra todo lo tomado** (`depositAll`).
-  6. Deposita el resultado; si **no cabe entero** en la red, revierte los ingredientes y falla.
-- `tryCraftOnce(net, recipe)` — variante para recetas Bukkit (legadas) con el mismo patrón de rollback. `tryCraftAll` itera las recetas legadas del blob. La mesa de crafteo de red (`CraftingGridMenu`) usa la misma resolución contra la red (ver §11).
+- `RecipeData` — `inputs[9]` (cantidad 1, `null` = vacío) y `output`. `Blueprints.encode/decode`
+  (serialización Java + Base64), `toItem`, `read`, `isBlueprint`.
+- `Blueprints.resolve(matrix, world)` resuelve la matriz contra las recetas vanilla del servidor (con
+  caché); `matchesOutput` exige que esa receta siga dando el resultado guardado, así que **si el
+  servidor cambia la receta, el blueprint deja de funcionar**.
+- `CraftingSupport.tryCraftBlueprint(net, data)` — **todo o nada**:
+  1. Resuelve el resultado (receta vanilla; con Slimefun, la receta de Slimefun; el resultado guardado
+     solo se acepta tal cual para ítems de Slimefun).
+  2. Agrupa las necesidades por ítem, comprueba con `count` y luego hace `withdraw` de cada una; un
+     fallo a mitad devuelve todo lo tomado (`returnOrDrop`: lo deposita de nuevo y suelta junto al
+     controlador **solo** lo que no cupo).
+  3. Deposita el resultado. Si solo cabe en parte, la parte guardada se vuelve a retirar y se
+     devuelven los ingredientes: el crafteo ocurre entero o no ocurre.
+- `tryCraftOnce` / `tryCraftAll` — variante antigua por clave de receta con el mismo rollback.
+- `RequestTerminalMenu` planifica las cadenas con un stock simulado (`planCraft`), ejecuta paso a paso
+  con un búfer intermedio y devuelve a la red los intermedios sobrantes.
 
-## 11. Capa GUI (`gui/`)
+## 12. Capa de GUI (`gui/`)
 
-### 11.1 Base: `MenuHolder`
-Clase abstracta que implementa `InventoryHolder`. `open(size, title)` crea el inventario, llama a `draw()` (render de botones/ítems) y lo abre. `refresh()` redibuja conservando las ranuras `vanillaSlots()`. Proporciona `giveOrDrop` (devuelve ítems al jugador o los suelta si el inventario está lleno) y `playerInventorySlot(event)` (resolución robusta de la ranura del jugador para evitar dupes). Cada menú implementa `draw()` y `click(event)`; `onClose(event)` opcional.
-
-Menús e inventarios:
+### 12.1 Base: `MenuHolder`
+`InventoryHolder` abstracto. `open(size, title)` crea el inventario, llama a `draw()` y lo abre;
+`refresh()` redibuja conservando el contenido de `vanillaSlots()`. Ayudas: `giveOrDrop`,
+`playerInventorySlot(event)`. Cada menú implementa `draw()` y `click(event)`; `onClose` es opcional.
 
 | Menú | Tamaño | Uso / detalles |
 | --- | --- | --- |
-| `TerminalMenu` | 54 | Terminal (bloque, inalámbrica y receptor). Cajas de extracción por ítem; ranura de entrada `INPUT_SLOT=8`; botones de purger `17`, orden `SORT=26`, filtro `35`, páginas `PREV=44`/`NEXT=53`; 48 ítems por página. En cierre, guarda lo dejado en la entrada en la red. |
-| `EncoderMenu` | 45 | Matriz 3×3 (`BLANK_SLOT=19`), botón codificar `ENCODE=16`, salida `OUTPUT=34`, vista previa `PREVIEW=25`. Produce un ítem Blueprint con la receta embebida. |
-| `CrafterMenu` | 27 | Auto-Crafter: hasta 18 blueprints instalados (`MAX_BLUEPRINT_SLOTS=18`), estado `STATUS=24`, limpiar `CLEAR=25`, ayuda `HELP=26`. |
-| `CraftingGridMenu` | 54 | Mesa de crafteo de red: 3×3 propio + `RESULT=31`, `CRAFT_ONE=33`, `CRAFT_ALL=35`, `CLEAR=38`, páginas `27/29`, info `41`. Consume de la red y entrega al jugador. |
-| `FilterMenu` | 27 | Filtros (grabbers, pushers, vacuum, purger, greedy, receiver): hasta 17 ítems, modo whitelist/blacklist `MODE=17`, botón todas las caras `ALL_DIRECTIONS=24`, limpiar `25`, ayuda `26`. |
-| `MonitorMenu` | 27 | Monitor de conteo de la red. |
-| `CellMenu` | 18 | Quantum Cell individual: plantilla `ITEM=4`, depósito rápido `DEPOSIT_ALL=11`, fijar `SET=13`, extraer todo `EXTRACT_ALL=15`. |
-| `GreedyMenu` | 54 | Greedy Cell: 36 ranuras de almacenamiento (0–35), filtro `45`, depósito rápido `46`, monitor `49`, dirección `50`, info `53`. |
-| `BarrelMenu` | 18 | Barrica Infinita: plantilla `ITEM=4`, depósito `11`, fijar `13`, extraer todo `15`. |
-| `QuantumWorkbenchMenu` | 45 | Mejora de celdas: receta 3×3 (centro `CENTER=20`), craftear `CRAFT=23`, salida `OUTPUT=25` (celda mejorada con carga preservada). |
-| `ChatPrompts` | — | Prompts por chat del plugin (estado `isPending` consultado por `GuiListener`). |
+| `TerminalMenu` | 54 | Terminal (bloque, inalámbrico, botones de transmisor/receptor). Entrada `INPUT_SLOT=8`, vista del purgador `17`, orden `26`, página de fluidos `35`, páginas `44`/`53`; 48 ítems por página. Depósito/retirada de fluidos con cubos y botellas. |
+| `ControllerMenu` | 27 | Estado del controlador, uso de la caché de CPU, estado del router. |
+| `MonitorMenu` | 27 | Diagnóstico en vivo (tarea de refresco mientras está abierto). |
+| `FilterMenu` | 27 | Grabbers, pushers, vacuum, purger, greedy cell, receptor y transmisor: hasta 17 plantillas, modo `17`, limpiar `25`, ayuda `26`. Ranura `24`: selector de cara en los avanzados, "abrir bloque adyacente" en los simples, "abrir terminal" en Transmisor/Receptor. |
+| `CellMenu` / `BarrelMenu` | 18 | Plantilla `4`, depositar todo `11`, fijar ítem `13`, extraer todo `15`. En el barril, clic derecho en *Set Item* borra el registro si está vacío. |
+| `GreedyMenu` | 54 | 36 ranuras de almacenamiento con páginas, filtro `45`, depósito `46`, monitor `49`, dirección `50`, info `53`. |
+| `CrafterMenu` | 27 | Auto/Request/Slimefun crafters: hasta 18 Blueprints, estado `24`, limpiar todo `25` (los devuelve), ayuda `26`. Instalar consume el Blueprint; desinstalar o reemplazar lo devuelve. |
+| `EncoderMenu` / `SfEncoderMenu` | 45 | Plantilla, ranura de blueprint `19`, codificar `16`, vista previa `25`, salida `34`. El Recipe Encoder guarda en el bloque los Blueprints dejados en `19`/`34`; mientras un menú está abierto solo viven en ese menú. |
+| `CraftingGridMenu` | 54 | Crafteo con la red: resultado `31`, craftear uno `33`, craftear todo `35`, limpiar `38`, páginas `27`/`29`, info `41`. |
+| `RequestTerminalMenu` | 54 | 45 opciones por página, entrega `49`, refrescar `51`, páginas `45`/`53`. |
+| `QuotaLimiterMenu` | 36 | Ítem objetivo `13`, activar/desactivar `22`, límite por chat `31`, botones ±1/10/64/1.000. |
+| `FluidCellMenu` | 27 | Tanque `13`, interacción con cubo `10`, extraer un cubo `15`, vaciar tanque `16` (shift+clic derecho). |
+| `LiquidPumpMenu` | 27 | Filtro de fluido `12` (ANY/WATER/LAVA), fluidos de la red `14`. |
+| `QuantumWorkbenchMenu` | 45 | Mejora de celdas: centro `20`, craftear `23`, salida `25`; ingredientes devueltos al cerrar. |
+| `ChatPrompts` | — | Preguntas numéricas por chat (request terminal, limitador). |
 
-### 11.2 Seguridad: `GuiListener` (anti-dupe)
-Listener global que filtra TODOS los clics cuando el inventario superior es un `MenuHolder`:
-- Cancela clics peligrosos: doble-clic, botón medio, teclas numéricas, intercambio con offhand, drop (simple/control), modo creativo, `COLLECT_TO_CURSOR`, movimientos de hotbar y `UNKNOWN`.
-- En inventario del jugador: solo se reenvía el **shift-clic** al menú (salvo si hay un `ChatPrompts` pendiente).
-- En inventario superior: si la ranura no está en `vanillaSlots()`, cancela y reenvía a `menu.click(event)`.
-- `onDrag`: cancela si el arrastre pisa ranuras no-vanilla del menú. `onClose`: notifica a `menu.onClose(event)`.
+### 12.2 Seguridad: `GuiListener` (anti-dupe)
+Para todo inventario superior que sea un `MenuHolder`: cancela doble clic, clic central, teclas
+numéricas, cambio a la otra mano, soltar, acciones de creativo, `COLLECT_TO_CURSOR`, movimientos de la
+barra rápida y `UNKNOWN`; del inventario del jugador solo llegan al menú los shift+clic; las ranuras
+superiores no vanilla se cancelan y se envían a `click`; los arrastres sobre ranuras no vanilla se
+cancelan; `onClose` se reenvía.
 
-## 12. Listener de bloques (`listen/BlockListener`)
+## 13. Eventos (`listen/`)
 
-El listener se ocupa del **cableado de eventos** (colocar, romper, explosiones, pistones, uso de herramientas) y delega el **comportamiento de dispositivos** en `listen/DeviceInteractions`: qué menú abre cada tipo, la puerta de acceso del jugador (`canAccessNetwork`, incluida la comprobación de isla de BentoBox), la instalación de módulos de caché en el controlador y la interacción rápida con la celda de fluidos. `BlockListener.openTargetBlockInterface` queda como costura pública de una línea porque `FilterMenu` la usa para inspeccionar el bloque adyacente desde dentro de un GUI.
-
-Eventos manejados:
+`BlockListener` lleva el cableado de eventos; `DeviceInteractions` decide qué abre cada dispositivo y
+la puerta de acceso del jugador (`canAccessNetwork`, estático: bypass de admin, providers de
+protección, pertenencia a la isla de BentoBox), instala módulos de caché y gestiona la interacción
+rápida con la celda de fluidos.
 
 | Evento | Comportamiento |
 | --- | --- |
-| `BlockPlaceEvent` | Si el ítem colocado es un dispositivo: lo registra (`NodeStore.put`), restaura carga embebida (`CELL_CARGO`), vincula un Receptor si procede, y si es controlador lo da de alta (`registerController`) o invalida los vecinos. |
-| `BlockBreakEvent` | Si el bloque es un nodo: suelta un ítem del dispositivo **con el estado embebido en `CELL_CARGO`** (salvo controlador/cable/estado vacío), elimina el nodo y reescanea. |
-| `PlayerInteractEvent` | Herramientas de mano (Sonda → diagnóstico, Rastrillo → retirar sin romper, Llave → copiar/pegar filtros, Crayón → partículas); vinculaciones (`shift+clic` terminal inalámbrica sobre controlador/terminal; receptor sobre transmisor); y apertura del menú correspondiente según dispositivo (ver tabla de menús). |
-| `BlockPistonExtendEvent` / `BlockPistonRetractEvent` | Cancela si algún bloque movido es un nodo (los nodos no se pueden empujar/arrastrar). |
-| `EntityExplodeEvent` / `BlockExplodeEvent` | Retira los nodos de la lista de bloques destruidos (inmunes a explosiones). |
+| `BlockPlaceEvent` | Comprueba mundos bloqueados y `max-nodes-per-chunk`; registra el nodo, restaura el estado embebido (`CELL_CARGO`), aplica el enlace del puente desde el ítem (Receptor o Transmisor), guarda el dueño del Controlador y luego registra el controlador o reescanea los vecinos. |
+| `BlockBreakEvent` | Suelta los Blueprints guardados del Encoder, suelta el dispositivo con su estado embebido (nada en creativo), quita el nodo y reescanea. |
+| `PlayerInteractEvent` | Clic al aire con Terminal Inalámbrico (bloqueo por combate, alcance/mundo salvo con Router, acceso). Clic en bloque: acceso, luego Probe, Rake (devuelve el dispositivo), Llave, vínculos (inalámbrico en controlador/terminal; ítem Receptor en Transmisor e ítem Transmisor en Receptor), agachado nunca abre menús, mensaje de estado del cable, instalación de módulos de caché, interacción rápida con la celda de fluidos, menú del dispositivo. |
+| `InventoryMoveItemEvent` | Las tolvas pueden meter y sacar de un Infinity Barrel (su ítem registrado); el resto de nodos rechaza las tolvas. |
+| Pistones / explosiones | Los nodos no se pueden mover y se quitan de las listas de bloques de las explosiones. |
+| `EntityDamageByEntityEvent` | Anota el momento del combate para el bloqueo del Terminal Inalámbrico. |
 
-Herramientas destacadas:
-- **Probe** (`probeNode`): informa del dispositivo, de su red (o «NO NETWORK» si no llega al controlador) y de avisos del último escaneo.
-- **Rake** (`useRake`): elimina el nodo al instante (nunca un controlador y nunca almacenamiento con carga), gasta un uso y se rompe al acabarse.
-- **Wrench** (`useWrench`): shift+clic copia filtros al ítem; clic normal los pega en otro dispositivo filtrable.
+`CraftingListener` vuelve a registrar las recetas tras recargas, las desbloquea al entrar y mejora una
+celda con carga en una mesa de crafteo normal conservando la carga.
 
-## 13. Comando `/mvnets` (`command/MvnetsCommand`)
+## 14. Comando `/mvnets` (`command/MvnetsCommand`)
 
-Subcomandos: `help`, `info`, `guide`, `reload`, `give <id> [n]`, `devices`, `doctor`, `stats`, `inspect`, `repair`. Los comandos de administración usan **`multiversenets.admin`** (`reload`, `give`, `doctor`, `stats`, `inspect`, `repair`); `help`/`info`/`guide`/`devices` están abiertos. `TabCompleter` completa subcomandos y, para `give`, los IDs de dispositivos (`type.id()`, en minúsculas sin prefijo `mvn_`).
+Subcomandos: `help`, `info`, `guide`, `devices` (abiertos) y `give <id> [n]`, `doctor`, `stats`,
+`inspect`, `repair`, `recipes`, `reload` (**`multiversenets.admin`**). El autocompletado sugiere
+subcomandos, `en|es|both` para `guide` y los ids de dispositivo para `give` (`type.id()`, p. ej.
+`mvn_controller`; `give` también acepta la forma sin prefijo).
 
-## 14. Integración con Slimefun (`compat/SlimefunBridge`)
+## 15. API pública (`api/MultiverseNetsAPI`)
 
-- **Por qué existe**: las máquinas de Slimefun guardan su inventario en `BlockMenu`, no como `InventoryHolder`; sin puente serían bloques decorativos para grabbers/pushers.
-- **Por reflexión**: el plugin sigue siendo 100 % autónomo. Busca los paquetes `com.github.drakescraft_labs.slimefun4.legacy` y `io.github.thebusybiscuit.slimefun4.legacy`. Si `compat.slimefun=false` o Slimefun no está instalado, queda **inactivo** (`isAvailable()` = false) y solo se usan contenedores vanilla.
-- API: `isMachine(Block)` (menú propio), `getId(Block)` (`checkID`) e `getId(ItemStack)` (lee el tag PDC `slimefun_item`), `extract` (saca de los slots de salida respetando `getSlotsAccessedByItemTransport` + `WITHDRAW`), `insert` (empuja a slots de entrada + `INSERT`). Conserva alias legados en español: `disponible`, `esMaquina`, `idDe`, `esItemSlimefun`, `extraer`, `insertar`.
+Métodos estáticos y null-safe para otros plugins, todos a partir de cualquier bloque de una red:
+`isNetworkBlock(block)`, `extract(block, matcher, amount)`, `insert(block, stack)` (devuelve el
+sobrante) y `count(block, matcher)`. Van directos a `NetworkStorage`, así que se aplican las cuotas y
+el orden de almacenamiento.
 
-## 15. Protección de tierras (`compat/ProtectionBridge`)
+## 16. Integración con Slimefun (`compat/SlimefunBridge`)
 
-- **Por qué existe**: una red es un **actor anónimo**. No lleva identidad de jugador, así que un grabber sentado en tierra pública podía leer un cofre dentro de la región de ProtectionStones de otro jugador: dos jugadores acababan robándose entre sí a través de sus propios dispositivos.
-- **La red tiene dueño**: como la red no es un jugador, se le da la única identidad que sí puede tener. Al colocar el Controlador se guarda en su `NodeBlob` el UUID de quien lo puso (`ownerUuid`), y el plugin pregunta por esa identidad en vez de por un jugador anónimo (`ProtectionBridge.mayActorUse`). Una red puede operar dentro de los reclamos de **su propio dueño** y de nadie más: construir la base dentro del propio reclamo dejó de ser el caso roto (antes el escaneo cortaba en la frontera y el controlador se quedaba solo en una red de 1 nodo con «NO NETWORK» en cada máquina).
-- **Es tercero**: el `Provider` tiene un tercer método opcional, `allowsActor(UUID, Location)`, aparte de `test` (anónimo) y `allowsPlayer` (jugador). Solo `ProtectionStonesProvider` lo implementa hoy, reutilizando su `isOwner`/`isMember`; los demás devuelven `null`, que significa «no puedo certificar a este actor» y deja sus reclamos cerrados ante toda red, exactamente como antes. El UUID es el del dueño de la red, nunca el de quien pregunta, así que un provider roto no abre tierra: `allowsActor` que lanza **no** concede propiedad, igual que `test` que lanza sí protege.
-- **La respuesta se memoriza aparte**: `ownsAt` cachea por `(mundo, actor, posición)` y no reutiliza la caché anónima por posición, porque el mismo punto puede ser tierra de uno para una red y de un extraño para la siguiente.
-- **Controladores antiguos**: un controlador colocado antes de que existiera el campo no tiene dueño y se trata como extraño. No hace falta romperlo: el primer jugador al que `mayPlayerAccess` ya autorizó a abrir el controlador queda registrado como dueño en ese momento (`DeviceInteractions.adoptControllerOwner`).
-- **Dónde se aplica**: en `NetworkTicker` se comprueba el bloque destino antes de cada operación (grabber, pusher, distribución de la Greedy Cell, vacuum, bomba de líquidos y puente inalámbrico, comprobando los dos extremos **con el dueño de cada red**), y en `Network.scan()` el BFS **deja de tenderse** al entrar en tierra que no es del dueño de la red. Ese corte es lo que garantiza que dos redes a lados opuestos de una frontera nunca se fusionen en un mismo bus de ítems. `DeviceInteractions.canAccessNetwork` añade la comprobación para cuando un jugador abre un dispositivo a mano.
-- **Por reflexión**: cada plugin es un `ProtectionBridge.Provider` independiente que resuelve su API una vez en `setup()`. Si el plugin falta, está desactivado, expone otro empaquetado o `setup()` lanza, ese provider **no se registra** y los demás siguen funcionando. Si un provider lanza en tiempo de ejecución, la posición se trata como **protegida** (nunca como "libre"), de modo que una API rota no abre una fuga.
-- **Providers**: `ProtectionStonesProvider` (`PSRegion.fromLocation`), `WorldGuardProvider` (pertenencia a cualquier región), `LandsProvider`, `TownyProvider` (todo lo que no sea desierto) y `GriefPreventionProvider`. Cada uno es una clase aparte, así que añadir otro es añadir un archivo.
-- **La API real de ProtectionStones**: la versión anterior del provider buscaba `PSProtectionManager.getProtectionFromLocation(Location)` devolviendo un `Optional`, más un `isRegion()` y un parámetro de claims. **Nada de eso existe**, ni en el fork de Drake ni en la API pública documentada: `setup()` devolvía `false`, el provider no se registraba y la tierra de ProtectionStones quedaba sin cubrir sin avisar. La única pregunta que la API hace es `PSRegion.fromLocation(Location)`, una factoría estática que devuelve la región más interna o `null`. Se prefiere `fromLocationUnsafe`, que además cubre regiones cuyo tipo de bloque protector no está en la config, mientras que `fromLocation` devolvería `null` y desprotegería tierra que el jugador sigue poseyendo. Al no existir `isRegion()`, `protection.allow-claims` **no se aplica a ProtectionStones**: todos sus reclamos quedan protegidos y la única salida es `exempt-locations`.
-- **Resolución por firma, no por nombre**: los providers enlazan sus métodos exigiendo el tipo estático o de instancia y la lista exacta de parámetros. Esto no es purismo: la forma de 4 argumentos de `GriefPrevention.getClaimAt` es `(Location, boolean ignoreHeight, boolean ignoreSubclaims, Claim)`, así que rellenarla contando argumentos pasa un `Boolean` donde va un `Claim` y lanza en cada llamada. En `GriefPrevention` `ignoreHeight` además siempre es `false`, porque `true` responde "¿está en la columna del reclamo?" y marcaría una cueva como tierra protegida.
-- **Solo contención, no flags**: una región que permite `BLOCK_BREAK` a sus miembros sigue siendo territorio del que MVN no debe entrar. Los flags por posición y tick son caros y, para una región que el servidor abre, `protection.exempt-locations` ya es la respuesta.
-- **Rendimiento**: la pregunta se hace miles de veces por segundo y detrás hay una llamada reflectiva, así que las respuestas se memorizan por mundo y posición en un `ConcurrentHashMap` y se vacían cada `protection.cache-ticks` (100 por defecto, mínimo 20). Un cambio de reclamo se aplica en ≤ 5 s sin reiniciar.
-- **Diagnóstico del corte**: `Network.scan()` cuenta los enlaces que rechazó por protección (`linksBlockedByProtection()`) y los añade a `Network.error`, así que `/mvnets doctor`, `/mvnets repair` y la sonda dicen «N link(s) stopped at protected land» en vez de dejar una red silenciosamente incompleta. Es la respuesta a «tengo todo conectado y no detecta ningún bloque».
-- **Salida para el resto de casos**: para tierra ajena en la que de verdad quieras que corra una red, `protection.exempt-worlds` y `protection.exempt-locations` (`mundo;x;y;z;radio`, radio por defecto 16) siguen siendo la vía. El permiso `multiversenets.protection.bypass` (hijo de `multiversenets.admin`) deja abrir y configurar dispositivos a mano.
+- Las máquinas de Slimefun guardan su inventario en un `BlockMenu`, no en un `InventoryHolder`; sin el
+  puente parecerían bloques decorativos.
+- **Solo por reflexión** — prueba los paquetes `com.github.drakescraft_labs.slimefun4.legacy` e
+  `io.github.thebusybiscuit.slimefun4.legacy`. Con `compat.slimefun: false` o sin Slimefun queda
+  dormido (`isAvailable()` = false).
+- API: `isMachine`, `getId(Block)` / `getId(ItemStack)`, `extract` (ranuras de salida + `WITHDRAW`),
+  `insert` (ranuras de entrada + `INSERT`), `isNetworkCable`, `isBarrel` y depósito/retirada de
+  barriles, `findSlimefunRecipe`, `openSlimefunMenu`. Se mantienen los alias en español (`disponible`,
+  `esMaquina`, `idDe`, `esItemSlimefun`, `extraer`, `insertar`).
 
-## 16. Configuración (`util/Settings`)
+## 17. Protección de terrenos (`compat/ProtectionBridge`)
 
-Todas las lecturas pasan por `Settings` sobre `plugin.getConfig()` (se refresca en `onEnable` y `/mvnets reload`). Tabla completa:
+- **Por qué**: una red es un actor anónimo; sin esto, un grabber en terreno público podría leer un
+  cofre dentro de la región de otro jugador.
+- **Dueño**: el Controlador guarda el UUID de quien lo colocó (`ownerUuid`); `mayActorUse(lugar,
+  dueño)` permite a la red operar en el terreno de ese dueño. Un provider certifica la propiedad con el
+  método opcional `allowsActor(UUID, Location)` (lo implementa ProtectionStones); los demás devuelven
+  `null` y sus reclamos siguen cerrados para toda red. Un provider que lanza una excepción nunca da
+  acceso.
+- **Controladores antiguos** sin dueño adoptan al primer jugador que `mayPlayerAccess` permite
+  (`DeviceInteractions.adoptControllerOwner`).
+- **Dónde se aplica**: `Network.scan()` (el BFS se detiene en terreno que el dueño no puede usar y
+  cuenta el corte) y `NetworkTicker` antes de cada bloque que toca — grabbers, pushers, desvío a
+  pushers, reparto de greedy, vacuum, bomba y ambos extremos del puente en los dos sentidos. Los
+  jugadores que abren dispositivos pasan por `canAccessNetwork`, incluido el botón de terminal remoto
+  del Receptor.
+- **Providers** (un archivo cada uno, solo se registran si su plugin y su API se resuelven):
+  `ProtectionStonesProvider` (`PSRegion.fromLocationUnsafe`), `WorldGuardProvider`, `LandsProvider`,
+  `TownyProvider`, `GriefPreventionProvider`. Los métodos se enlazan por firma exacta y solo se
+  comprueba la pertenencia a una región, nunca flags.
+- **Salvedad de ProtectionStones**: su API no distingue un reclamo de una región del servidor, así que
+  `protection.allow-claims` no se le aplica.
+- **Rendimiento**: las respuestas se memorizan por mundo y posición (y por dueño en `ownsAt`) y se
+  descartan cada `protection.cache-ticks`.
+- **Salidas**: `protection.exempt-worlds`, `protection.exempt-locations` (`mundo;x;y;z;radio`, radio
+  16 por defecto), `protection.block-network-linking: false` y el permiso
+  `multiversenets.protection.bypass` para jugadores.
 
-| Método | Clave en `config.yml` | Valor por defecto | Límites |
+## 18. Configuración (`util/Settings`)
+
+Todas las lecturas pasan por `Settings` sobre `plugin.getConfig()` (se refresca en `onEnable` y con
+`/mvnets reload`).
+
+| Método | Clave de `config.yml` | Por defecto | Límites |
 | --- | --- | --- | --- |
 | `scanIntervalTicks()` | `network.scan-interval-ticks` | 20 | ≥ 5 |
-| `maxNodes()` | `network.max-nodes` | 16 384 | ≥ 16 |
+| `maxNodes()` | `network.max-nodes` | 16.384 | ≥ 16 |
+| `maxNodesPerChunk()` | `network.max-nodes-per-chunk` | 64 | ≥ 1 |
 | `transferIntervalTicks()` | `network.op-interval-ticks.transfer` | 5 | ≥ 1 |
 | `vacuumIntervalTicks()` | `network.op-interval-ticks.vacuum` | 10 | ≥ 1 |
 | `craftIntervalTicks()` | `network.op-interval-ticks.craft` | 20 | ≥ 1 |
 | `itemsPerOp()` | `transfer.items-per-op` | 128 | ≥ 1 |
 | `htMultiplier()` | `transfer.ht-multiplier` | 8 | ≥ 1 |
-| `greedyCapacity()` | `greedy.capacity` | 262 144 | ≥ 1 |
-| `barrelCapacity()` | `barrel.capacity` | 2 000 000 000 | ≥ 1 |
-| `maxBlueprints()` | `crafter.max-recipes` | 18 | entre 1 y 18 |
+| `cellCapacity(tier)` | `cells.capacities` | lista de abajo | se ajusta al último nivel |
+| `virtualCacheCapacity(tier)` | `virtual-cache.tier-1` … `tier-5` | 2.048 … 524.288 | — |
+| `greedyCapacity()` | `greedy.capacity` | 262.144 | ≥ 1 |
+| `barrelCapacity()` | `barrel.capacity` | 2.000.000.000 | ≥ 1 |
+| `fluidCellCapacity()` | `fluids.cell-capacity-mb` | 64.000 | ≥ 1.000 |
+| `maxBlueprints()` | `crafter.max-recipes` | 18 | 1 – 18 |
 | `vacuumRadius()` | `vacuum.radius` | 4.0 | ≥ 1.0 |
-| `cellCapacity(tier)` | `cells.capacities` | lista por defecto (ver abajo) | clamping a última tier |
+| `rakeUses()` | `rake.uses` | 250 | ≥ 1 |
+| `wirelessLocalRange()` | `wireless.local-range-without-router` | 64 | ≥ 1 |
+| `wirelessCombatCooldownSeconds()` | `wireless.combat-cooldown-seconds` | 10 | ≥ 1 |
+| `blockedWorld(world)` | `blocked-worlds` | `[]` | sin distinguir mayúsculas |
 | `compatSlimefun()` | `compat.slimefun` | `true` | — |
+| `sfEncoderEnabled()` / `sfCrafterEnabled()` | `sf-encoder.enabled` / `sf-crafter.enabled` | `true` | — |
 | `protectionEnabled()` | `protection.enabled` | `true` | — |
-| `protectionProviderEnabled(id)` | `protection.providers` | lista vacía = todos | comparación sin distinguir mayúsculas |
-| `protectionAllowClaims()` | `protection.allow-claims` | `false` | `cfg` ausente = `false` (¡no `true`!) |
+| `protectionProviderEnabled(id)` | `protection.providers` | lista vacía = todos | sin distinguir mayúsculas |
+| `protectionAllowClaims()` | `protection.allow-claims` | `false` | config ausente = `false` |
 | `protectionBlocksNetworkLinking()` | `protection.block-network-linking` | `true` | — |
 | `protectionBlocksPlayerInteraction()` | `protection.deny-player-interaction` | `true` | — |
-| `protectionBypassPermission()` | `protection.bypass-permission` | `multiversenets.protection.bypass` | vacío desactiva el bypass |
+| `protectionBypassPermission()` | `protection.bypass-permission` | `multiversenets.protection.bypass` | vacío quita el bypass |
 | `protectionCacheTicks()` | `protection.cache-ticks` | 100 | ≥ 20 |
-| `protectionExemptWorlds()` | `protection.exempt-worlds` | `[]` | — |
-| `protectionExemptLocations()` | `protection.exempt-locations` | `[]` | entradas inválidas se descartan en silencio |
+| `protectionExemptWorlds()` / `protectionExemptLocations()` | `protection.exempt-worlds` / `exempt-locations` | `[]` | entradas ilegibles se descartan |
 | `debug()` | `debug` | `false` | — |
-| `rakeUses()` | `rake.uses` | 250 | ≥ 1 |
 
-**Capacidades de celdas por tier** (`cells.capacities`, lista de `long`): por defecto `[65536, 262144, 1048576, 16777216, 268435456, 2000000000]` para T1…T6. Si la clave falta o está vacía, se usa la fórmula geométrica `65536 × 2^(tier−1)` (solo T1 coincide con la lista). Si se pide una tier no declarada, se clamp a la última disponible (con aviso único en consola). `SettingsCellCapacityTest` cubre todos estos casos límite.
-
----
-
-Siguiente página: [Los tests del plugin](Tests.md).
+**Capacidades de celda** (`cells.capacities`, lista de `long`): por defecto `[65536, 262144, 1048576,
+16777216, 268435456, 2000000000]`. Clave ausente o vacía → `65536 × 2^(nivel−1)`; un nivel no
+declarado usa el último, con un aviso único en consola (`SettingsCellCapacityTest`).

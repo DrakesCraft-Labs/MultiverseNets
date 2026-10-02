@@ -8,65 +8,265 @@
 
 **Standalone digital logistics networks and massive storage for Paper — no Slimefun.**
 
-> Wiki index: [README](README.md) · [Recipes & functions](Recipes.md) · **Development:** [Structure](dev/Structure.md) · [Code](dev/Code.md) · [Tests](dev/Tests.md)
+> Wiki index: [README](README.md) · [Recipes & functions](Recipes.md) · **Development:** [Structure](dev/Structure.md) · [Code](dev/Code.md) · [Tests](dev/Tests.md) · [Español](../Wiki-es/README.md)
 
 ---
 
 ## 📖 What is MultiverseNets?
 
-**MultiverseNets** implements the full logic of a Networks-style logistics network, but **100% standalone**: no Slimefun and no other dependency. Everything works with the native Paper API using custom items (PDC), chunk-tagged blocks, and persistent virtual storage.
+**MultiverseNets** implements a Networks-style logistics network **100% standalone**: no Slimefun and
+no other dependency. Every device is a custom item (identified by PDC), every placed device is a
+tagged block whose state lives in the chunk, and the network's storage is virtual and persistent.
 
-## ⚙️ Implemented systems
+A network is **one Network Controller plus every MultiverseNets block connected to it**, face to
+face. Cables are the cheap way to connect things, but every device conducts: a grabber touching a
+cell touching the controller is already a network.
 
-### 🖥️ Network
-* **Network Controller**: the heart of the network; indexes nodes via BFS through cables.
-* **Network Cable**: carries the signal between nodes.
-* **Network Terminal** (block) and **Wireless Terminal** (item bindable with shift+click to the controller).
-* **Network Monitor**: diagnostic panel with a breakdown of nodes, storage, and status.
-* **Wireless Transmitter / Receiver**: bind a receiver (shift+click on the transmitter holding the item) and place it in another base or dimension. The receiver **opens the remote network's terminal** and, if you give it a filter, **bridges items** from the transmitter's network to its own every cycle (without a filter it crosses nothing, by design).
+## 🎮 Quick start
 
-### 📦 Quantum storage
-* **Cells T1–T6**: each cell stores a single item type up to its capacity (65k → 2,000M configurable).
-* **Quantum Fluid Cell & Network Fluid Storage**: Stores fluids (Water, Lava, Milk, Honey, Powder Snow) in quantum capacity (default 64,000 mB / 64 buckets). Liquid levels are aggregated into network fluid storage.
-* **Greedy Cell**: a smart buffer that claims its filtered item from the network and feeds it to adjacent containers (ideal for continuous lines).
-* **Network Terminal**: Redesigned Terminal GUI with a 3rd toggle button (slot 35) for fluid storage. Deposit fluid buckets/bottles or withdraw fluids using matching empty containers (Bucket for Water/Lava/Milk/Powder Snow; Glass Bottle for Honey).
-* The network's storage is the aggregate of all connected cells.
-* Atomic per-chunk persistence (Paper region data), anti-dupe in all flows.
+1. Place a **Network Controller**. Whoever places it becomes the network's owner.
+2. Connect **Cables** and devices to it. Add at least one **Quantum Cell** (or an Infinity Barrel)
+   — without storage the network has nowhere to put items.
+3. Right-click a **Network Terminal** (or the controller's menu) to see and use the storage.
+4. Put a **Grabber** next to a chest to import, a **Pusher** next to a chest to export. Configure
+   their filters with right-click.
+5. Check `/mvnets doctor` or a **Network Probe** if something does not connect.
 
-### 🔄 Transport
-* **Importer (Grabber)**: extracts from adjacent containers into the network, with whitelist filter.
-* **Exporter (Pusher)**: inserts from the network into adjacent containers, with filter.
-* **HT (High-Throughput) variants**: fast versions ×8 (configurable) for massive factories.
-* **Liquid Pump**: Dark blue stained glass device that extracts liquid source blocks (strictly Water and Lava) from the block directly below (`BlockFace.DOWN`) into network fluid storage.
-* **Vacuum**: picks up ground items within a configurable radius, now with an optional whitelist filter.
+Every device id below can be given with `/mvnets give <id>`; `/mvnets devices` lists them all.
+Crafting recipes for every device are in [Recipes (EN)](Recipes.md) /
+[Recetas (ES)](../Wiki-es/Recipes.md).
 
-### 🛠️ Auto-crafting
-* **Auto-Crafter**: accepts **Blueprints** (real 3×3 grid) and result-based recipes (legacy mode). Each blueprint is attempted once per cycle with **atomic extraction**: either there are ingredients for everything or nothing is touched.
-* **Slimefun Auto-Crafter**: dedicated autonomous crafter for Slimefun item recipes (Crying Obsidian). Strictly accepts Slimefun blueprints, keeping Slimefun automated production completely isolated from vanilla recipes.
-* **Request Crafter**: dedicated on-demand crafting node managed exclusively by Request Terminals. Blueprints placed here are not auto-crafted periodically, keeping manual crafting orders clean and isolated.
-* **Slimefun Request Crafter**: dedicated on-demand crafting node for Slimefun recipes (Purpur Pillar). Discovered exclusively by Request Terminals for manual and recursive Slimefun crafting.
-* **Request Terminal**: on-demand crafting console linked strictly to Request Crafters across the network. Resolves recursive chained dependencies (e.g., Oak Logs -> Planks -> Crafting Table). Left-click crafts 1x, right-click crafts 64x, and shift+right-click prompts in chat to specify an exact custom quantity with strict numeric validation.
-* **Recipe Encoder**: builds the recipe in a persistent 3×3 template grid (click to fix slots, without spending items) and encodes a blank Blueprint with one click.
-* **Slimefun Recipe Encoder**: Dedicated encoder for Slimefun recipes (toggleable via `sf-encoder.enabled`).
-* **Network Quota Limiter**: Regulates maximum stock allowed in network storage for a specified target item.
-* **Blueprints**: reusable plans that carry the full recipe (grid + result) in their PDC; they are installed in an Auto-Crafter with a click and are not consumed.
-* **Crafting Grid**: manual crafting pulling from the network: the template grid is saved in the block, and each craft withdraws ingredients from the network transactionally.
+---
 
-### 🧰 Tools (brought over from NetworksV6)
-* **Configuration Wrench**: shift+click on a device with a filter **copies** its configuration; normal click **pastes** it onto another.
-* **Network Rake**: removes nodes instantly (250 uses by default, `rake.uses`); does not touch controllers or loaded cells.
-* Filters with **whitelist/blacklist mode** on any device with a filter (grabbers, pushers, vacuum, purger, greedy cell, receiver).
-* **Quick adjacent machine/container inspection**: Shift-Click or Right-Click on any directional face button within Grabber and Pusher menus directly opens the GUI or inventory of the adjacent machine or container (Slimefun machines, vanilla containers, MultiverseNets devices).
+## 🧩 Machine reference
 
-### 🛡️ Reliability
-* Protection against pistons and explosions on nodes.
-* When you break a node, its state travels inside the item (like in Networks): cell cargo, filters, blueprints, grid matrix, and receiver binding. When you place it again, it is as it was.
-* Networks-style anti-dupe guards in all menus (no double-click, no drags over painted slots, no shift+right-click into the void) and **recovery of anything left in the real slots on close**.
-* `/mvnets doctor` rescans and diagnoses all networks; `/mvnets inspect` and `/mvnets repair` inspect and rescan the block you are looking at.
+Rates are the defaults from `config.yml`; every one of them is configurable (see
+[Configuration](#configuration) below). "Cycle" means one transfer cycle (`network.op-interval-ticks.transfer`,
+5 ticks by default).
+
+### 🖥️ Core and access
+
+| Device | id · block | What it does | How to use it |
+|---|---|---|---|
+| **Network Controller** | `mvn_controller` · Lodestone | The network's root. Every scan starts here (breadth-first through connected blocks, up to `network.max-nodes`). Records its owner (the placer), shows a floating hologram with status, nodes and stored totals, and can hold a **CPU Virtual Cache**. | Right-click: status, cache usage, router status. Right-click with a Cache Module to install it. Only one controller per network: a second one wired to the same cables is reported as `foreign controller` (see [Shared buses](#shared-buses)). |
+| **Network Cable** | `mvn_cable` · Glass | Connects devices. No logic of its own. | Right-click it to see whether it reaches a controller (and the network size). Holding a block while right-clicking places the block instead. |
+| **Network Terminal** | `mvn_terminal` · Beacon | The storage grid: every item in the network (cache, cells, barrels, greedy cells, Slimefun barrels) and a second page for fluids. | Left-click takes 1, right-click a stack, shift+click sends to your inventory. Shift+left-click your items (or drop them in the input slot) to store them. Search, sort and page buttons. Buckets/honey bottles go to fluid storage. |
+| **Wireless Terminal** | `mvn_wireless_terminal` · item (Nether Star) | Opens the Network Terminal remotely. | Shift+right-click a Controller or a Terminal to bind it, then right-click in the air. Without a **Network Router** it works only in the same world and within `wireless.local-range-without-router` (64) blocks. Never within 10 s of combat, and only if you may access the network's land. |
+| **Network Router** | `mvn_router` · Lightning Rod | Lifts the Wireless Terminal limits for its network: any distance and any world. | Connect it anywhere in the network. |
+| **Network Monitor** | `mvn_monitor` · Respawn Anchor | Live diagnostic panel: node counts by type, storage usage, errors. | Right-click; it refreshes while open. |
+| **Network Probe** | `mvn_probe` · item (Spyglass) | Answers "is this connected?": network size, controller position, scan errors and protection cuts for the block you click. | Right-click any block. |
+| **CPU Cache Modules** | `mvn_cache_l1` · `_l2` · `_l3` · `_dram` · `_quantum` · items | Turn the controller into multi-item storage: 2,048 / 8,192 / 32,768 / 131,072 / 524,288 items in total, any mix of types. The contents travel inside the controller item when it is broken. | Right-click the controller with the module. Only upgrades are accepted; the module is consumed and a lower one already installed is not returned. |
+
+### 📦 Item storage
+
+| Device | id · block | What it does | How to use it |
+|---|---|---|---|
+| **Quantum Cell T1–T6** | `mvn_cell_t1` … `mvn_cell_t6` · Terracotta (plain, orange, yellow, lime, cyan, purple) | Stores **one item type** each: 65,536 / 262,144 / 1,048,576 / 16,777,216 / 268,435,456 / 2,000,000,000 items. An empty cell takes the first item type that has nowhere else to go. | Connect it. Right-click to see or manage its contents. Breaking it keeps the cargo in the item. Upgrade one tier with the Quantum Workbench or in a crafting table (cell surrounded by 8 diamonds); the cargo is kept. |
+| **Infinity Barrel** | `mvn_infinity_barrel` · Barrel | Same as a cell — one item type — with `barrel.capacity` (2,000,000,000), but it **stays registered** to its item when it empties. Hoppers can insert the registered item and pull it out one by one; hoppers cannot touch any other MultiverseNets block. | Right-click: click *Set Item* with an item on the cursor to register it; right-click *Set Item* with an empty cursor clears the registration (only when empty). |
+| **Greedy Cell** | `mvn_greedy_cell` · Slime Block | With a filter: a **priority sink**. Incoming items matching its filter go to it before any other storage, every cycle it pulls up to 512 more of them from the network, and it pushes up to 256 per cycle into adjacent **non-network** containers (chests, Slimefun machines). Holds several types, up to `greedy.capacity` (262,144) in total. Without a filter: general overflow storage, used only when everything else is full. | Right-click to set the filter and see its buffer. Its stock is reserved: Pushers and the wireless bridge never take items out of a Greedy Cell (terminals and crafting can). |
+| **Quantum Workbench** | `mvn_quantum_workbench` · Brain Coral Block | Upgrades a Quantum Cell T1–T5 to the next tier, keeping its cargo. | Cell in the centre, 8 diamonds around it, press *Entangle & Upgrade*, take the result. |
+
+### 💧 Fluids
+
+Fluids live in their own storage, separate from items, and only in Quantum Fluid Cells.
+
+| Device | id · block | What it does | How to use it |
+|---|---|---|---|
+| **Quantum Fluid Cell** | `mvn_fluid_cell` · Prismarine Bricks | Holds one fluid — Water, Lava, Milk, Powder Snow or Honey — up to `fluids.cell-capacity-mb` (64,000 mB = 64 buckets). All fluid cells of a network form its fluid storage. | Right-click with a filled bucket / honey bottle to pour into that cell; with an empty bucket to fill it (Water, Lava, Milk, Powder Snow). Or use the Terminal's fluid page: deposit buckets/bottles, withdraw with an empty bucket (honey with a glass bottle). |
+| **Liquid Pump** | `mvn_liquid_pump` · Blue Stained Glass | Each cycle drains one **source** block of water or lava directly **below** it (1,000 mB). The block is removed only if the whole 1,000 mB fit in the network. | Place it on top of the liquid. Right-click to choose ANY / WATER / LAVA. |
+
+### 🔄 Item transport
+
+| Device | id · block | What it does | How to use it |
+|---|---|---|---|
+| **Simple Grabber** | `mvn_grabber` · Observer | Imports from adjacent containers into the network: up to 128 items of one type per cycle, all six faces. | Right-click for the filter (whitelist/blacklist). Empty filter = everything. |
+| **Advanced Grabber** | `mvn_grabber_ht` · Sticky Piston | Same, ×8 (`transfer.ht-multiplier`): 1,024 per cycle, and it can be restricted to **one face**. | Filter menu + face selector. |
+| **Simple Pusher** | `mvn_pusher` · Target | Exports from the network into adjacent containers: up to 128 items of one type per cycle. It does nothing unless at least one adjacent face has a container. | Filter decides what leaves. **Empty whitelist = idle** (so a fresh pusher never empties the network); empty blacklist = anything. |
+| **Advanced Pusher** | `mvn_pusher_ht` · Piston | Same, ×8, with face selection. | Filter menu + face selector. |
+| **Network Vacuum** | `mvn_vacuum` · Sponge | Every 10 ticks picks up dropped items within `vacuum.radius` (4 blocks) into the network. | Optional filter. Items that do not fit stay on the ground. |
+| **Network Purger** | `mvn_purger` · Magma Block | Deletes up to 128 items per cycle that match its filter. | **Without a filter it deletes nothing**, on purpose. |
+| **Network Quota Limiter** | `mvn_limiter` · Target | Caps how much of one item the network may hold. Every deposit (grabbers, vacuum, terminal, crafting results, wireless bridge) stops at the cap. | Right-click: set the target item, the limit and on/off. Several limiters on one item: the lowest wins. |
+| **Wireless Transmitter** | `mvn_transmitter` · Conduit | One end of a wireless bridge. If it holds the link to a Receiver, it **pushes** up to 128 items per cycle that pass **its** filter into the receiver's network. | Right-click: filter menu, plus a button that opens its own network's terminal. Link: shift+right-click a placed Transmitter holding a Receiver item, or a placed Receiver holding a Transmitter item. |
+| **Wireless Receiver** | `mvn_receiver` · Redstone Lamp | The other end. If it holds the link to a Transmitter, it **pulls** up to 128 items per cycle that pass **its** filter from the transmitter's network into its own. Works across distance and worlds as long as the other end's chunk is loaded. | Right-click: filter menu, plus a button that opens the **remote** network's terminal. **Empty whitelist = nothing crosses**, on purpose. |
+
+Containers that Grabbers, Pushers and Greedy Cells work with: chests, trapped chests, barrels,
+hoppers, dispensers, droppers, furnaces, blast furnaces, smokers, brewing stands, chiseled
+bookshelves, shulker boxes, and — with Slimefun installed — Slimefun machines (only the slots the
+machine declares for input/output).
+
+### 🛠️ Crafting
+
+| Device | id · block | What it does | How to use it |
+|---|---|---|---|
+| **Blueprint** | `mvn_blueprint` · item (Book) | A recipe: full 3×3 grid + result in its PDC. Crafting never consumes it. | Encode it in a Recipe Encoder and install it in a crafter. Installing moves the Blueprint into the crafter; removing it, replacing it or *Clear All* gives it back. |
+| **Recipe Encoder** | `mvn_encoder` · Smithing Table | Builds a recipe in a 3×3 template grid (clicking only marks slots, no items are spent) and writes it to a Blueprint (blank or already encoded). | Fill the grid, put a Blueprint in the blue slot, press *Encode*. Clicking an encoded Blueprint loads its recipe into the grid. Blueprints left in its slots stay stored in the block (one viewer at a time sees them). |
+| **Slimefun Recipe Encoder** | `mvn_sf_encoder` · Enchanting Table | Same for Slimefun recipes. | Needs Slimefun; disable with `sf-encoder.enabled`. |
+| **Auto-Crafter** | `mvn_crafter` · Crafting Table | Every 20 ticks tries each installed vanilla Blueprint once (up to `crafter.max-recipes`, 18). All-or-nothing: if any ingredient is missing nothing is taken, and if the result does not fit the whole craft is undone. | Right-click, click Blueprints in. |
+| **Slimefun Auto-Crafter** | `mvn_sf_crafter` · Crying Obsidian | Same, Slimefun Blueprints only. | Disabled entirely (menu and crafting) with `sf-crafter.enabled: false`. |
+| **Request Crafter** | `mvn_request_crafter` · Fletching Table | Holds Blueprints that are **only** crafted on demand from a Request Terminal (never automatically). | Install Blueprints like in an Auto-Crafter. |
+| **Slimefun Request Crafter** | `mvn_sf_request_crafter` · Purpur Pillar | Same for Slimefun Blueprints. | — |
+| **Request Terminal** | `mvn_request_terminal` · Lectern | Lists everything the network's Request Crafters can make and crafts it on demand, resolving chains (logs → planks → crafting table) with the network's stock. | Left-click 1 batch, shift+left-click 10, right-click 64, shift+right-click asks for a number in chat. Toggle delivery to your inventory or to the network. |
+| **Network Crafting Grid** | `mvn_crafting_grid` · Cartography Table | A crafting table that pulls ingredients from the network; the template grid is stored in the block. | Right-click, set the grid, craft. |
+
+### 🧰 Tools
+
+| Device | id · block | What it does | How to use it |
+|---|---|---|---|
+| **Configuration Wrench** | `mvn_configurator` · item (Comparator) | Copies a filter (exact templates, materials and whitelist/blacklist mode) from one device to another. | Shift+right-click a filterable device to copy, right-click another to paste. |
+| **Network Rake** | `mvn_rake` · item (Dead Bush) | Dismantles a node instantly and gives it back to you with its state (filter, Blueprints, binding). 250 uses (`rake.uses`). | Right-click a node. It refuses controllers and storage that still holds items or fluid. |
+
+Filterable devices: Grabbers, Pushers, Vacuum, Purger, Greedy Cell, Wireless Transmitter and Receiver. All of
+them support whitelist and blacklist mode, and in the Grabber/Pusher menus clicking a face button
+opens the container on that face.
+
+---
+
+## 🔀 How items move inside and between networks
+
+### 1. What belongs to a network
+
+On every scan (every `network.scan-interval-ticks`, and immediately after placing or breaking a
+node) the controller walks through every connected MultiverseNets block, face to face. The scan:
+
+* never loads chunks — nodes in unloaded chunks are simply not part of the network until they load;
+* stops at another controller (`foreign controller at x,y,z`);
+* stops at land the network's owner cannot use (see [Land protection](#land-protection));
+* with Slimefun installed, also walks through Slimefun blocks whose id contains `CABLE` or `BRIDGE`
+  and adds touching **Slimefun barrels** to the storage.
+
+There is no per-node "which network am I in" state: the topology is rebuilt from scratch every
+scan, so a node can never point to a network that no longer exists.
+
+### 2. The internal storages and their order
+
+A network's item storage is the sum of five internal storages. Every deposit — from a grabber,
+the vacuum, the terminal, a crafting result or the wireless bridge — first checks the
+**Quota Limiters**, then fills in this order:
+
+| # | Where the items go | Condition |
+|---|---|---|
+| 1 | **Greedy Cells** | their filter matches, or they already hold the item |
+| 2 | **CPU Virtual Cache** | it already holds that item type |
+| 3 | **Slimefun barrels** | they already hold that item type |
+| 4 | **Quantum Cells / Infinity Barrels** | they already hold that item type |
+| 5 | **CPU Virtual Cache** | free space, new item type |
+| 6 | **Slimefun barrels** | empty |
+| 7 | **Quantum Cells / Infinity Barrels** | empty (the cell adopts the item type) |
+| 8 | **Greedy Cells without a filter** | general overflow |
+
+Whatever does not fit is returned to whoever deposited it (it is never deleted).
+
+Withdrawals read in this order: CPU Virtual Cache → Quantum Cells / Infinity Barrels → Slimefun
+barrels → Greedy Cells. Pushers, a Greedy Cell's own suction and the wireless bridge **skip
+Greedy Cells**, so stock reserved for a machine line is never exported somewhere else; terminals,
+crafting and the API can use it.
+
+A single withdrawal always returns **one** item type (the first one that matches), which is why a
+pusher with a five-item filter exports one of them per cycle.
+
+### 3. One cycle, step by step
+
+Every 5 ticks the ticker runs these per network (each on its own configurable interval):
+
+| Interval | Device | Per device |
+|---|---|---|
+| transfer (5 t) | Grabber / Advanced Grabber | Up to 128 / 1,024 of one type from the first face that yields something. If the network refuses part of it: first offered directly to Pushers whose filter accepts it, then returned to the source container, and only if that is also full it waits in the grabber's **transit buffer** (the grabber pauses until it clears; the buffer survives breaking the block). |
+| transfer | Pusher / Advanced Pusher | Only with a container next to it: takes up to 128 / 1,024 of one type and inserts into the adjacent containers; what does not fit goes back to the network, or waits in the pusher's transit buffer if the network is full meanwhile (retried first on the next cycle). |
+| transfer | Greedy Cell | Pulls up to 512 matching items, pushes up to 256 into adjacent non-network containers. |
+| transfer | Purger | Deletes up to 128 matching items (only with a filter). |
+| transfer | Wireless Receiver / Transmitter | Pulls / pushes up to 128 matching items across the bridge (see below). |
+| transfer | Liquid Pump | Drains one source block (1,000 mB), only if it fits whole. |
+| vacuum (10 t) | Vacuum | Picks up dropped items within the radius. |
+| craft (20 t) | Auto-Crafter / Slimefun Auto-Crafter | Tries each installed Blueprint once. |
+
+Idle grabbers and pushers back off: after finding nothing they only check every third cycle until
+something moves again, so a thousand idle devices cost almost nothing.
+
+### 4. Between networks: the wireless bridge
+
+Two networks never merge through the air. The only way items cross is a **Transmitter / Receiver**
+link, and the end that holds the link is the one that moves items:
+
+```
+ Network A                                         Network B
+ [Controller]-[Cells]-[Transmitter]  ~~~~~~~~~~~  [Receiver]-[Cells]-[Controller]
+
+ Receiver linked to the Transmitter:  B pulls from A what passes the RECEIVER's filter
+ Transmitter linked to the Receiver:  A pushes into B what passes the TRANSMITTER's filter
+```
+
+* **Linking**: shift+right-click a placed Transmitter holding a Receiver item (the receiver pulls),
+  or a placed Receiver holding a Transmitter item (the transmitter pushes). Link both for a
+  two-way exchange.
+* **Filter on the end that moves**: whitelist or blacklist, exact templates or materials. **An
+  empty whitelist moves nothing**; an empty blacklist moves everything.
+* Up to 128 items of one type per cycle and per linked device. **Greedy Cells are never drained.**
+* Works across any distance and across worlds, but only while the other end's chunk is loaded.
+* Both ends pass the protection check, each with the owner of its own network.
+* If the destination cannot take the items they go back to the source; if the source cannot take
+  them back either they drop next to the device that moved them — never into the void.
+* The Receiver's menu has a button that opens **A's** terminal, so you can use A's storage by hand
+  from B's base (only if you are allowed to access A's land).
+
+<a id="shared-buses"></a>
+### 5. Shared buses: two controllers on the same cables
+
+If two controllers end up connected (a cable touching both), each one builds its own network and
+both include the cables and devices between them. `/mvnets doctor`, the Probe and the hologram
+report it as `foreign controller at x,y,z`. While that lasts:
+
+* **Every shared device still works once per cycle**: it is assigned to the first of the two
+  networks (stable order by world and controller position). Previously every shared grabber,
+  pusher, purger, pump and crafter worked twice per cycle.
+* Shared cells are visible from both terminals.
+* Each controller keeps its own CPU Virtual Cache, which only its own network sees.
+
+The clean fix is to keep one controller per network, and use a Transmitter/Receiver pair if you
+really want two networks to exchange items.
+
+### 6. Fluids
+
+Fluid storage is separate: only Quantum Fluid Cells hold fluids, and only the Liquid Pump, the
+Terminal's fluid page, the Terminal's input slot and direct right-clicks on a fluid cell move them.
+Deposits are **all-or-nothing**: a bucket, bottle or source block is consumed only if its whole
+volume fits, so a nearly full network can never keep both the fluid and the bucket.
+
+### 7. Nothing is lost, nothing is duplicated
+
+* Breaking a node stores its state in the dropped item (cell cargo, cache contents, filters, face,
+  transit buffer, Blueprints, crafting grid, receiver link, limiter, fluid, pump filter) and placing
+  it restores it. The Rake does the same.
+* All GUIs have anti-dupe guards and return anything left in real slots when closed.
+* Crafting is all-or-nothing, including when only part of the result fits.
+* Nodes are immune to pistons and explosions.
+
+---
+
+<a id="land-protection"></a>
+## 🛡️ Land protection
+
+Supported: ProtectionStones, WorldGuard, Lands, Towny, GriefPrevention (plus BentoBox islands for
+player access).
+
+* The **Controller remembers who placed it**; that player is the network's owner. Controllers from
+  before this existed adopt the first player allowed to open them.
+* The scan does not extend the network into land its owner cannot use, and **every block a network
+  reads from or writes to is checked** — grabbers, pushers, overflow to pushers, greedy cells,
+  vacuum, pump and both ends of a wireless bridge, in either direction.
+* Players cannot open devices on protected land they do not own (`multiversenets.protection.bypass`
+  and `multiversenets.admin` skip it). That includes opening a remote network through a Receiver.
+* Escape hatches: `protection.exempt-worlds`, `protection.exempt-locations`, and
+  `protection.block-network-linking: false`.
 
 ## 🍳 Recipes (crafting grid)
 
-Each device is crafted on a standard 3×3 crafting table. `·` marks an empty slot.
+Each device is crafted on a standard 3×3 crafting table. `·` marks an empty slot. The full list with
+each item's function is in [Recipes & functions](Recipes.md). The three Slimefun devices (Slimefun
+Recipe Encoder, Slimefun Auto-Crafter, Slimefun Request Crafter) only have a recipe while
+`sf-encoder.enabled` / `sf-crafter.enabled` are `true`. The full list with
+each item's function is in [Recipes & functions](Recipes.md). The three Slimefun devices (Slimefun
+Recipe Encoder, Slimefun Auto-Crafter, Slimefun Request Crafter) only have a recipe while
+`sf-encoder.enabled` / `sf-crafter.enabled` are `true`.
 
 | Device | Grid (3×3) | Ingredients |
 |---|---|---|
@@ -110,54 +310,48 @@ Each device is crafted on a standard 3×3 crafting table. `·` marks an empty sl
 | Slimefun Auto-Crafter | <pre>R C R<br/>I T I<br/>R C R</pre> | R = Ender Pearl · C = Crying Obsidian · I = Iron Ingot · T = Target |
 | Slimefun Request Crafter | <pre>R C R<br/>I L I<br/>R C R</pre> | R = Ender Pearl · C = Purpur Pillar · I = Iron Ingot · L = Lectern |
 
-
 ## ⌨️ Commands
 
 | Command | Description | Permission |
 |---|---|---|
-| `/mvnets guide [en\|es\|both]` | Receive official interactive guide book (English, Spanish, or both) | `multiversenets.use` |
-| `/mvnets devices` | List the device IDs | `multiversenets.use` |
+| `/mvnets help` | Command list | `multiversenets.use` |
+| `/mvnets info` | Version | `multiversenets.use` |
+| `/mvnets guide [en\|es\|both]` | Interactive guide book | `multiversenets.use` |
+| `/mvnets devices` | List all device ids | `multiversenets.use` |
 | `/mvnets give <id> [n]` | Give a device | `multiversenets.admin` |
-| `/mvnets doctor` | Rescan and diagnose networks | `multiversenets.admin` |
+| `/mvnets doctor` | Rescan and diagnose all networks (also says whether the Slimefun integration is active) | `multiversenets.admin` |
 | `/mvnets stats` | Global statistics | `multiversenets.admin` |
 | `/mvnets inspect` | Inspect the block you are looking at (type, network, contents, filter) | `multiversenets.admin` |
-| `/mvnets repair` | Force a rescan of the network of the block you are looking at | `multiversenets.admin` |
-| `/mvnets reload` | Reload the configuration | `multiversenets.admin` |
+| `/mvnets repair` | Force a rescan of the network you are looking at | `multiversenets.admin` |
+| `/mvnets recipes` | Re-register and re-unlock all crafting recipes | `multiversenets.admin` |
+| `/mvnets reload` | Reload configuration, protection providers and recipes | `multiversenets.admin` |
 
-## 🎮 Quick start
+<a id="configuration"></a>
+## ⚙️ Configuration
 
-1. Place a **Controller**, surround the area with **Cables**, and connect **Cells**, **Grabbers/Pushers**, etc.
-2. Right-click the controller or a **Terminal** to open the Grid.
-3. In the terminal (the same conventions as the Networks grid): **left-click** takes 1 to the cursor, **right-click** a stack, **shift+click** sends to inventory; **shift+left-click** on your items inserts them into the network, or leave them in the **input slot** (right corner) and the network absorbs them. The magnifying glass/search label searches (right-click clears), the blue button changes the sort order, the **Network Fluids Storage** button opens digital liquid storage, and the arrows page.
-4. Shift+click with a **Wireless Terminal** on the controller to bind it (then right-click in the air to open the network from a distance).
-5. **Encoder**: build the recipe in the template grid, put a blank **Blueprint** in the blue slot, and press *Encode*. That Blueprint is installed in an Auto-Crafter with a click on its list.
-6. **Receiver**: shift+click with the receiver item on a Transmitter, place it in another base and open it; give it a filter and it will also **bring items** from the transmitter's network.
-7. **Request Terminal & Request Crafter**: Encode blueprints into a **Request Crafter** (using the Recipe Encoder). Open the **Request Terminal** to order crafting jobs on-demand. The system automatically resolves recursive chained crafting dependencies (e.g., crafting logs into planks, then planks into a crafting table) and supports custom chat amount entry via Shift+Right Click.
+The most relevant keys of `config.yml` (every key is documented in the file itself, in English and
+Spanish):
 
-## 🤝 Coexistence with Networks
-
-**Both plugins can be installed at the same time.** They don't step on each other at all:
-
-| | MultiverseNets | NetworksV6-Drake |
+| Key | Default | Effect |
 |---|---|---|
-| Plugin name | `MultiverseNets` | `NetworksV6-Drake` |
-| Main class | `com.chagui68.multiversenets.…` | `io.github.sefiraat.networks.…` |
-| Command | `/mvnets` | `/networks` |
-| Permissions | `multiversenets.*` | `networks.*` |
-| Items | own, via PDC, with vanilla recipes | Slimefun's (`NTW_*`) |
-
-Networks doesn't register any vanilla recipe — theirs go through the Slimefun crafting table — so
-the 20 here don't clash either. There are five tests (`ConvivenciaConNetworksTest`) that pin this
-down; what breaks coexistence isn't the code but the identifiers.
-
-**One interaction to keep in mind.** With the Slimefun integration active, a MultiverseNets Grabber
-can pull from a Networks block, because those are Slimefun items with their own menu. That's
-interoperability, not a bug, but if you prefer each network to stick to its own:
-
-```yaml
-compat:
-  slimefun: false
-```
+| `network.scan-interval-ticks` | 20 | Topology rescan interval |
+| `network.max-nodes` | 16384 | Maximum nodes per network |
+| `network.max-nodes-per-chunk` | 64 | Maximum devices per chunk |
+| `network.op-interval-ticks.transfer` / `vacuum` / `craft` | 5 / 10 / 20 | Intervals of each family of operations |
+| `transfer.items-per-op` | 128 | Items per Grabber/Pusher/Purger/Receiver operation |
+| `transfer.ht-multiplier` | 8 | Multiplier for Advanced Grabbers/Pushers |
+| `cells.capacities` | 65,536 … 2,000,000,000 | Capacity per cell tier |
+| `virtual-cache.tier-1` … `tier-5` | 2,048 … 524,288 | CPU cache capacity |
+| `greedy.capacity` / `barrel.capacity` | 262,144 / 2,000,000,000 | Greedy Cell / Infinity Barrel capacity |
+| `fluids.cell-capacity-mb` | 64,000 | Fluid cell capacity |
+| `vacuum.radius` | 4.0 | Vacuum pickup radius |
+| `crafter.max-recipes` | 18 | Blueprints per crafter |
+| `wireless.local-range-without-router` | 64 | Wireless Terminal range without a Router |
+| `wireless.combat-cooldown-seconds` | 10 | Wireless Terminal combat lock |
+| `compat.slimefun` | true | Slimefun machines, cables and barrels integration |
+| `sf-encoder.enabled` / `sf-crafter.enabled` | true | Slimefun encoder / crafters |
+| `blocked-worlds` | [] | Worlds where devices cannot be placed |
+| `protection.*` | — | See [Land protection](#land-protection) |
 
 ## 🧹 Brought over from Networks
 
@@ -171,13 +365,43 @@ completing the checklist:
 
 ## 🔗 Slimefun integration (optional)
 
-MultiverseNets **does not depend on Slimefun** and works fully without it. But if it's installed, it
-detects it at startup and the **Grabbers, Pushers, and Auto-Crafters can work with Slimefun
-machines** just like with a chest: pull the product out of an electric smeltery, feed an arc furnace,
-empty a harvester. Everything is resolved via reflection at startup, works for both the DrakesCraft
-fork and the original Slimefun, and only the machine's declared input/output slots are used.
+MultiverseNets **does not depend on Slimefun**. If it is installed it is detected at startup
+(both the DrakesCraft fork and the original) and, with `compat.slimefun: true`:
 
-To check whether the integration is active: `/mvnets doctor` says so on the first line.
+* Grabbers, Pushers, Greedy Cells and crafters work with **Slimefun machines** like with a chest,
+  using only the slots the machine declares for input and output.
+* Slimefun blocks whose id contains `CABLE` or `BRIDGE` conduct a MultiverseNets network, and
+  Slimefun barrels touching it become part of its storage.
+* Slimefun encoder and crafters become usable.
+
+Without Slimefun the bridge stays inert and nothing else changes. `/mvnets doctor` says on its first
+line whether the integration is active.
+
+## 🤝 Coexistence with Networks
+
+**Both plugins can be installed at the same time.** Their identifiers never collide:
+
+| | MultiverseNets | NetworksV6-Drake |
+|---|---|---|
+| Plugin name | `MultiverseNets` | `NetworksV6-Drake` |
+| Main class | `com.chagui68.multiversenets.…` | `io.github.sefiraat.networks.…` |
+| Command | `/mvnets` | `/networks` |
+| Permissions | `multiversenets.*` | `networks.*` |
+| Items | own, via PDC, with vanilla recipes | Slimefun's (`NTW_*`) |
+
+Networks registers no vanilla recipes (theirs go through the Slimefun crafting table), so the 43
+recipes here do not clash either. Five tests in `NetworksCoexistenceTest` pin the identifiers down,
+because what breaks coexistence is an identifier renamed by accident, not the code.
+
+**Interactions to keep in mind** with the Slimefun integration active: a MultiverseNets Grabber can
+pull from a Networks block (it is a Slimefun item with its own menu), and a Networks block whose id
+contains `CABLE` or `BRIDGE` (e.g. `NTW_BRIDGE`) conducts a MultiverseNets network. If you prefer
+each network to stick to its own blocks:
+
+```yaml
+compat:
+  slimefun: false
+```
 
 ## 🔍 How it differs from Networks
 
@@ -185,9 +409,12 @@ To check whether the integration is active: `/mvnets doctor` says so on the firs
 |---|---|---|
 | Dependencies | Slimefun + its chain | None, only the Paper API |
 | Network membership | Each node stores its root | Recalculated by BFS from the controller |
-| Orphan nodes | Possible | **Structurally impossible** |
-| Diagnosis | Added later (`/networks doctor`) | `/mvnets doctor` from day one |
-| Ticker | Depends on the Slimefun cycle | Own, with per-operation intervals in the config |
+| Orphan nodes | Possible | **Structurally impossible**: every scan rebuilds the topology |
+| Diagnosis | Added later (`/networks doctor`) | `/mvnets doctor`, Probe, Monitor, hologram |
+| Ticker | Slimefun's cycle | Own, with per-operation intervals in the config |
+
+The price is that scanning costs one BFS over up to `max-nodes` blocks every
+`scan-interval-ticks` — predictable, bounded work in exchange for no state that can be corrupted.
 
 ## 🛠️ Building
 
@@ -203,11 +430,10 @@ The jar is generated at `target/MultiverseNets-v<version>.jar`.
 |---|---|
 | **Server** | Paper / Purpur 1.21.11 |
 | **Java** | Java 21 LTS |
-| **Dependencies** | None (standalone) |
+| **Dependencies** | None (Slimefun and protection plugins are optional) |
 
 > **Not Folia-compatible.** The network ticker, the topology scan and every GUI run on Paper's
-> global scheduler and assume the main thread owns the blocks they touch. Folia's regionised
-> threads would need a region-aware ticker and per-region storage locks. Install it on Paper or
+> global scheduler and assume the main thread owns the blocks they touch. Install it on Paper or
 > Purpur.
 
 ## 📜 License
@@ -215,5 +441,3 @@ The jar is generated at `target/MultiverseNets-v<version>.jar`.
 This project is licensed under the terms of the **GNU General Public License Version 3 (GPL-3.0)**. See the [LICENSE](../LICENSE) file for details.
 
 ---
-
-**Author:** Chagui68 · Review and tuning: Jack · A [DrakesCraft Labs](https://github.com/DrakesCraft-Labs) project

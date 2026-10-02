@@ -10,55 +10,59 @@ project is laid out.
 ## Project root
 ```
 MultiverseNets/
-├─ docs/                 # Documentation images and resources (banner, icon, etc.)
-├─ src/                  # Plugin source code
-│   ├─ main/            # Code compiled into the final artifact
-│   │   ├─ java/        # Java packages of the plugin
-│   │   │   └─ com/chagui68/multiversenets/   # Base package of the plugin
-│   │   │       ├─ command/          # Command classes (/mvnets …)
-│   │   │       ├─ compat/           # Optional Slimefun compatibility
-│   │   │       ├─ craft/            # Blueprint and recipe system
-│   │   │       ├─ gui/              # Graphical menus (inventories) and their logic
-│   │   │       ├─ item/             # Device type definitions and item registration
-│   │   │       ├─ listen/           # Server event listeners (blocks, GUI, etc.)
-│   │   │       ├─ net/              # Network core: controller, node management, ticker
-│   │   │       ├─ persist/          # Per-chunk data persistence (NodeBlob, NodeStore)
-│   │   │       └─ util/             # Helper utilities (keys, positions, settings)
-│   │   └─ resources/    # YAML configuration, plugin metadata and other static resources
-│   └─ test/            # Unit and integration tests
-│       └─ java/        # Tests mirroring the packages in src/main/java
-├─ pom.xml               # Maven project configuration (dependencies, Java version, etc.)
-├─ README.md             # Main plugin documentation (English)
-├─ Wiki-es/              # Wiki in Spanish
-│   ├─ README.md         # Plugin overview in Spanish
-│   ├─ Recipes.md        # Recipes and functions of each item in Spanish
-│   └─ dev/              # Technical / developer documentation (in Spanish)
-│       ├─ Structure.md  # Project structure description in Spanish
-│       ├─ Code.md       # How the code works internally in Spanish
-│       └─ Tests.md      # Tests: running them and what each covers in Spanish
-└─ Wiki-en/              # Wiki in English (mirror of the Spanish wiki)
-    ├─ README.md         # Plugin overview in English
-    ├─ Recipes.md        # Recipes and functions of each item in English
-    └─ dev/              # Technical / developer documentation
-        ├─ Structure.md  # This file – project structure description in English
-        ├─ Code.md       # How the code works internally in English
-        └─ Tests.md      # Tests: running them and what each covers in English
+├─ .github/              # CI: Modrinth publishing workflow and its helper scripts
+├─ docs/                 # Documentation images (banners, icon)
+├─ src/
+│   ├─ main/
+│   │   ├─ java/com/chagui68/multiversenets/
+│   │   │   ├─ MultiverseNets.java   # Main class (onEnable/onDisable, singletons)
+│   │   │   ├─ api/          # MultiverseNetsAPI: public read/write access to a network's storage
+│   │   │   ├─ command/      # /mvnets and its tab completion
+│   │   │   ├─ compat/       # Optional integrations: SlimefunBridge and land protection
+│   │   │   │                #   (ProtectionBridge + one provider per protection plugin)
+│   │   │   ├─ craft/        # Blueprints, RecipeData and atomic crafting (CraftingSupport)
+│   │   │   ├─ gui/          # Every inventory menu (MenuHolder base + one class per device)
+│   │   │   ├─ item/         # DeviceType (every device), Items (items, lore, recipes), GuideBook
+│   │   │   ├─ listen/       # BlockListener (events), DeviceInteractions (what each device opens),
+│   │   │   │                #   CraftingListener (recipe book, cell upgrades in the crafting table)
+│   │   │   ├─ net/          # Network, NetworkManager, NetworkTicker, NetworkStorage,
+│   │   │   │                #   NetworkFluidStorage, hologram and throughput tracker
+│   │   │   ├─ persist/      # Per-chunk persistence (NodeBlob, NodeStore)
+│   │   │   └─ util/         # Keys, PosUtil, Settings, StackUtils, Text
+│   │   └─ resources/        # config.yml and plugin.yml
+│   └─ test/java/            # JUnit 5 + MockBukkit tests (same packages as main, plus stubs)
+├─ pom.xml                   # Maven build (Java 21, Paper API, MockBukkit)
+├─ README.md                 # Main documentation (English)
+├─ Wiki-en/                  # Wiki in English
+│   ├─ README.md             # Overview, machine reference, item flow, commands, configuration
+│   ├─ Recipes.md            # Recipe and function of every item
+│   └─ dev/
+│       ├─ Structure.md      # This file
+│       ├─ Code.md           # How the code works internally
+│       └─ Tests.md          # Running the tests and what each one covers
+└─ Wiki-es/                  # Wiki in Spanish (same files, translated)
 ```
 
 ## Key folder details
-- **`src/main/java/com/chagui68/multiversenets/gui/`** – Implements the inventory menus (for
-  example, `FilterMenu`, `CellMenu`, `QuantumWorkbenchMenu`). Each class manages the player's
-  interaction with the plugin's blocks.
-- **`src/main/java/com/chagui68/multiversenets/item/`** – Contains `DeviceType.java` (device
-  enumeration) and `Items.java` (item registration and their recipes).
-- **`src/main/java/com/chagui68/multiversenets/net/`** – Core network logic: `NetworkManager`,
-  `NetworkTicker`, `NetworkStorage`.
-- **`src/main/java/com/chagui68/multiversenets/persist/`** – Classes responsible for saving and
-  loading each network node's information (per chunk).
-- **`src/main/resources/`** – Configuration files (`config.yml`, `plugin.yml`) and other static
-  resources.
-- **`src/test/java/`** – JUnit tests that validate the plugin's functionality. Run them with
-  `mvn test`.
+- **`api/`** – `MultiverseNetsAPI`: a thin, null-safe facade other plugins use to `extract`,
+  `insert` and `count` items in the network that owns a given block.
+- **`compat/`** – `SlimefunBridge` (reflection-only Slimefun integration) and land protection:
+  `ProtectionBridge` plus `ProtectionStonesProvider`, `WorldGuardProvider`/`WorldGuardRegions`,
+  `LandsProvider`, `TownyProvider` and `GriefPreventionProvider`. Each provider is one file.
+- **`gui/`** – One menu per device (`TerminalMenu`, `FilterMenu`, `CellMenu`, `BarrelMenu`,
+  `GreedyMenu`, `CrafterMenu`, `EncoderMenu`, `SfEncoderMenu`, `CraftingGridMenu`,
+  `RequestTerminalMenu`, `QuotaLimiterMenu`, `FluidCellMenu`, `LiquidPumpMenu`, `MonitorMenu`,
+  `ControllerMenu`, `QuantumWorkbenchMenu`), the `MenuHolder` base, the `GuiListener` dupe guard and
+  `ChatPrompts`.
+- **`item/`** – `DeviceType` (enumeration of the 43 devices, modules and tools), `Items` (item
+  creation, lore, PDC helpers and the 43 recipes) and `GuideBook` (the in-game guide book).
+- **`net/`** – Network core: topology (`Network`), registry (`NetworkManager`), the heartbeat
+  (`NetworkTicker`), item and fluid storage, the controller hologram and throughput tracking.
+- **`persist/`** – `NodeBlob` (serializable node state) and `NodeStore` (chunk PDC storage, the
+  controller registry and the decode cache).
+- **`src/main/resources/`** – `config.yml` (fully commented in English and Spanish) and `plugin.yml`.
+- **`src/test/java/`** – JUnit tests; `dev/espi/protectionstones/PSRegion` is a stub of the
+  ProtectionStones API used by the provider tests. Run them with `mvn test`.
 
 ## Documentation by area
 | Area | File | When to consult |

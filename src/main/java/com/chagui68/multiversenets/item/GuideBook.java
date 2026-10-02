@@ -324,7 +324,7 @@ public final class GuideBook {
                 "GGG",
                 "G = Glass Pane",
                 "C = Comparator",
-                "Emits redstone by item count"));
+                "Live network diagnostics panel"));
 
         // Page 30: Transmitter & Receiver
         meta.addPage("§1§lWireless Links§r\n\n"
@@ -690,7 +690,7 @@ public final class GuideBook {
                 "GGG",
                 "G = Panel de cristal",
                 "C = Comparador",
-                "Emite redstone según cantidad"));
+                "Panel de diagnóstico en vivo"));
 
         // Page 30: Enlaces Inalámbricos
         meta.addPage("§1§lEnlaces de Red§r\n\n"

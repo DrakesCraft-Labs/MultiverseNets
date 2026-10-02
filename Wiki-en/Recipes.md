@@ -1,587 +1,665 @@
 # 📜 Recipes and functions of MultiverseNets items
 
-Below is every item available in the plugin, its **crafting recipe** shown as you would see it on the
-crafting table (3×3 grid), and a brief **description** of its role within the network.
+Every item in the plugin, its **crafting recipe** as you see it on the crafting table (3×3 grid),
+and what it **does** in the network. Numbers are the `config.yml` defaults; "cycle" means one
+transfer cycle (`network.op-interval-ticks.transfer`, 5 ticks).
 
-> In the grids, `·` marks an empty slot.
-
----
-
-## Controller
-- **Recipe (3×3)**:
-
-  ```
-  I I I
-  I N I
-  I I I
-  ```
-
-  > I = **Iron Block** · N = **Nether Star**
-
-- **Result**: 1× Controller
-- **Function**: Core of the network. Indexes every node via BFS through the cables and keeps the network topology.
+> In the grids, `·` marks an empty slot. Every item can also be given with `/mvnets give <id>`.
+> Back to the [wiki index](README.md).
 
 ---
 
-## Cable (×16)
-- **Recipe (3×3)**:
+## 🖥️ Core and access
 
-  ```
-  G G G
-  G R G
-  G G G
-  ```
+### Network Controller · `mvn_controller`
 
-  > G = **Glass** · R = **Redstone**
+```
+I I I
+I N I
+I I I
+```
 
-- **Result**: 16× Cable
-- **Function**: Carries the signal between nodes. Required to connect any device to the network.
+> I = **Iron Block** · N = **Nether Star**
 
----
-
-## Terminal
-- **Recipe (3×3)**:
-
-  ```
-  G E G
-  E B E
-  G E G
-  ```
-
-  > G = **Glass** · E = **Ender Pearl** · B = **Beacon**
-
-- **Result**: 1× Terminal
-- **Function**: Main interface for players to interact with the network (open the Grid, withdraw/insert items).
+- **Result**: 1× Network Controller (Lodestone)
+- **Function**: Root of the network. Every scan starts here and walks through every connected
+  MultiverseNets block. Whoever places it becomes the network's **owner** (used by land protection).
+  Shows a floating hologram with status, node count and stored totals, and can hold a **CPU Virtual
+  Cache** (see the cache modules below). Right-click opens its status menu. Only one controller per
+  network: a second one wired to the same cables is reported as `foreign controller`.
 
 ---
 
-## Wireless Terminal
-- **Recipe (3×3)**:
+### Network Cable (×16) · `mvn_cable`
 
-  ```
-  · P ·
-  P N P
-  · C ·
-  ```
+```
+G G G
+G R G
+G G G
+```
 
-  > P = **Ender Pearl** · N = **Nether Star** · C = **Compass**
+> G = **Glass** · R = **Redstone**
 
-- **Result**: 1× Wireless Terminal
-- **Function**: Item that, when shift+clicked on a controller, lets you open that network's terminal from a distance (right-click in the air).
+- **Result**: 16× Network Cable (Glass)
+- **Function**: Connects devices. Every MultiverseNets block conducts, cables are just the cheap way
+  to cover distance. Right-click a cable to see whether it reaches a controller and how big the
+  network is.
 
 ---
 
-## Cell T1 – T6
-- **T1 recipe (3×3)**:
+### Network Terminal · `mvn_terminal`
 
-  ```
-  G G G
-  G D G
-  G G G
-  ```
+```
+G E G
+E B E
+G E G
+```
 
-  > G = **Glass** · D = **Diamond**
+> G = **Glass** · E = **Ender Pearl** · B = **Beacon**
 
-  - **Tn+1 recipe (n≥1)**: place the previous cell whole in the center and surround it with diamonds.
+- **Result**: 1× Network Terminal (Beacon)
+- **Function**: The storage grid. Shows every item in the network and has a second page for fluids.
+  Left-click takes 1, right-click a stack, shift+click sends to your inventory; shift+left-click your
+  own items (or leave them in the input slot) to store them. Buckets and honey bottles go to fluid
+  storage. Search, sort and page buttons.
 
-  ```
-  D D D
-  D P D
-  D D D
-  ```
+---
 
-  > D = **Diamond** · P = **Previous cell** (exact item)
+### Wireless Terminal · `mvn_wireless_terminal`
 
-- **Result**: 1× cell of the next tier
-- **Function**: Stores a single item type with growing capacity. Default capacities in `cells.capacities`:
+```
+· P ·
+P N P
+· C ·
+```
+
+> P = **Ender Pearl** · N = **Nether Star** · C = **Compass**
+
+- **Result**: 1× Wireless Terminal (hand item)
+- **Function**: Opens a network's terminal remotely. Shift+right-click a Controller or a Terminal to
+  bind it, then right-click in the air. Without a **Network Router** it only works in the same world
+  and within 64 blocks (`wireless.local-range-without-router`). It is locked for 10 s after combat and
+  checks that you may access the network's land.
+
+---
+
+### Network Router · `mvn_router`
+
+```
+· L ·
+· C ·
+· R ·
+```
+
+> L = **Lightning Rod** · C = **Network Cable** · R = **Redstone Block**
+
+- **Result**: 1× Network Router (Lightning Rod)
+- **Function**: Connected anywhere in a network, it lifts the Wireless Terminal limits for that
+  network: any distance and any world.
+
+---
+
+### Network Monitor · `mvn_monitor`
+
+```
+G G G
+G C G
+G G G
+```
+
+> G = **Glass Pane** · C = **Comparator**
+
+- **Result**: 1× Network Monitor (Respawn Anchor)
+- **Function**: Live diagnostic panel: node counts by type, storage usage and scan errors. It refreshes
+  while open.
+
+---
+
+### Network Probe · `mvn_probe`
+
+```
+· A ·
+A S A
+· A ·
+```
+
+> A = **Amethyst Shard** · S = **Spyglass**
+
+- **Result**: 1× Network Probe (hand item)
+- **Function**: Right-click any block (node or not) to see which network it belongs to, how many nodes
+  it has, where its controller is, and any scan warning — including links cut by land protection.
+
+---
+
+### CPU Virtual Cache Modules · `mvn_cache_l1` … `mvn_cache_quantum`
+
+Installed into the **Network Controller** by right-clicking it with the module. They turn the
+controller into multi-item storage (any mix of item types). Only upgrades are accepted: the module
+is consumed and a lower module already installed is not returned. The contents travel inside the
+controller item when it is broken.
+
+#### L1 CPU Cache Module — 2,048 items
+
+```
+C R C
+R C R
+C R C
+```
+
+> C = **Copper Ingot** · R = **Redstone Dust**
+
+#### L2 CPU Cache Module — 8,192 items
+
+```
+G L G
+L P L
+G L G
+```
+
+> G = **Gold Ingot** · L = **Lapis Lazuli** · P = **L1 CPU Cache Module**
+
+#### L3 CPU Cache Module — 32,768 items
+
+```
+D A D
+A P A
+D A D
+```
+
+> D = **Diamond** · A = **Amethyst Shard** · P = **L2 CPU Cache Module**
+
+#### DRAM Memory Module — 131,072 items
+
+```
+N E N
+E P E
+N E N
+```
+
+> N = **Netherite Ingot** · E = **Eye of Ender** · P = **L3 CPU Cache Module**
+
+#### Quantum Cache Matrix — 524,288 items
+
+```
+N S N
+S P S
+N S N
+```
+
+> N = **Netherite Block** · S = **Nether Star** · P = **DRAM Memory Module**
+
+---
+
+## 📦 Item storage
+
+### Quantum Cell T1 – T6 · `mvn_cell_t1` … `mvn_cell_t6`
+
+**T1:**
+
+```
+G G G
+G D G
+G G G
+```
+
+> G = **Glass** · D = **Diamond**
+
+**Tn+1 (n ≥ 1):** the previous cell in the centre, surrounded by diamonds.
+
+```
+D D D
+D P D
+D D D
+```
+
+> D = **Diamond** · P = **Previous cell** (exact item)
+
+- **Result**: 1× cell of the next tier (terracotta: plain, orange, yellow, lime, cyan, purple)
+- **Function**: Stores **one item type** each. An empty cell adopts the first item type that has
+  nowhere else to go. Right-click to see or manage its contents; breaking it keeps the cargo inside
+  the item. A cell **with cargo** is upgraded keeping that cargo (in the crafting table or the Quantum
+  Workbench). Capacities (`cells.capacities`):
 
 | Tier | Capacity |
 |---|---|
-| T1 | 65,536 (65k) |
-| T2 | 262,144 (262k) |
-| T3 | 1,048,576 (1M) |
-| T4 | 16,777,216 (16M) |
-| T5 | 268,435,456 (268M) |
-| T6 | 2,000,000,000 (2B) |
+| T1 | 65,536 |
+| T2 | 262,144 |
+| T3 | 1,048,576 |
+| T4 | 16,777,216 |
+| T5 | 268,435,456 |
+| T6 | 2,000,000,000 |
 
 ---
 
-## Greedy Cell
-- **Recipe (3×3)**:
+### Infinity Barrel · `mvn_infinity_barrel`
 
-  ```
-  G H G
-  H S H
-  G H G
-  ```
+```
+N D N
+D B D
+N D N
+```
 
-  > G = **Gold Ingot** · H = **Hopper** · S = **Slime Block**
+> N = **Netherite Ingot** · D = **Diamond Block** · B = **Barrel**
 
-- **Result**: 1× Greedy Cell
-- **Function**: Smart buffer (default capacity 262,144, configurable in `greedy.capacity`). It claims its filtered item from the network and feeds it to adjacent containers, ideal for continuous transport lines.
-
----
-
-## Infinity Barrel
-- **Recipe (3×3)**:
-
-  ```
-  N D N
-  D B D
-  N D N
-  ```
-
-  > N = **Netherite Ingot** · D = **Diamond Block** · B = **Barrel**
-
-- **Result**: 1× Infinity Barrel
-- **Function**: Individual store with a capacity of **2 × 10⁹** items of a single type. It joins the network and can deposit/withdraw items like any other storage node.
+- **Result**: 1× Infinity Barrel (Barrel)
+- **Function**: Like a cell, one item type, with `barrel.capacity` (2,000,000,000). It **stays
+  registered** to its item when it empties. In its menu, click *Set Item* with an item on the cursor
+  to register it; right-click *Set Item* with an empty cursor clears the registration (only when it
+  is empty). Hoppers can insert the registered item and pull it out one by one.
 
 ---
 
-## Importer (Grabber)
-- **Recipe (3×3)**:
+### Greedy Cell · `mvn_greedy_cell`
 
-  ```
-  I O I
-  O R O
-  I O I
-  ```
+```
+G H G
+H S H
+G H G
+```
 
-  > I = **Iron Ingot** · O = **Observer** · R = **Redstone Block**
+> G = **Gold Ingot** · H = **Hopper** · S = **Slime Block**
 
-- **Result**: 1× Importer
-- **Function**: Extracts items from adjacent containers into the network. Supports a whitelist filter.
-
----
-
-## Advanced Grabber (Grabber HT)
-- **Recipe (3×3)**:
-
-  ```
-  O P O
-  ```
-
-  > O = **Observer** · P = **Sticky Piston**
-
-- **Result**: 1× Advanced Grabber
-- **Function**: High-throughput variant (×8 by default, configurable in `transfer.ht-multiplier`) of the simple grabber. It is directional: it faces the container it pulls from.
+- **Result**: 1× Greedy Cell (Slime Block)
+- **Function**: Multi-item buffer up to `greedy.capacity` (262,144) in total.
+  - **With a filter** it is a priority sink: items entering the network that match go to it first;
+    every cycle it pulls up to 512 more from the network and pushes up to 256 into adjacent
+    **non-network** containers (chests, Slimefun machines). Ideal for feeding a machine line.
+  - **Without a filter** it is general overflow storage, used only when everything else is full.
+  - Its stock is reserved: Pushers and the wireless bridge never take items out of it (terminals
+    and crafting can).
 
 ---
 
-## Exporter (Pusher)
-- **Recipe (3×3)**:
+### Quantum Workbench · `mvn_quantum_workbench`
 
-  ```
-  I D I
-  D R D
-  I D I
-  ```
+```
+D D D
+D C D
+D D D
+```
 
-  > I = **Iron Ingot** · D = **Dropper** · R = **Redstone Block**
+> D = **Diamond** · C = **Crafting Table**
 
-- **Result**: 1× Exporter
-- **Function**: Inserts items from the network into adjacent containers. Also supports a whitelist filter.
-
----
-
-## Advanced Pusher (Pusher HT)
-- **Recipe (3×3)**:
-
-  ```
-  D P D
-  ```
-
-  > D = **Dropper** · P = **Piston**
-
-- **Result**: 1× Advanced Pusher
-- **Function**: High-throughput variant (×8 by default, configurable in `transfer.ht-multiplier`) of the simple pusher. It is directional: it faces the container it pushes into.
+- **Result**: 1× Quantum Workbench (Brain Coral Block)
+- **Function**: Upgrades a Quantum Cell T1–T5 to the next tier keeping its cargo. Place the cell in
+  the centre, 8 diamonds around it, press *Entangle & Upgrade* and take the result. Ingredients left
+  in the grid are returned when you close the menu.
 
 ---
 
-## Vacuum
-- **Recipe (3×3)**:
+## 💧 Fluids
 
-  ```
-  S R S
-  R H R
-  S R S
-  ```
+### Quantum Fluid Cell · `mvn_fluid_cell`
 
-  > S = **String** · R = **Redstone** · H = **Hopper**
+```
+G B G
+G L G
+G G G
+```
 
-- **Result**: 1× Vacuum
-- **Function**: Picks up ground items within a configurable radius (4.0 by default, in `vacuum.radius`). Optionally supports a whitelist filter.
+> G = **Glass** · B = **Bucket** · L = **Lapis Block**
 
----
-
-## Network Purger
-- **Recipe (3×3)**:
-
-  ```
-  I L I
-  L H L
-  I L I
-  ```
-
-  > I = **Iron Ingot** · L = **Magma Block** · H = **Hopper**
-
-- **Result**: 1× Network Purger
-- **Function**: Discards from the network whatever matches its filter (whitelist/blacklist), preventing waste from jamming the network. **Without a configured filter it removes nothing**, on purpose.
+- **Result**: 1× Quantum Fluid Cell (Prismarine Bricks)
+- **Function**: Holds one fluid — Water, Lava, Milk, Powder Snow or Honey — up to
+  `fluids.cell-capacity-mb` (64,000 mB = 64 buckets). All fluid cells of a network form its fluid
+  storage. Right-click it with a filled bucket / honey bottle to pour, with an empty bucket to fill
+  (Water, Lava, Milk, Powder Snow). Its menu shows the level, extracts one bucket, and has a *Void
+  Fluid Tank* button (shift+right-click to confirm) that empties the cell permanently.
 
 ---
 
-## Network Probe
-- **Recipe (3×3)**:
+### Liquid Pump · `mvn_liquid_pump`
 
-  ```
-  · A ·
-  A S A
-  · A ·
-  ```
+```
+· G ·
+P B P
+· R ·
+```
 
-  > A = **Amethyst Shard** · S = **Spyglass**
+> G = **Blue Stained Glass** · P = **Piston** · B = **Bucket** · R = **Redstone**
 
-- **Result**: 1× Network Probe
-- **Function**: Right-click on a block (whether it is a node or not) and it shows which network it belongs to, how many nodes it has, and where its controller is.
-
----
-
-## Auto-Crafter
-- **Recipe (3×3)**:
-
-  ```
-  R C R
-  I T I
-  R C R
-  ```
-
-  > R = **Redstone** · C = **Crafting Table** · I = **Iron Ingot** · T = **Target**
-
-- **Result**: 1× Auto-Crafter
-- **Function**: Executes recipes defined through **Blueprints** (3×3 grid) or by result (legacy mode). Each cycle it attempts a single craft atomically: either there are ingredients for everything or nothing is touched.
+- **Result**: 1× Liquid Pump (Blue Stained Glass)
+- **Function**: Each cycle drains one **source** block of water or lava directly **below** it
+  (1,000 mB) into the network's fluid cells. The source is removed only if the whole 1,000 mB fit.
+  Right-click to choose ANY / WATER / LAVA.
 
 ---
 
-## Recipe Encoder
-- **Recipe (3×3)**:
+## 🔄 Item transport
 
-  ```
-  K P K
-  P S P
-  K P K
-  ```
+### Simple Grabber (Importer) · `mvn_grabber`
 
-  > K = **Ink Sac** · P = **Paper** · S = **Smithing Table**
+```
+I O I
+O R O
+I O I
+```
 
-- **Result**: 1× Recipe Encoder
-- **Function**: Lets you build and save a recipe in a persistent 3×3 template grid. It generates a **Blueprint** that you then install in the Auto-Crafter.
+> I = **Iron Ingot** · O = **Observer** · R = **Redstone Block**
 
----
-
-## Blank Blueprint (×4)
-- **Recipe (3×3)**:
-
-  ```
-  P P P
-  P B P
-  P P P
-  ```
-
-  > P = **Paper** · B = **Blue Dye**
-
-- **Result**: 4× Blank Blueprint
-- **Function**: Empty template that, once encoded with the **Recipe Encoder**, becomes a Blueprint with the desired recipe.
+- **Result**: 1× Simple Grabber (Observer)
+- **Function**: Imports from adjacent containers into the network: up to 128 items of one type per
+  cycle, from all six faces. Whitelist/blacklist filter; an empty filter imports everything. If the
+  network refuses part of it, the overflow goes first to Pushers that accept it, then back to the
+  source, and only then waits in the grabber's transit buffer (kept even if you break it).
 
 ---
 
-## Crafting Grid
-- **Recipe (3×3)**:
+### Advanced Grabber · `mvn_grabber_ht`
 
-  ```
-  C R C
-  R G R
-  C R C
-  ```
+```
+O P O
+```
 
-  > C = **Crafting Table** · R = **Redstone** · G = **Cartography Table**
+> O = **Observer** · P = **Sticky Piston**
 
-- **Result**: 1× Crafting Grid
-- **Function**: Lets players use the network as a regular crafting table, consuming items directly from the network in a transactional way.
+- **Result**: 1× Advanced Grabber (Sticky Piston)
+- **Function**: Same as the Simple Grabber ×8 (`transfer.ht-multiplier`): 1,024 items per cycle. Its
+  menu can restrict it to **one face**.
 
 ---
 
-## Quantum Workbench (Advanced)
-- **Recipe (3×3)**:
+### Simple Pusher (Exporter) · `mvn_pusher`
 
-  ```
-  D D D
-  D C D
-  D D D
-  ```
+```
+I D I
+D R D
+I D I
+```
 
-  > D = **Diamond** · C = **Crafting Table**
+> I = **Iron Ingot** · D = **Dropper** · R = **Redstone Block**
 
-- **Result**: 1× Quantum Workbench
-- **Function**: Specialized crafting station that lets you **upgrade quantum cells** (T1 → T2 → … → T6). Place a T1–T5 cell in the center, surround it with 8 diamonds, and press *Entangle & Upgrade*: the stored cargo is preserved without loss.
-
----
-
-## Network Monitor
-- **Recipe (3×3)**:
-
-  ```
-  G G G
-  G C G
-  G G G
-  ```
-
-  > G = **Glass Pane** · C = **Comparator**
-
-- **Result**: 1× Network Monitor
-- **Function**: Diagnostic panel showing the number of nodes, total storage, and network status in real time.
+- **Result**: 1× Simple Pusher (Target)
+- **Function**: Exports from the network into adjacent containers: up to 128 items of one type per
+  cycle, only when a container is next to it. **An empty whitelist does nothing** (a fresh pusher
+  never empties the network); an empty blacklist exports anything. What does not fit goes back to the
+  network.
 
 ---
 
-## Wireless Transmitter
-- **Recipe (3×3)**:
+### Advanced Pusher · `mvn_pusher_ht`
 
-  ```
-  I R I
-  R C R
-  I R I
-  ```
+```
+D P D
+```
 
-  > I = **Iron Ingot** · R = **Redstone Block** · C = **Conduit**
+> D = **Dropper** · P = **Piston**
 
-- **Result**: 1× Wireless Transmitter
-- **Function**: Binds a **Wireless Receiver** (shift+click with the receiver item on the transmitter) to create a long-distance network connection. The receiver opens the terminal of the transmitter's network.
+- **Result**: 1× Advanced Pusher (Piston)
+- **Function**: Same as the Simple Pusher ×8 (1,024 per cycle), with face selection.
 
 ---
 
-## Wireless Receiver
-- **Recipe (3×3)**:
+### Network Vacuum · `mvn_vacuum`
 
-  ```
-  I P I
-  P L P
-  I P I
-  ```
+```
+S R S
+R H R
+S R S
+```
 
-  > I = **Iron Ingot** · P = **Ender Pearl** · L = **Redstone Lamp**
+> S = **String** · R = **Redstone** · H = **Hopper**
 
-- **Result**: 1× Wireless Receiver
-- **Function**: Receives the transmitter's signal and gives remote access to the network. It can use filters to **bridge items** between both networks (without a filter it crosses nothing).
-
----
-
-## Configuration Wrench
-- **Recipe (3×3)**:
-
-  ```
-  I · I
-  · C ·
-  · I ·
-  ```
-
-  > I = **Iron Ingot** · C = **Comparator**
-
-- **Result**: 1× Configuration Wrench
-- **Function**: Quick configuration tool. *Shift+click* copies the configuration of a device with a filter; normal click pastes it onto another.
+- **Result**: 1× Network Vacuum (Sponge)
+- **Function**: Every 10 ticks picks up dropped items within `vacuum.radius` (4 blocks) into the
+  network. Optional filter. Items that do not fit stay on the ground.
 
 ---
 
-## Network Rake
-- **Recipe (3×3)**:
+### Network Purger · `mvn_purger`
 
-  ```
-  D · D
-  · S ·
-  · S ·
-  ```
+```
+I L I
+L H L
+I L I
+```
 
-  > D = **Dead Bush** · S = **Stick**
+> I = **Iron Ingot** · L = **Magma Block** · H = **Hopper**
 
-- **Result**: 1× Network Rake
-- **Function**: Removes network nodes instantly (250 uses by default, configurable in `rake.uses`). Does not affect controllers or loaded cells.
-
----
-
+- **Result**: 1× Network Purger (Magma Block)
+- **Function**: Deletes up to 128 items per cycle that match its filter, so waste (gravel, seeds…)
+  never jams the network. **Without a filter it deletes nothing**, on purpose.
 
 ---
 
-## Network Router Antenna
-- **Recipe (3×3)**:
+### Network Quota Limiter · `mvn_limiter`
 
-  ```
-  · L ·
-  · C ·
-  · R ·
-  ```
+```
+R C R
+C T C
+R C R
+```
 
-  > L = **Lightning Rod** · C = **Network Cable** · R = **Redstone Block**
+> R = **Redstone** · C = **Comparator** · T = **Target**
 
-- **Result**: 1× Network Router
-- **Function**: Broadcasting antenna that amplifies the network signal across chunks and dimensions. With an active router, the Wireless Terminal gains global access across the world (without a router, access is restricted to 64 local blocks).
-
----
-
-## CPU Virtual Cache Modules (L1 – Quantum)
-Internal multi-item storage installed directly into the **Network Controller** by right-clicking it with the module. Provides ultra-fast item memory without requiring external cell blocks.
-
-### L1 CPU Cache Module (2,048 items)
-- **Recipe (3×3)**:
-  ```
-  C R C
-  R C R
-  C R C
-  ```
-  > C = **Copper Ingot** · R = **Redstone Dust**
-- **Capacity**: 2,048 items
-
-### L2 CPU Cache Module (8,192 items)
-- **Recipe (3×3)**:
-  ```
-  G L G
-  L P L
-  G L G
-  ```
-  > G = **Gold Ingot** · L = **Lapis Lazuli** · P = **L1 CPU Cache Module**
-- **Capacity**: 8,192 items
-
-### L3 CPU Cache Module (32,768 items)
-- **Recipe (3×3)**:
-  ```
-  D A D
-  A P A
-  D A D
-  ```
-  > D = **Diamond** · A = **Amethyst Shard** · P = **L2 CPU Cache Module**
-- **Capacity**: 32,768 items
-
-### DRAM Memory Module (131,072 items)
-- **Recipe (3×3)**:
-  ```
-  N E N
-  E P E
-  N E N
-  ```
-  > N = **Netherite Ingot** · E = **Eye of Ender** · P = **L3 CPU Cache Module**
-- **Capacity**: 131,072 items
-
-### Quantum Cache Matrix (524,288 items)
-- **Recipe (3×3)**:
-  ```
-  N S N
-  S P S
-  N S N
-  ```
-  > N = **Netherite Block** · S = **Nether Star** · P = **DRAM Memory Module**
-- **Capacity**: 524,288 items
+- **Result**: 1× Network Quota Limiter (Target)
+- **Function**: Caps how much of one item the network may hold. Every deposit stops at the cap:
+  grabbers, vacuum, terminal, crafting results and the wireless bridge. In its menu: click with an
+  item to set the target, ±1/10/64/1,000 buttons or a chat prompt for the limit, and an on/off toggle.
+  Several limiters on the same item: the lowest wins.
 
 ---
 
-## Slimefun Recipe Encoder
-- **Recipe (3×3)**:
-  ```
-  E P E
-  P B P
-  E P E
-  ```
-  > E = **Ender Pearl** · P = **Paper** · B = **Enchanting Table**
-- **Result**: 1× Slimefun Recipe Encoder
-- **Function**: Dedicated encoder for Slimefun item recipes. Allows encoding blueprints with custom Slimefun recipes that Auto-Crafters can craft. Config toggle: `sf-encoder.enabled`.
+### Wireless Transmitter · `mvn_transmitter`
+
+```
+I R I
+R C R
+I R I
+```
+
+> I = **Iron Ingot** · R = **Redstone Block** · C = **Conduit**
+
+- **Result**: 1× Wireless Transmitter (Conduit)
+- **Function**: One end of a wireless bridge between two networks. Shift+right-click a placed
+  Transmitter with a Receiver item to make that **receiver pull** from this network. Or link the other
+  way: shift+right-click a placed Receiver with a Transmitter item, and this transmitter **pushes** up
+  to 128 items per cycle that pass its filter into the receiver's network. Its menu is a filter menu
+  with a button that opens its own network's terminal.
 
 ---
 
-## Network Quota Limiter
-- **Recipe (3×3)**:
-  ```
-  R C R
-  C T C
-  R C R
-  ```
-  > R = **Redstone** · C = **Comparator** · T = **Target**
-- **Result**: 1× Network Quota Limiter
-- **Function**: Regulates max stock allowed in network storage for a specified target item. Once quota ceiling is met, importers will refuse further items of that type.
+### Wireless Receiver · `mvn_receiver`
+
+```
+I P I
+P L P
+I P I
+```
+
+> I = **Iron Ingot** · P = **Ender Pearl** · L = **Redstone Lamp**
+
+- **Result**: 1× Wireless Receiver (Redstone Lamp)
+- **Function**: The other end of the bridge. When linked to a Transmitter it **pulls** up to 128 items
+  per cycle that pass **its** filter from the transmitter's network into its own, across any distance
+  and world while the other end's chunk is loaded. **An empty whitelist moves nothing**, on purpose;
+  an empty blacklist moves everything. Greedy Cells are never drained. Its menu has a button that
+  opens the remote network's terminal (if you may access that land).
 
 ---
 
-## Quantum Fluid Cell
-- **Recipe (3×3)**:
-  ```
-  G B G
-  G L G
-  G G G
-  ```
-  > G = **Glass** · B = **Bucket** · L = **Lapis Block**
-- **Result**: 1× Quantum Fluid Cell
-- **Function**: High-capacity liquid container (default 64,000 mB / 64 Buckets). Stores Water, Lava, Milk, Honey, and Powder Snow. Right-click directly with buckets/bottles to deposit or extract, or open GUI to inspect volume levels.
+## 🛠️ Crafting
+
+### Blank Blueprint (×4) · `mvn_blueprint`
+
+```
+P P P
+P B P
+P P P
+```
+
+> P = **Paper** · B = **Blue Dye**
+
+- **Result**: 4× Blueprint (Book)
+- **Function**: Carries a recipe (3×3 grid + result) once written by a Recipe Encoder. Crafting never
+  consumes it. Installing it moves it into the crafter; removing it, replacing it or *Clear All*
+  gives it back.
 
 ---
 
-## Liquid Pump
-- **Recipe (3×3)**:
-  ```
-  · G ·
-  P B P
-  · R ·
-  ```
-  > G = **Blue Stained Glass** · P = **Piston** · B = **Bucket** · R = **Redstone**
-- **Result**: 1× Liquid Pump
-- **Function**: Automatically extracts liquid source blocks (strictly Water and Lava) from the block directly below the pump (`BlockFace.DOWN`) into the network's quantum fluid storage.
+### Recipe Encoder · `mvn_encoder`
+
+```
+K P K
+P S P
+K P K
+```
+
+> K = **Ink Sac** · P = **Paper** · S = **Smithing Table**
+
+- **Result**: 1× Recipe Encoder (Smithing Table)
+- **Function**: Build the recipe in its persistent 3×3 template grid (clicking only marks slots, no
+  items are spent), put a Blueprint (blank or already encoded) in the blue slot and press *Encode*.
+  Clicking an encoded Blueprint loads its recipe back into the grid. Blueprints left in its slots
+  stay stored in the block; only one player at a time sees them.
 
 ---
 
-## Request Terminal
-- **Recipe (3×3)**:
-  ```
-  G L G
-  R C R
-  G G G
-  ```
-  > G = **Glass** · L = **Lectern** · C = **Crafting Table** · R = **Redstone**
-- **Result**: 1× Request Terminal
-- **Function**: On-demand crafting console. Discovers blueprints strictly configured in connected **Request Crafters** (`MVN_REQUEST_CRAFTER`) across the network, completely isolated from regular Auto-Crafters. Features recursive / chained crafting dependency resolution: if you request an item (such as a Crafting Table) and network storage lacks intermediate items (such as Planks) but contains base raw materials (such as Oak Logs) with their corresponding recipes installed in Request Crafters, the terminal will automatically plan and craft all prerequisites in sequence before producing and delivering the final item. Left click crafts 1x, Right click crafts 64x, and Shift + Right Click opens an interactive chat prompt allowing the player to specify an exact custom numeric batch amount (canceling automatically on non-numeric inputs or values $\le 0$).
+### Slimefun Recipe Encoder · `mvn_sf_encoder`
+
+```
+E P E
+P B P
+E P E
+```
+
+> E = **Ender Pearl** · P = **Paper** · B = **Enchanting Table**
+
+- **Result**: 1× Slimefun Recipe Encoder (Enchanting Table)
+- **Function**: Same as the Recipe Encoder for Slimefun recipes. Needs Slimefun. Its recipe and menu
+  exist only while `sf-encoder.enabled: true`.
 
 ---
 
-## Request Crafter
-- **Recipe (3×3)**:
-  ```
-  R C R
-  I L I
-  R C R
-  ```
-  > R = **Redstone** · C = **Crafting Table** · I = **Iron Ingot** · L = **Lectern**
-- **Result**: 1× Request Crafter
-- **Function**: On-demand crafting execution unit managed exclusively via the Request Terminal. Holds encoded blueprints (both Vanilla and Slimefun) for manual/on-demand crafting orders without automatically executing them during background network ticks. Only blueprints placed in Request Crafters are discovered and processed by Request Terminals for manual and recursive dependency crafting.
+### Auto-Crafter · `mvn_crafter`
+
+```
+R C R
+I T I
+R C R
+```
+
+> R = **Redstone** · C = **Crafting Table** · I = **Iron Ingot** · T = **Target**
+
+- **Result**: 1× Auto-Crafter (Crafting Table)
+- **Function**: Holds up to 18 vanilla Blueprints (`crafter.max-recipes`) and every 20 ticks tries
+  each one once with the network's stock. All-or-nothing: if any ingredient is missing nothing is
+  taken, and if the result does not fit the whole craft is undone. Slimefun Blueprints are refused
+  (use the Slimefun Auto-Crafter).
 
 ---
 
-## Slimefun Auto-Crafter
-- **Recipe (3×3)**:
-  ```
-  R C R
-  I T I
-  R C R
-  ```
-  > R = **Ender Pearl** · C = **Crying Obsidian** · I = **Iron Ingot** · T = **Target**
-- **Result**: 1× Slimefun Auto-Crafter
-- **Function**: Dedicated autonomous crafter designed specifically for Slimefun item recipes. Only accepts blueprints encoded with Slimefun recipes (from the Slimefun Recipe Encoder), strictly isolating them from vanilla auto-crafting. Executes crafting attempts periodically during network ticks with atomic item transactions. Config toggle: `sf-crafter.enabled`.
+### Slimefun Auto-Crafter · `mvn_sf_crafter`
+
+```
+R C R
+I T I
+R C R
+```
+
+> R = **Ender Pearl** · C = **Crying Obsidian** · I = **Iron Ingot** · T = **Target**
+
+- **Result**: 1× Slimefun Auto-Crafter (Crying Obsidian)
+- **Function**: Same as the Auto-Crafter, Slimefun Blueprints only. `sf-crafter.enabled: false`
+  removes its recipe, its menu and its crafting.
 
 ---
 
-## Slimefun Request Crafter
-- **Recipe (3×3)**:
-  ```
-  R C R
-  I L I
-  R C R
-  ```
-  > R = **Ender Pearl** · C = **Purpur Pillar** · I = **Iron Ingot** · L = **Lectern**
-- **Result**: 1× Slimefun Request Crafter
-- **Function**: Dedicated on-demand crafting node for Slimefun item recipes, managed exclusively by the Request Terminal. Holds Slimefun blueprints without auto-crafting them periodically. Discovered dynamically by connected Request Terminals for manual batch requests and recursive chained crafting. Config toggle: `sf-crafter.enabled`.
+### Request Crafter · `mvn_request_crafter`
+
+```
+R C R
+I L I
+R C R
+```
+
+> R = **Redstone** · C = **Crafting Table** · I = **Iron Ingot** · L = **Lectern**
+
+- **Result**: 1× Request Crafter (Fletching Table)
+- **Function**: Holds vanilla Blueprints that are **only** crafted on demand from a Request Terminal,
+  never automatically.
 
 ---
 
-This documentation is meant as a quick reference for both players and developers who want to understand what each item does and how to craft it. The capacities and speeds quoted are the `config.yml` defaults and can be tuned in that file.
+### Slimefun Request Crafter · `mvn_sf_request_crafter`
+
+```
+R C R
+I L I
+R C R
+```
+
+> R = **Ender Pearl** · C = **Purpur Pillar** · I = **Iron Ingot** · L = **Lectern**
+
+- **Result**: 1× Slimefun Request Crafter (Purpur Pillar)
+- **Function**: Same as the Request Crafter for Slimefun Blueprints. Depends on
+  `sf-crafter.enabled`.
+
+---
+
+### Request Terminal · `mvn_request_terminal`
+
+```
+G L G
+R C R
+G G G
+```
+
+> G = **Glass** · L = **Lectern** · C = **Crafting Table** · R = **Redstone**
+
+- **Result**: 1× Request Terminal (Lectern)
+- **Function**: Lists everything the network's Request Crafters can make and crafts it on demand,
+  resolving chains with the network's stock (e.g. logs → planks → crafting table). Left-click 1
+  batch, shift+left-click 10, right-click 64, shift+right-click asks for an exact number in chat
+  (non-numeric or ≤ 0 cancels). A button toggles delivery to your inventory or to the network.
+  Auto-Crafters are not listed here.
+
+---
+
+### Network Crafting Grid · `mvn_crafting_grid`
+
+```
+C R C
+R G R
+C R C
+```
+
+> C = **Crafting Table** · R = **Redstone** · G = **Cartography Table**
+
+- **Result**: 1× Network Crafting Grid (Cartography Table)
+- **Function**: A crafting table that pulls ingredients from the network transactionally. The
+  template grid is stored in the block; *Craft 1* / *Craft All* hand you the result.
+
+---
+
+## 🧰 Tools
+
+### Configuration Wrench · `mvn_configurator`
+
+```
+I · I
+· C ·
+· I ·
+```
+
+> I = **Iron Ingot** · C = **Comparator**
+
+- **Result**: 1× Configuration Wrench (hand item)
+- **Function**: Shift+right-click a filterable device to copy its filter (exact templates, materials
+  and whitelist/blacklist mode); right-click another one to paste it, replacing its filter.
+
+---
+
+### Network Rake · `mvn_rake`
+
+```
+D · D
+· S ·
+· S ·
+```
+
+> D = **Dead Bush** · S = **Stick**
+
+- **Result**: 1× Network Rake (hand item, 250 uses — `rake.uses`)
+- **Function**: Dismantles a node instantly and gives it back to you with its state (filter,
+  Blueprints, link…). It refuses controllers and storage that still holds items or fluid.

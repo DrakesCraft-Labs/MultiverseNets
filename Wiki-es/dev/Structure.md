@@ -1,61 +1,75 @@
 # 📁 Estructura del plugin MultiverseNets
 
-Este documento describe la organización de carpetas y archivos del proyecto **MultiverseNets**. Está pensado para desarrolladores que quieran comprender rápidamente dónde encontrar cada elemento del código y cómo está estructurado el proyecto.
+Este documento describe la organización de carpetas y archivos del proyecto **MultiverseNets**. Está
+pensado para desarrolladores que quieran entender rápido dónde está cada pieza de código y cómo se
+organiza el proyecto.
 
 > Esta página forma parte de la **zona de desarrollo** de la wiki. Complementos recomendados:
-> [Cómo funciona el código](Code.md) · [Los tests del plugin](Tests.md)
+> [Cómo funciona el código](Code.md) · [Tests del plugin](Tests.md)
 
 ## Raíz del proyecto
 ```
 MultiverseNets/
-├─ docs/                 # Imágenes y recursos de documentación (banner, icono, etc.)
-├─ src/                  # Código fuente del plugin
-│   ├─ main/            # Código que se compila en el artefacto final
-│   │   ├─ java/        # Paquetes Java del plugin
-│   │   │   └─ com/chagui68/multiversenets/   # Package base del plugin
-│   │   │       ├─ command/          # Clases de comandos (/mvnets …)
-│   │   │       ├─ compat/           # Compatibilidad opcional con Slimefun
-│   │   │       ├─ craft/            # Sistema de blueprints y recetas
-│   │   │       ├─ gui/              # Menús gráficos (inventarios) y su lógica
-│   │   │       ├─ item/             # Definiciones de tipos de dispositivos y registro de ítems
-│   │   │       ├─ listen/           # Listeners de eventos del servidor (bloques, GUI, etc.)
-│   │   │       ├─ net/              # Núcleo de la red: controlador, gestión de nodos, ticker
-│   │   │       ├─ persist/          # Persistencia de datos por chunk (NodeBlob, NodeStore)
-│   │   │       └─ util/             # Utilidades auxiliares (claves, posiciones, configuración)
-│   │   └─ resources/    # Configuración YAML, idioma y otros recursos estáticos
-│   └─ test/            # Tests unitarios y de integración
-│       └─ java/        # Tests correspondientes a los paquetes de src/main/java
-├─ pom.xml               # Configuración del proyecto Maven (dependencias, versión Java, etc.)
-├─ README.md             # Documentación principal del plugin (Inglés)
-├─ Wiki-es/              # Wiki en español
-│   ├─ README.md         # Vista general del plugin en español
-│   ├─ Recipes.md        # Recetas y funciones de cada ítem del plugin
-│   └─ dev/              # Zona técnica / documentación para desarrolladores
-│       ├─ Structure.md  # Este archivo – estructura del proyecto
-│       ├─ Code.md       # Cómo funciona el código internamente
-│       └─ Tests.md      # Los tests: ejecución y qué cubre cada uno
-└─ Wiki-en/              # Wiki en inglés (espejo de la wiki en español)
-    ├─ README.md         # Overview of the plugin in English
-    ├─ Recipes.md        # Recipes and functions of each item in English
-    └─ dev/              # Developer documentation (mirror in English)
-        ├─ Structure.md  # Project structure description in English
-        ├─ Code.md       # How the code works internally in English
-        └─ Tests.md      # Tests: running them and what each covers in English
+├─ .github/              # CI: workflow de publicación en Modrinth y sus scripts
+├─ docs/                 # Imágenes de documentación (banners, icono)
+├─ src/
+│   ├─ main/
+│   │   ├─ java/com/chagui68/multiversenets/
+│   │   │   ├─ MultiverseNets.java   # Clase principal (onEnable/onDisable, singletons)
+│   │   │   ├─ api/          # MultiverseNetsAPI: acceso público de lectura/escritura al almacenamiento
+│   │   │   ├─ command/      # /mvnets y su autocompletado
+│   │   │   ├─ compat/       # Integraciones opcionales: SlimefunBridge y protección de terrenos
+│   │   │   │                #   (ProtectionBridge + un provider por plugin de protección)
+│   │   │   ├─ craft/        # Blueprints, RecipeData y crafteo atómico (CraftingSupport)
+│   │   │   ├─ gui/          # Todos los menús (base MenuHolder + una clase por dispositivo)
+│   │   │   ├─ item/         # DeviceType (todos los dispositivos), Items (ítems, lore, recetas), GuideBook
+│   │   │   ├─ listen/       # BlockListener (eventos), DeviceInteractions (qué abre cada dispositivo),
+│   │   │   │                #   CraftingListener (libro de recetas, mejora de celdas en la mesa)
+│   │   │   ├─ net/          # Network, NetworkManager, NetworkTicker, NetworkStorage,
+│   │   │   │                #   NetworkFluidStorage, holograma y medidor de flujo
+│   │   │   ├─ persist/      # Persistencia por chunk (NodeBlob, NodeStore)
+│   │   │   └─ util/         # Keys, PosUtil, Settings, StackUtils, Text
+│   │   └─ resources/        # config.yml y plugin.yml
+│   └─ test/java/            # Tests JUnit 5 + MockBukkit (mismos paquetes que main, más stubs)
+├─ pom.xml                   # Build de Maven (Java 21, Paper API, MockBukkit)
+├─ README.md                 # Documentación principal (inglés)
+├─ Wiki-en/                  # Wiki en inglés (mismos archivos)
+└─ Wiki-es/                  # Wiki en español
+    ├─ README.md             # Visión general, referencia de máquinas, flujo de ítems, comandos, config
+    ├─ Recipes.md            # Receta y función de cada ítem
+    └─ dev/
+        ├─ Structure.md      # Este archivo
+        ├─ Code.md           # Cómo funciona el código por dentro
+        └─ Tests.md          # Cómo ejecutar los tests y qué cubre cada uno
 ```
 
-## Detalles de carpetas clave
-- **`src/main/java/com/chagui68/multiversenets/gui/`** – Implementa los menús de inventario (por ejemplo, `FilterMenu`, `CellMenu`, `QuantumWorkbenchMenu`). Cada clase gestiona la interacción del jugador con los bloques del plugin.
-- **`src/main/java/com/chagui68/multiversenets/item/`** – Contiene `DeviceType.java` (enumeración de dispositivos) y `Items.java` (registro de ítems y sus recetas).
-- **`src/main/java/com/chagui68/multiversenets/net/`** – Núcleo de la lógica de red: `NetworkManager`, `NetworkTicker`, `NetworkStorage`.
-- **`src/main/java/com/chagui68/multiversenets/persist/`** – Clases responsables de guardar y cargar la información de cada nodo de la red (por chunk).
-- **`src/main/resources/`** – Archivos de configuración (`config.yml`, `plugin.yml`) y demás recursos estáticos.
-- **`src/test/java/`** – Tests JUnit que validan la funcionalidad del plugin. Se ejecutan con `mvn test`.
+## Detalle de las carpetas clave
+- **`api/`** – `MultiverseNetsAPI`: fachada fina y null-safe que otros plugins usan para `extract`,
+  `insert` y `count` ítems en la red a la que pertenece un bloque.
+- **`compat/`** – `SlimefunBridge` (integración con Slimefun solo por reflexión) y protección de
+  terrenos: `ProtectionBridge` más `ProtectionStonesProvider`, `WorldGuardProvider`/`WorldGuardRegions`,
+  `LandsProvider`, `TownyProvider` y `GriefPreventionProvider`. Cada provider es un archivo.
+- **`gui/`** – Un menú por dispositivo (`TerminalMenu`, `FilterMenu`, `CellMenu`, `BarrelMenu`,
+  `GreedyMenu`, `CrafterMenu`, `EncoderMenu`, `SfEncoderMenu`, `CraftingGridMenu`,
+  `RequestTerminalMenu`, `QuotaLimiterMenu`, `FluidCellMenu`, `LiquidPumpMenu`, `MonitorMenu`,
+  `ControllerMenu`, `QuantumWorkbenchMenu`), la base `MenuHolder`, la protección anti-dupe
+  `GuiListener` y `ChatPrompts`.
+- **`item/`** – `DeviceType` (enumeración de los 43 dispositivos, módulos y herramientas), `Items`
+  (creación de ítems, lore, ayudantes de PDC y las 43 recetas) y `GuideBook` (el libro guía del juego).
+- **`net/`** – Núcleo de red: topología (`Network`), registro (`NetworkManager`), el latido
+  (`NetworkTicker`), almacenamiento de ítems y fluidos, holograma del controlador y medición de flujo.
+- **`persist/`** – `NodeBlob` (estado serializable de un nodo) y `NodeStore` (almacenamiento en el PDC
+  del chunk, registro de controladores y caché de decodificación).
+- **`src/main/resources/`** – `config.yml` (comentado en inglés y español) y `plugin.yml`.
+- **`src/test/java/`** – Tests JUnit; `dev/espi/protectionstones/PSRegion` es un stub de la API de
+  ProtectionStones que usan los tests del provider. Se ejecutan con `mvn test`.
 
-## Documentación por zona
-| Zona | Archivo | Cuando la consultas |
+## Documentación por área
+| Área | Archivo | Cuándo consultarlo |
 | --- | --- | --- |
-| Estructura y organización | `Structure.md` | Quieres saber dónde está cada cosa en el repo. |
-| Funcionamiento interno | `Code.md` | Quieres entender cómo funciona la red, la persistencia o los menús. |
+| Estructura y organización | `Structure.md` | Quieres saber dónde vive cada cosa en el repo. |
+| Funcionamiento interno | `Code.md` | Quieres entender la red, la persistencia o los menús. |
 | Tests | `Tests.md` | Quieres ejecutar los tests o saber qué cubre cada uno. |
 
-Esta estructura sigue el estándar de proyectos Maven, lo que facilita la compilación (`mvn clean package`) y la gestión de dependencias.
+Esta estructura sigue el layout estándar de Maven, lo que simplifica la compilación
+(`mvn clean package`) y la gestión de dependencias.

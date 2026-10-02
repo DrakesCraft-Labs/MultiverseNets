@@ -1,149 +1,110 @@
 # 🧪 Tests del plugin MultiverseNets
 
-Este documento explica cómo funcionan los tests del proyecto y qué cubre cada uno de ellos. Pensado para desarrolladores que quieran ejecutarlos, entenderlos o ampliarlos.
+Este documento explica cómo funcionan los tests del proyecto y qué cubre cada uno. Pensado para quien
+quiera ejecutarlos, entenderlos o ampliarlos.
 
 > Zona de desarrollo: [Estructura](Structure.md) · [Cómo funciona el código](Code.md) · **Los tests**
 
 ---
 
-## 1. Cómo ejecutarlos
+## 1. Ejecutar los tests
 
-Los tests son **JUnit 5 (Jupiter)** y no necesitan un servidor de Minecraft real. Para ejecutarlos:
+Los tests son **JUnit 5 (Jupiter)** y no necesitan un servidor de Minecraft real:
 
 ```
 mvn test
 ```
 
-O compilación completa con empaquetado (también ejecuta los tests):
-
-```
-mvn clean package
-```
-
-Requisitos: JDK compatible con el proyecto (Paper 1.21 / `api-version: '1.21'`) y Maven.
+Un build completo (`mvn clean package`) también los ejecuta. Requisitos: JDK 21 y Maven.
 
 ## 2. Infraestructura: MockBukkit
 
-La mayoría de tests usan **[MockBukkit](https://github.com/MockBukkit/MockBukkit)**, que simula un servidor Bukkit en memoria. El patrón típico es:
+La mayoría de tests usan **[MockBukkit](https://github.com/MockBukkit/MockBukkit)**, un servidor
+Bukkit en memoria:
 
 ```java
 @BeforeEach void setUp() {
-    server = MockBukkit.mock();                    // crea el servidor falso
-    plugin = MockBukkit.load(MultiverseNets.class); // carga el plugin (onEnable)
-    world = server.addSimpleWorld("world");        // mundo falso
-    player = server.addPlayer();                   // jugador falso
+    server = MockBukkit.mock();                     // servidor falso
+    plugin = MockBukkit.load(MultiverseNets.class); // ejecuta onEnable
+    world = server.addSimpleWorld("world");
+    player = server.addPlayer();
 }
 
 @AfterEach void tearDown() {
-    MockBukkit.unmock();                            // limpieza entre tests
+    MockBukkit.unmock();
 }
 ```
 
-Con esto se puede: colocar bloques, emitir eventos (`server.getPluginManager().callEvent(...)`), simular clics en inventarios, interacciones, explosiones y pistones, y verificar el estado persistido en el PDC de los chunks.
+Así se pueden colocar bloques, lanzar eventos (`server.getPluginManager().callEvent(...)`), simular
+clics de inventario, explosiones y pistones, ejecutar el ticker
+(`new NetworkTicker(plugin, plugin.networks()).tick()`) y leer el estado guardado en el PDC de los
+chunks.
 
-**Tests puramente unitarios** (sin MockBukkit): `PosUtilTest`, `SettingsCellCapacityTest`, `DeviceTypeTest`, `NetworksCoexistenceTest`, `PluginResourcesTest`, `NewDevicesTest`, `ToolsTest` y `SlimefunBridgeTest`.
+A tener en cuenta:
+- Un test que coloca un dispositivo a mano debe guardar también su blob
+  (`NodeStore.put(block, NodeBlob.create(type.name()))`); sin él, el bloque no es un nodo.
+- MockBukkit no implementa `Display.setBillboard` ni `HumanEntity.openWorkbench`. El ticker captura
+  los fallos del holograma, así que los tests del ticker funcionan con normalidad; los dos tests que
+  llaman a esas APIs directamente (`FluidAndRequesterTest.testHologramRedesignNoFlowOrRouted`,
+  `RecipeTest.prepareCraftUpgradesCellWithCargoSeamlessly`) aparecen como **skipped**.
+- `src/test/java/dev/espi/protectionstones/PSRegion.java` es un stub de la API de ProtectionStones que
+  los tests del provider cargan por reflexión.
 
-## 3. Resumen de los 17 tests
+## 3. Resumen: 30 clases, 232 tests
 
-| Archivo (en `src/test/java/com/chagui68/multiversenets/`) | Tipo | Qué cubre |
+| Clase (paquete `com.chagui68.multiversenets` salvo que se indique) | Tests | Cubre |
 | --- | --- | --- |
-| `BlockFlowsTest` | Integración | Flujos de bloques: rotura/colocación, pistones, explosiones e interacción; protección y persistencia de nodos. |
-| `CellGuiTest` | Integración | GUI de la Quantum Cell: plantilla de ítem, depósito rápido, extracción y seguridad de capacidad. |
-| `CrafterGuiTest` | Integración | GUI del Auto-Crafter: instalar/desinstalar blueprints y limpiar recetas. |
-| `DeviceTypeTest` | Unitario | Clasificación y propiedades de `DeviceType` (filtrables, celdas, mano vs. colocable). |
-| `FilterGuiTest` | Integración | GUI de filtros: añadir/eliminar ítems, modo whitelist/blacklist, shift-clic y caras direccionales. |
-| `GreedyCellTest` | Integración | Greedy Cell: almacenamiento multi-ítem, capacidad compartida, su menú y mejoras en la terminal. |
-| `GuiDupeGuardTest` | Integración | Guardas anti-duplicación de los menús frente a clics peligrosos. |
-| `GuiFlowsTest` | Integración | Integración de todas las GUIs de red: terminal, codificador, crafter, mesa de crafteo y monitor. |
-| `InfinityBarrelTest` | Integración | Barrica Infinita: capacidad 2×10⁹, depósitos/retiros y persistencia al romper/colocar. |
-| `NetworksCoexistenceTest` | Unitario | Convivencia con el plugin legado Networks: nombre, clase principal, comandos, permisos y softdepend de Slimefun. |
-| `NewDevicesTest` | Unitario | Dispositivos recientes (Purgador, Sonda): colocables, filtrables y nunca celdas. |
-| `PluginResourcesTest` | Unitario | Recursos esenciales (`plugin.yml`, `config.yml`) presentes en el classpath. |
-| `PosUtilTest` | Unitario | Empaquetado/desempaquetado de coordenadas en un `long` de 64 bits. |
-| `QuantumWorkbenchTest` | Integración | Mesa de Trabajo Cuántica: mejora de celdas preservando la carga y devolución de ingredientes. |
-| `SettingsCellCapacityTest` | Unitario | Cálculo de capacidades ante configs vacías, ausentes o límite; valores por defecto. |
-| `SlimefunBridgeTest` | Unitario | Comportamiento seguro del puente de Slimefun cuando este no está presente. |
-| `ToolsTest` | Unitario | Herramientas de mano (Configurador, Rastrillo, Crayón) y filtrado del Receptor. |
+| `BlockFlowsTest` | 24 | Romper/colocar con estado embebido, pistones, explosiones, vínculo inalámbrico, rake, llave, corte por agachado, dimensiones, enlace del puente desde el ítem Transmisor, estado del cable. |
+| `BlueprintDupeTest` | 3 | Los Blueprints del Encoder nunca se duplican (dos jugadores, romperlo con el menú abierto); instalar un Blueprint lo consume y *Clear All* lo devuelve. |
+| `CellGuiTest` | 9 | Menú de la Celda Cuántica: plantilla, depósito rápido, retirada, capacidad, sin duplicación al correr el ticker. |
+| `CrafterGuiTest` | 10 | Menú del crafter: instalar/desinstalar/limpiar; los crafters de Slimefun solo aceptan Blueprints de Slimefun. |
+| `DeviceTypeTest` | 7 | Clasificación de `DeviceType`: dispositivos con filtro, la Greedy Cell no es celda, ítems de mano, dispositivos direccionales, request y crafters de Slimefun. |
+| `FilterGuiTest` | 15 | Menú de filtro: añadir/quitar plantillas, whitelist/blacklist, shift+clic, caras, limpiar. |
+| `FluidAndRequesterTest` | 16 | Almacenamiento de fluidos e interacción rápida con la celda, Liquid Pump, página de fluidos del terminal, Request Terminal (pedidos, cantidad por chat, cadenas recursivas, ignora Auto-Crafters, Slimefun Request Crafter), Slimefun Auto-Crafter, comando del libro guía. |
+| `GrabberQuotaTest` | 8 | `extractMatching`: respeta toda la cuota por ciclo (también HT), junta ranuras del mismo ítem, no toca otros ítems. |
+| `GreedyCellTest` | 8 | Greedy Cell: almacenamiento multi-ítem, capacidad compartida, menú e integración con el terminal. |
+| `GuiDupeGuardTest` | 3 | `GuiListener` cancela los clics peligrosos (también en los menús de celda y barril); los depósitos con shift+clic nunca duplican. |
+| `GuiFlowsTest` | 10 | Flujos de Terminal, Encoder, Auto-Crafter (crafteo atómico), Crafting Grid y Monitor. |
+| `InfinityBarrelTest` | 4 | Capacidad del barril, menú, integración con la red y persistencia al romper/colocar. |
+| `NetworksCoexistenceTest` | 5 | Nombre, clase principal, comandos y permisos nunca chocan con NetworksV6; Slimefun es dependencia blanda. |
+| `NewDevicesTest` | 6 | Propiedades del Purger y la Probe; todo `DeviceType` tiene material y nombre. |
+| `PluginResourcesTest` | 3 | `plugin.yml` y `config.yml` en el classpath; comprobación de versión. |
+| `PosUtilTest` | 2 | El empaquetado de coordenadas ida y vuelta, incluidos bordes del mundo e Y negativa. |
+| `QuantumWorkbenchTest` | 2 | La mejora de celdas conserva la carga; los ingredientes se devuelven al cerrar. |
+| `RecipeTest` | 7 | Cada receta registrada una vez, las recetas de cable y celda funcionan, una celda con carga se mejora conservándola. |
+| `SettingsCellCapacityTest` | 9 | Valores por defecto y casos límite de `Settings` (capacidades, límites, config null). |
+| `SlimefunBridgeTest` | 5 | El puente de Slimefun queda inerte y nunca lanza excepciones sin Slimefun. |
+| `ToolsTest` | 3 | Llave y Rake son herramientas de mano; el Receptor tiene filtro; los filtros empiezan en whitelist. |
+| `TransmissionFixesTest` | 10 | Transmisión de ítems y fluidos: depósitos de fluido todo o nada, la bomba nunca duplica fluido, puente con filtro solo de plantillas, el puente nunca vacía Greedy Cells, un dispositivo compartido por dos controladores trabaja una vez por ciclo, los resultados de crafteo parciales se deshacen, la llave pega plantillas exactas, el rake devuelve el dispositivo, filtros/cara/búfer de tránsito sobreviven a romper y colocar. |
+| `UpgradedFeaturesTest` | 6 | Caché Virtual de CPU, Router, límite de nodos por chunk, búfer de tránsito del grabber, caché conservada al romper, romper en creativo no suelta nada. |
+| `compat.NetworkOwnershipTest` | 9 | Una red funciona dentro del reclamo de su dueño; otras redes y un dueño null son extraños; el terreno público sigue abierto; providers rotos o sin conectar no dan acceso; las respuestas de dueño no se filtran entre redes. |
+| `compat.ProtectionStonesProviderTest` | 18 | El provider de ProtectionStones contra la forma real de la API (`PSRegion.fromLocation*`, firmas exactas), certificación de dueño/miembro, comportamiento cerrado ante fallos; la búsqueda de regiones de WorldGuard falla de forma segura. |
+| `compat.ProtectionWhitelistTest` | 15 | Valores por defecto de la protección y parseo y geometría de `exempt-locations`; el puente queda inerte sin providers. |
+| `listen.SneakingRightClickTest` | 3 | Agachado + clic derecho nunca abre el menú de un dispositivo y sigue permitiendo colocar bloques. |
+| `net.ScanCostTest` | 2 | El recorrido de vecinos del BFS no reserva memoria por nodo y un escaneo grande sigue siendo lineal. |
+| `persist.NodeStoreCanonicalTest` | 5 | El blob compartido nunca es más viejo que la última escritura. |
+| `persist.NodeStoreCorruptionTest` | 5 | Las entradas corruptas del PDC se leen como ausentes, en silencio y barato, y se pueden sobrescribir. |
 
-## 4. Detalle por test
+## 4. Notas sobre algunas suites
+
+### `TransmissionFixesTest` y `BlueprintDupeTest`
+Cada test reproduce una pérdida o duplicación que existía en el código y se corrigió. Se comprobó que
+**fallan** con el código anterior a la corrección, así que protegen contra regresiones en vez de
+repetir la implementación. Ejemplos: un purgador compartido por dos controladores borraba 256 ítems
+por ciclo en vez de 128; una red de fluidos casi llena se quedaba con parte del cubo y con el cubo;
+dos jugadores abriendo el mismo Recipe Encoder convertían 16 Blueprints guardados en 32.
 
 ### `BlockFlowsTest`
-Cubre los «flujos de bloque» gobernados por `BlockListener`: eventos `BlockBreakEvent`, `BlockPlaceEvent`, `BlockPistonExtendEvent`, `EntityExplodeEvent` y `PlayerInteractEvent`. Valida que los nodos no se puedan empujar con pistones ni destruir con explosiones, que al romper un dispositivo se suelte el ítem correspondiente (con su estado preservado) y que colocar/romper nodos actualice correctamente la red (registro de controladores, invalidación de vecinos).
+Los tres tests de dimensiones (`networkExtractsInsideTheNether/End/Overworld`) montan una red real con
+un grabber y un cofre y ejecutan el planificador. Demuestran que el escaneo, el ticker y el
+almacenamiento no tienen ninguna comprobación de dimensión propia, así que lo que bloquee una
+dimensión en el servidor es el puente de protección.
 
-### `CellGuiTest`
-Prueba la GUI de la Quantum Cell (`CellMenu`, 18 ranuras): fijar la plantilla de ítem, el **depósito rápido** de la mano al inventario del jugador, la extracción de ítems y que la capacidad de la celda nunca se supere.
-
-### `CrafterGuiTest`
-Prueba la GUI del Auto-Crafter (`CrafterMenu`, 27 ranuras): **instalar** un blueprint en una ranura libre, **desinstalarlo** y **limpiar** la lista de recetas.
-
-### `DeviceTypeTest`
-Unitario sobre el enum `DeviceType`: los dispositivos **filtrables** incluyen los tipos nuevos; la **Greedy Cell no es una celda de almacenamiento** (no cuenta tier); y los ítems de mano (blueprint, terminal inalámbrica) no son colocables.
-
-### `FilterGuiTest`
-Prueba `FilterMenu` (27 ranuras): añadir ítems al filtro, eliminar filtros, alternar **whitelist/blacklist**, el **shift-clic** sobre el inventario del jugador y la configuración de **caras direccionales**.
-
-### `GreedyCellTest`
-Prueba la Greedy Cell: almacenamiento **multi-ítem** (varias muestras al mismo tiempo) con **capacidad compartida** (`greedy.capacity`), su menú dedicado (`GreedyMenu`, 54 ranuras con 36 de almacenamiento) y las mejoras de purger/greedy sobre el menú de la terminal.
-
-### `GuiDupeGuardTest`
-Valida el **`GuiListener`**: los clics peligrosos (doble-clic, botón medio, teclas numéricas, drop, hotbar, colección al cursor, etc.) se cancelan en los menús personalizados para prevenir duplicación o clonado de ítems.
-
-### `GuiFlowsTest`
-Integración de todas las GUIs de red:
-- **Terminal**: abrirla clicando el bloque, retirar 1 ítem con clic izquierdo o un stack con shift-clic, guardar los ítems de la ranura de entrada al cerrar, depositar con shift-clic desde el inventario del jugador, y retirar **ítems custom** (con ID en el PDC y lore) preservando su metadata.
-- **Codificador**: codifica una matriz 3×3 en un ítem Blueprint (`RecipeData` embebido) y persiste la matriz en el bloque.
-- **Auto-Crafter**: craftea desde la red **atómicamente** (con ingredientes insuficientes no consume nada; con los suficientes, consume y deposita el resultado).
-- **Mesa de crafteo de red**: consume 8 de 9 ingredientes de la red y entrega el resultado al jugador.
-- **Monitor**: abre su GUI al estar conectado a una red; grabber/vacuum abren `FilterMenu` y el crafter su `CrafterMenu`.
-
-### `InfinityBarrelTest`
-Prueba la Barrica Infinita: **capacidad de 2 000 000 000** de ítems, abrir el menú y hacer depósito rápido con plantilla fijada, integración con el almacenamiento de la red (depósito/retiro masivo) y **persistencia al romper y volver a colocar** (el `CELL_CARGO` embebido conserva cantidad y tipo).
-
-### `NetworksCoexistenceTest`
-**Convivencia con el plugin legado Networks** para poder estar ambos en el mismo servidor:
-- El nombre del plugin no es `NetworksV6-Drake`.
-- La clase principal no es `io.github.sefiraat.networks.Networks`.
-- Los comandos y alias del plugin no colisionan con el comando `networks`.
-- Los permisos viven bajo el prefijo `multiversenets.` y no invaden `networks.`.
-- La dependencia de Slimefun es **softdepend** (el plugin funciona standalone).
-
-Lee estos valores directamente de `plugin.yml` con SnakeYAML.
-
-### `NewDevicesTest`
-Prueba los dispositivos utilitarios recientes:
-- El **Purgador** es colocable y **filtrable** (para no borrar ítems indiscriminadamente).
-- La **Sonda** es de mano y no colocable ni filtrable, y nunca celda.
-- Purgador y Sonda **nunca cuentan como celdas** de almacenamiento.
-- Todos los `DeviceType.values()` tienen material y nombre visible no vacío.
-
-### `PluginResourcesTest`
-Comprueba que `plugin.yml` y `config.yml` existen en el classpath (esenciales para que el plugin arranque) y un sanity check de versionado.
-
-### `PosUtilTest`
-Fija el formato binario de `PosUtil.pack/unpack`: coordenadas positivas y negativas/límites del mundo (±30 000 000 en X/Z, Y negativa) hacen roundtrip sin pérdida en un único `long`.
-
-### `QuantumWorkbenchTest`
-Prueba `QuantumWorkbenchMenu` (45 ranuras):
-- **Mejora de celda**: una Quantum Cell T1 con carga (500 lingotes de hierro) + diamantes a su alrededor → botón craftear → salida **T2 con la carga preservada** en `CELL_CARGO`, y la matriz consumida.
-- **Cierre**: los ingredientes no crafteados se **devuelven al jugador**.
-
-### `SettingsCellCapacityTest`
-Prueba `Settings` con inyección por reflexión de configuraciones simuladas:
-- Usa las capacidades declaradas en `cells.capacities`.
-- Lista vacía o clave ausente → **fallback geométrico** sin excepción.
-- Tier no declarada → clamp a la **última** capacidad configurada.
-- Tier inválida/negativa → capacidad positiva segura.
-- Barril: 2 000 000 000 por defecto o valor custom (`barrel.capacity`).
-- `crafter.max-recipes` se clamp entre 1 y 18.
-- Capacidades `long` de hasta 2×10⁹ sin desbordamiento de 32 bits.
-- Con `cfg == null` todos los getters devuelven sus **valores por defecto** (escaneo 20, máx nodos 16 384, transferencia 5, vacío 10, crafteo 20, 64 ítems/op, multiplicador HT 8, greedy 262 144, barril 2×10⁹, blueprints 18, radio 4.0, `compat.slimefun` true, `debug` false, rake 250, celda 65 536).
-
-### `SlimefunBridgeTest`
-Sin Slimefun presente: el puente informa `isAvailable()`/`disponible()` = false; consultar bloques/ítems null no lanza (`isMachine`, `getId`, `isSlimefunItem` y sus alias en español); `extract`/`extraer` devuelven null y `insert`/`insertar` devuelven 0 de forma segura.
-
-### `ToolsTest`
-Prueba las herramientas de mano: **Configurador y Rastrillo** no son colocables, no almacenan y no filtran; el **Receptor es filtrable** (transporte inalámbrico controlado); y los filtros por defecto usan modo **whitelist** (`filterBlacklist = false`).
+### `compat.*`
+Los plugins de protección no están en el classpath de test. Se prueba todo lo que no los necesita
+(valores por defecto, geometría de la lista blanca, puente inerte) más el provider de ProtectionStones
+contra un stub de su API; la decisión real de cada provider se verifica en un servidor.
 
 ---
 
-Para entender el funcionamiento que estos tests cubren, consulta [Cómo funciona el código](Code.md).
+Para entender la funcionalidad que cubren estos tests, ver [Cómo funciona el código](Code.md).
