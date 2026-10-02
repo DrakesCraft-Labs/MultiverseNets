@@ -266,6 +266,16 @@ public class CrafterMenu extends MenuHolder {
                 return;
             }
             blob.blueprintData.add(encoded);
+            // Instalar consume el plano igual que al soltarlo con el cursor: desinstalar lo devuelve,
+            // asi que instalarlo gratis desde el inventario fabricaba planos sin fin.
+            int playerSlot = playerInventorySlot(event);
+            if (mover.getAmount() > 1) {
+                mover.setAmount(mover.getAmount() - 1);
+                player.getInventory().setItem(playerSlot, mover);
+            } else {
+                player.getInventory().setItem(playerSlot, null);
+            }
+            player.updateInventory();
             NodeStore.put(block, blob);
             player.sendMessage(Text.msg("Blueprint installed: " + Blueprints.readableName(data.output), NamedTextColor.GREEN));
             draw();
@@ -274,6 +284,13 @@ public class CrafterMenu extends MenuHolder {
 
         // 2) Botón de Limpiar Todo (Slot 25)
         if (raw == CLEAR_SLOT) {
+            // Los planos instalados son items del jugador: vaciar el crafter se los devuelve.
+            for (String b64 : blob.blueprintData) {
+                RecipeData removed = Blueprints.decode(b64);
+                if (removed != null) {
+                    giveOrDrop(Blueprints.toItem(removed));
+                }
+            }
             blob.blueprintData.clear();
             blob.recipes.clear();
             NodeStore.put(block, blob);

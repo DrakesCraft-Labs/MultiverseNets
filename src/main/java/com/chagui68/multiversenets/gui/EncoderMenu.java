@@ -45,12 +45,26 @@ public class EncoderMenu extends MenuHolder {
     public void openMenu() {
         open(45, Component.text("Recipe Encoder", NamedTextColor.DARK_AQUA)
                 .decoration(TextDecoration.ITALIC, false));
-        NodeBlob blob = blob();
+        // Los planos guardados pasan del bloque al menu y el bloque queda vacio hasta que se cierre:
+        // un unico dueño a la vez. Copiarlos sin vaciar el bloque dejaba que un segundo jugador que
+        // abriera el mismo codificador (o romperlo con el menu abierto) los duplicara.
+        NodeBlob blob = NodeStore.get(block);
+        if (blob == null) {
+            return;
+        }
+        boolean moved = false;
         if (blob.encoderBlank != null && !blob.encoderBlank.getType().isAir()) {
             inv.setItem(BLANK_SLOT, blob.encoderBlank.clone());
+            blob.encoderBlank = null;
+            moved = true;
         }
         if (blob.encoderOutput != null && !blob.encoderOutput.getType().isAir()) {
             inv.setItem(OUTPUT_SLOT, blob.encoderOutput.clone());
+            blob.encoderOutput = null;
+            moved = true;
+        }
+        if (moved) {
+            NodeStore.put(block, blob);
         }
     }
 
@@ -241,12 +255,8 @@ public class EncoderMenu extends MenuHolder {
         if (blank.getAmount() <= 0) {
             inv.setItem(BLANK_SLOT, null);
         }
-        NodeBlob blob = blob();
-        ItemStack b = inv.getItem(BLANK_SLOT);
-        ItemStack o = inv.getItem(OUTPUT_SLOT);
-        blob.encoderBlank = (b != null && !b.getType().isAir()) ? b.clone() : null;
-        blob.encoderOutput = (o != null && !o.getType().isAir()) ? o.clone() : null;
-        NodeStore.put(block, blob);
+        // Mientras el menu esta abierto, los planos viven en el inventario del menu; el bloque solo
+        // los recupera al cerrar (onClose). Copiarlos aqui al bloque los dejaba en dos sitios.
         player.sendMessage(Text.msg("Blueprint encoded: " + Blueprints.readableName(data.output),
                 NamedTextColor.GREEN));
         refresh();
@@ -254,12 +264,41 @@ public class EncoderMenu extends MenuHolder {
 
     @Override
     protected void onClose(InventoryCloseEvent event) {
-        NodeBlob blob = blob();
         ItemStack b = inv.getItem(BLANK_SLOT);
         ItemStack o = inv.getItem(OUTPUT_SLOT);
-        blob.encoderBlank = (b != null && !b.getType().isAir()) ? b.clone() : null;
-        blob.encoderOutput = (o != null && !o.getType().isAir()) ? o.clone() : null;
+        inv.setItem(BLANK_SLOT, null);
+        inv.setItem(OUTPUT_SLOT, null);
+        NodeBlob blob = NodeStore.get(block);
+        if (blob == null) {
+            // El codificador se rompio con el menu abierto: los planos vuelven al jugador en vez
+            // de escribirse sobre un bloque que ya no es un nodo.
+            giveIfPresent(b);
+            giveIfPresent(o);
+            return;
+        }
+        // Si otro jugador dejo planos mientras este menu estaba abierto, los de este se le
+        // devuelven en vez de pisar los suyos.
+        if (b != null && !b.getType().isAir()) {
+            if (blob.encoderBlank == null) {
+                blob.encoderBlank = b.clone();
+            } else {
+                giveOrDrop(b);
+            }
+        }
+        if (o != null && !o.getType().isAir()) {
+            if (blob.encoderOutput == null) {
+                blob.encoderOutput = o.clone();
+            } else {
+                giveOrDrop(o);
+            }
+        }
         NodeStore.put(block, blob);
+    }
+
+    private void giveIfPresent(ItemStack stack) {
+        if (stack != null && !stack.getType().isAir()) {
+            giveOrDrop(stack);
+        }
     }
 
     private ItemStack panel(Material material, String name) {
