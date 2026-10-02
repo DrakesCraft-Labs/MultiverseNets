@@ -245,7 +245,7 @@ public class BlockListener implements Listener {
                 && blob.filterMaterials.isEmpty()
                 && (blob.filterItems == null || blob.filterItems.isEmpty())
                 && blob.targetFace == null
-                && (blob.transitBuffer == null || blob.transitBuffer.getAmount() <= 0)
+                && !blob.hasTransit()
                 && blob.recipes.isEmpty()
                 && blob.blueprintData.isEmpty()
                 && matrixEmpty
@@ -295,7 +295,7 @@ public class BlockListener implements Listener {
         actual.virtualCacheTier = loaded.virtualCacheTier;
         actual.virtualSamples = loaded.virtualSamples != null ? new ArrayList<>(loaded.virtualSamples) : new ArrayList<>();
         actual.virtualAmounts = loaded.virtualAmounts != null ? new ArrayList<>(loaded.virtualAmounts) : new ArrayList<>();
-        actual.transitBuffer = loaded.transitBuffer;
+        actual.setTransit(loaded.transitStack());
         actual.quotaSample = loaded.quotaSample;
         actual.quotaLimit = loaded.quotaLimit;
         actual.quotaActive = loaded.quotaActive;

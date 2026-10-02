@@ -50,7 +50,7 @@ A tener en cuenta:
 - `src/test/java/dev/espi/protectionstones/PSRegion.java` es un stub de la API de ProtectionStones que
   los tests del provider cargan por reflexión.
 
-## 3. Resumen: 30 clases, 232 tests
+## 3. Resumen: 30 clases, 235 tests
 
 | Clase (paquete `com.chagui68.multiversenets` salvo que se indique) | Tests | Cubre |
 | --- | --- | --- |
@@ -75,7 +75,7 @@ A tener en cuenta:
 | `SettingsCellCapacityTest` | 9 | Valores por defecto y casos límite de `Settings` (capacidades, límites, config null). |
 | `SlimefunBridgeTest` | 5 | El puente de Slimefun queda inerte y nunca lanza excepciones sin Slimefun. |
 | `ToolsTest` | 3 | Llave y Rake son herramientas de mano; el Receptor tiene filtro; los filtros empiezan en whitelist. |
-| `TransmissionFixesTest` | 10 | Transmisión de ítems y fluidos: depósitos de fluido todo o nada, la bomba nunca duplica fluido, puente con filtro solo de plantillas, el puente nunca vacía Greedy Cells, un dispositivo compartido por dos controladores trabaja una vez por ciclo, los resultados de crafteo parciales se deshacen, la llave pega plantillas exactas, el rake devuelve el dispositivo, filtros/cara/búfer de tránsito sobreviven a romper y colocar. |
+| `TransmissionFixesTest` | 13 | Transmisión de ítems y fluidos: depósitos de fluido todo o nada, la bomba nunca duplica fluido, puente con filtro solo de plantillas, el puente nunca vacía Greedy Cells, un dispositivo compartido por dos controladores trabaja una vez por ciclo, los resultados de crafteo parciales se deshacen, la llave pega plantillas exactas, el rake devuelve el dispositivo, filtros/cara/búfer de tránsito sobreviven a romper y colocar, los búferes de tránsito de más de 99 unidades se guardan sin fallar. |
 | `UpgradedFeaturesTest` | 6 | Caché Virtual de CPU, Router, límite de nodos por chunk, búfer de tránsito del grabber, caché conservada al romper, romper en creativo no suelta nada. |
 | `compat.NetworkOwnershipTest` | 9 | Una red funciona dentro del reclamo de su dueño; otras redes y un dueño null son extraños; el terreno público sigue abierto; providers rotos o sin conectar no dan acceso; las respuestas de dueño no se filtran entre redes. |
 | `compat.ProtectionStonesProviderTest` | 18 | El provider de ProtectionStones contra la forma real de la API (`PSRegion.fromLocation*`, firmas exactas), certificación de dueño/miembro, comportamiento cerrado ante fallos; la búsqueda de regiones de WorldGuard falla de forma segura. |

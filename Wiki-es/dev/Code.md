@@ -97,7 +97,7 @@ antiguos) con campos públicos:
 | `cellSample` / `cellAmount` | `ItemStack` / `long` | Celdas Cuánticas e Infinity Barrel (el barril conserva `cellSample` al vaciarse). |
 | `filterMaterials` / `filterItems` / `filterBlacklist` | `List<String>` / `List<ItemStack>` / `boolean` | Dispositivos con filtro. `filterItems` (plantillas exactas) manda sobre `filterMaterials` cuando no está vacío. |
 | `targetFace` | `String` | Cara del Advanced Grabber/Pusher (`NORTH`… o `ALL`). |
-| `transitBuffer` | `ItemStack` | Grabbers y Pushers: ítems en espera porque ni la red ni el origen los aceptaron. |
+| `transitBuffer` / `transitAmount` | `ItemStack` / `long` | Grabbers y Pushers: ítems en espera porque ni la red ni el origen los aceptaron. El `ItemStack` es una muestra de 1 unidad y la cantidad va en `transitAmount`, porque Paper no puede serializar un `ItemStack` de más de 99 (un búfer puede guardar 1.024). Usa siempre `transitStack()` / `setTransit()` / `addTransit()`. |
 | `recipes` / `blueprintData` | `List<String>` | Crafters: claves de receta antiguas / `RecipeData` instalados (Base64). |
 | `craftingMatrix` | `ItemStack[9]` | Plantilla del Encoder y de la Crafting Grid. |
 | `encoderBlank` / `encoderOutput` | `ItemStack` | Blueprints dejados en las ranuras del Recipe Encoder. |

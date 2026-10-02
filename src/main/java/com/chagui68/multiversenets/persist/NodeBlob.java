@@ -62,8 +62,23 @@ public class NodeBlob implements Serializable {
     public List<ItemStack> virtualSamples = new ArrayList<>();
     /** EN: Multi-item storage quantities for Virtual Cache / ES: Cantidades de ítems en la caché virtual. */
     public List<Long> virtualAmounts = new ArrayList<>();
-    /** EN: Transit buffer holding items during backpressure / ES: Búfer de tránsito ante contrapresión. */
+    /**
+     * EN: Sample (1 unit) of the items waiting in the transit buffer; the quantity is
+     * {@link #transitAmount}. Use {@link #transitStack()}, {@link #setTransit} and
+     * {@link #addTransit} instead of touching these fields.
+     * ES: Muestra (1 unidad) de los ítems que esperan en el búfer de tránsito; la cantidad está en
+     * {@link #transitAmount}. Usa {@link #transitStack()}, {@link #setTransit} y {@link #addTransit}.
+     */
     public ItemStack transitBuffer;
+    /**
+     * EN: Units waiting in the transit buffer. Kept apart from the sample because Paper refuses to
+     * serialize an ItemStack above 99 units, and a buffer can hold a whole Advanced Grabber cycle
+     * (1,024): saving it threw inside the ticker and the items were lost.
+     * ES: Unidades en el búfer de tránsito. Va aparte de la muestra porque Paper no serializa un
+     * ItemStack de más de 99, y un búfer puede guardar un ciclo entero de un Advanced Grabber
+     * (1.024): guardarlo lanzaba una excepción dentro del ticker y los ítems se perdían.
+     */
+    public long transitAmount;
     /** EN: Target item sample for stock quota limit / ES: Muestra de ítem objetivo para el delimitador de cuota. */
     public ItemStack quotaSample;
     /** EN: Maximum stock quota allowed in the network / ES: Cuota máxima de stock permitida en la red. */
@@ -228,6 +243,73 @@ public class NodeBlob implements Serializable {
             virtualAmounts.set(index, remaining);
         }
         return take;
+    }
+
+    /**
+     * EN: Units waiting in the transit buffer. Blobs saved before {@link #transitAmount} existed
+     * kept the quantity in the sample itself, so that is the fallback.
+     * ES: Unidades en el búfer de tránsito. Los blobs guardados antes de {@link #transitAmount}
+     * llevaban la cantidad en la propia muestra, de ahí el respaldo.
+     */
+    public long transitAmount() {
+        if (transitBuffer == null || transitBuffer.getType().isAir()) {
+            return 0;
+        }
+        return transitAmount > 0 ? transitAmount : transitBuffer.getAmount();
+    }
+
+    public boolean hasTransit() {
+        return transitAmount() > 0;
+    }
+
+    /**
+     * EN: The buffered items as a single stack (in memory only, it may exceed 99), or null.
+     * ES: Los ítems del búfer como un solo stack (solo en memoria, puede pasar de 99), o null.
+     */
+    public ItemStack transitStack() {
+        long amount = transitAmount();
+        if (amount <= 0) {
+            return null;
+        }
+        return com.chagui68.multiversenets.util.StackUtils.getAsQuantity(transitBuffer,
+                (int) Math.min(Integer.MAX_VALUE, amount));
+    }
+
+    /**
+     * EN: Replaces the buffer with {@code stack} (null or empty clears it).
+     * ES: Reemplaza el búfer por {@code stack} (null o vacío lo vacía).
+     */
+    public void setTransit(ItemStack stack) {
+        if (stack == null || stack.getType().isAir() || stack.getAmount() <= 0) {
+            transitBuffer = null;
+            transitAmount = 0;
+            return;
+        }
+        transitBuffer = com.chagui68.multiversenets.util.StackUtils.getAsQuantity(stack, 1);
+        transitAmount = stack.getAmount();
+    }
+
+    /**
+     * EN: Adds {@code stack} to the buffer. False when the buffer already holds a different item,
+     * in which case nothing changes and the caller keeps the stack.
+     * ES: Suma {@code stack} al búfer. False si el búfer ya tiene otro ítem; entonces no cambia
+     * nada y el llamante conserva el stack.
+     */
+    public boolean addTransit(ItemStack stack) {
+        if (stack == null || stack.getType().isAir() || stack.getAmount() <= 0) {
+            return true;
+        }
+        if (!hasTransit()) {
+            setTransit(stack);
+            return true;
+        }
+        if (!com.chagui68.multiversenets.util.StackUtils.itemsMatch(transitBuffer, stack)) {
+            return false;
+        }
+        long total = transitAmount() + stack.getAmount();
+        transitBuffer = com.chagui68.multiversenets.util.StackUtils.getAsQuantity(transitBuffer, 1);
+        transitAmount = total;
+        return true;
     }
 
     /**

@@ -323,15 +323,15 @@ public class NetworkTicker {
             return;
         }
         // Zero-drop: process any transit buffer leftovers first
-        if (blob.transitBuffer != null && blob.transitBuffer.getAmount() > 0) {
-            int leftover = net.storage().deposit(blob.transitBuffer);
+        if (blob.hasTransit()) {
+            ItemStack pending = blob.transitStack();
+            int leftover = net.storage().deposit(pending);
             if (leftover <= 0) {
-                blob.transitBuffer = null;
+                blob.setTransit(null);
                 NodeStore.put(net.block(pos), blob);
             } else {
-                blob.transitBuffer.setAmount(leftover);
-                ItemStack unrouted = streamToPushers(net, blob.transitBuffer);
-                blob.transitBuffer = unrouted;
+                pending.setAmount(leftover);
+                blob.setTransit(streamToPushers(net, pending));
                 NodeStore.put(net.block(pos), blob);
                 return; // Wait until buffer clears before grabbing more
             }
@@ -370,7 +370,7 @@ public class NetworkTicker {
                             int unhoused = SlimefunBridge.insert(target, unrouted);
                             if (unhoused > 0) {
                                 unrouted.setAmount(unhoused);
-                                blob.transitBuffer = unrouted;
+                                blob.setTransit(unrouted);
                                 NodeStore.put(self, blob);
                                 moved -= unhoused;
                             }
@@ -403,7 +403,7 @@ public class NetworkTicker {
                         int sinCasa = NetworkManager.insertInto(inv, unrouted);
                         if (sinCasa > 0) {
                             unrouted.setAmount(sinCasa);
-                            blob.transitBuffer = unrouted;
+                            blob.setTransit(unrouted);
                             NodeStore.put(self, blob);
                             moved -= sinCasa;
                         }
@@ -434,14 +434,16 @@ public class NetworkTicker {
         // Lo que un ciclo anterior no pudo devolver a la red espera aqui. Se reintenta primero y,
         // mientras no se vacie, el pusher no saca nada mas: si no, ese buffer nunca se procesaba y
         // los items quedaban atrapados en el bloque.
-        if (blob.transitBuffer != null && blob.transitBuffer.getAmount() > 0) {
-            int stuck = net.storage().deposit(blob.transitBuffer);
+        if (blob.hasTransit()) {
+            ItemStack pending = blob.transitStack();
+            int stuck = net.storage().deposit(pending);
             if (stuck > 0) {
-                blob.transitBuffer.setAmount(stuck);
+                pending.setAmount(stuck);
+                blob.setTransit(pending);
                 NodeStore.put(net.block(pos), blob);
                 return;
             }
-            blob.transitBuffer = null;
+            blob.setTransit(null);
             NodeStore.put(net.block(pos), blob);
         }
 
@@ -527,11 +529,7 @@ public class NetworkTicker {
             if (leftover > 0) {
                 stack.setAmount(leftover);
                 // Safe buffer: do not drop items on ground if transitBuffer can hold them
-                if (blob.transitBuffer == null || blob.transitBuffer.getType().isAir()) {
-                    blob.transitBuffer = stack.clone();
-                    NodeStore.put(self, blob);
-                } else if (StackUtils.itemsMatch(blob.transitBuffer, stack)) {
-                    blob.transitBuffer.setAmount(blob.transitBuffer.getAmount() + stack.getAmount());
+                if (blob.addTransit(stack)) {
                     NodeStore.put(self, blob);
                 } else {
                     dropAt(self, stack);

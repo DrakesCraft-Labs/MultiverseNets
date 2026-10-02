@@ -48,7 +48,7 @@ Things to know:
 - `src/test/java/dev/espi/protectionstones/PSRegion.java` is a stub of the ProtectionStones API that
   the provider tests load by reflection.
 
-## 3. Overview: 30 classes, 232 tests
+## 3. Overview: 30 classes, 235 tests
 
 | Class (package `com.chagui68.multiversenets` unless stated) | Tests | Covers |
 | --- | --- | --- |
@@ -73,7 +73,7 @@ Things to know:
 | `SettingsCellCapacityTest` | 9 | `Settings` defaults and edge cases (capacities, clamps, null config). |
 | `SlimefunBridgeTest` | 5 | The Slimefun bridge is inert and never throws without Slimefun. |
 | `ToolsTest` | 3 | Wrench and Rake are hand tools; the Receiver is filterable; filters default to whitelist. |
-| `TransmissionFixesTest` | 10 | Item and fluid transmission: all-or-nothing fluid deposits, the pump never duplicates fluid, bridge with template-only filter, bridge never drains Greedy Cells, a device shared by two controllers works once per cycle, partial crafting results are undone, wrench pastes exact templates, rake returns the device, filters/face/transit buffer survive break and place. |
+| `TransmissionFixesTest` | 13 | Item and fluid transmission: all-or-nothing fluid deposits, the pump never duplicates fluid, bridge with template-only filter, bridge never drains Greedy Cells, a device shared by two controllers works once per cycle, partial crafting results are undone, wrench pastes exact templates, rake returns the device, filters/face/transit buffer survive break and place, transit buffers above 99 units are saved without crashing. |
 | `UpgradedFeaturesTest` | 6 | CPU Virtual Cache, Router, per-chunk node limit, grabber transit buffer, cache kept on break, creative breaking drops nothing. |
 | `compat.NetworkOwnershipTest` | 9 | A network runs inside its owner's claim; other networks and a null owner are strangers; public land stays open; broken or unwired providers grant nothing; owner answers never leak between networks. |
 | `compat.ProtectionStonesProviderTest` | 18 | The ProtectionStones provider against the real API shape (`PSRegion.fromLocation*`, exact signatures), owner/member certification, fail-closed behaviour; WorldGuard region lookup fails safe. |

@@ -348,7 +348,64 @@ class TransmissionFixesTest {
         assertEquals(1, restored.filterItems.size());
         assertTrue(restored.filterItems.get(0).isSimilar(named(Material.IRON_INGOT, "Special")));
         assertEquals("UP", restored.targetFace);
-        assertNotNull(restored.transitBuffer);
-        assertEquals(7, restored.transitBuffer.getAmount(), "items waiting in the transit buffer are not lost");
+        assertTrue(restored.hasTransit());
+        assertEquals(7, restored.transitAmount(), "items waiting in the transit buffer are not lost");
+    }
+
+    // ---------------------------------------------------------------- transit buffer above 99
+
+    /**
+     * [EN] Paper refuses to serialize an ItemStack above 99 units ("Value must be within range
+     * [1;99]"). The transit buffer used to store the real amount in the ItemStack, so saving a
+     * buffer of an Advanced Grabber cycle (1,024) or an accumulated one (427 in the server log)
+     * threw inside the ticker and the items were lost. Only a 1-unit sample may be serialized.
+     * [ES] Paper no serializa un ItemStack de más de 99. El búfer de tránsito guardaba la cantidad
+     * real en el ItemStack, así que guardar 1.024 (o 427, como en el log) lanzaba una excepción en
+     * el ticker y los ítems se perdían. Solo se puede serializar una muestra de 1 unidad.
+     */
+    @Test
+    void transitBufferAboveNinetyNineIsStoredAsSamplePlusAmount() {
+        Block pusher = place(0, 64, 0, DeviceType.MVN_PUSHER_HT);
+        NodeBlob blob = NodeStore.get(pusher);
+        blob.setTransit(new ItemStack(Material.COBBLESTONE, 1_024));
+        assertTrue(blob.addTransit(new ItemStack(Material.COBBLESTONE, 427)), "same item merges");
+        assertFalse(blob.addTransit(new ItemStack(Material.DIRT, 5)), "a different item is refused, not mixed");
+
+        assertTrue(blob.transitBuffer.getAmount() <= 99, "never serialize an ItemStack above 99");
+        NodeStore.put(pusher, blob);
+
+        NodeBlob reloaded = NodeStore.decode(NodeStore.encode(NodeStore.get(pusher)));
+        assertEquals(1_451, reloaded.transitAmount());
+        assertEquals(Material.COBBLESTONE, reloaded.transitStack().getType());
+        assertEquals(1_451, reloaded.transitStack().getAmount());
+    }
+
+    @Test
+    void transitBufferSavedBeforeTheAmountFieldStillReadsItsQuantity() {
+        NodeBlob legacy = NodeBlob.create(DeviceType.MVN_GRABBER.name());
+        legacy.transitBuffer = new ItemStack(Material.EMERALD, 16);
+
+        NodeBlob reloaded = NodeStore.decode(NodeStore.encode(legacy));
+        assertEquals(16, reloaded.transitAmount(), "old blobs kept the quantity in the sample itself");
+        reloaded.setTransit(reloaded.transitStack());
+        assertEquals(1, reloaded.transitBuffer.getAmount());
+        assertEquals(16, reloaded.transitAmount());
+    }
+
+    @Test
+    void pusherRetriesALargeTransitBufferWithoutLosingIt() {
+        Block controller = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
+        place(1, 64, 0, DeviceType.MVN_CELL_T1);
+        Block pusher = place(2, 64, 0, DeviceType.MVN_PUSHER_HT);
+        Network net = network(controller);
+        NodeBlob p = NodeStore.get(pusher);
+        p.setTransit(new ItemStack(Material.COBBLESTONE, 427));
+        NodeStore.put(pusher, p);
+
+        tick();
+
+        assertEquals(427, net.storage().count(i -> i.getType() == Material.COBBLESTONE),
+                "the buffered 427 items go back into the network");
+        assertFalse(NodeStore.get(pusher).hasTransit());
     }
 }
