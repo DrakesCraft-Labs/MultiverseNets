@@ -349,20 +349,18 @@ public class TerminalMenu extends MenuHolder {
                 ? new ArrayList<>(meta.lore())
                 : new ArrayList<>();
         lore.add(Component.empty());
-        lore.add(Component.text(AMOUNT_PREFIX + Items.formatAmount(view.amount()), NamedTextColor.GRAY)
+        lore.add(Component.text(AMOUNT_PREFIX + exact(view.amount()) + " in the network", NamedTextColor.WHITE)
                 .decoration(TextDecoration.ITALIC, false));
 
         if (!showOnlyPurged) {
-            long greedyAmt = network.storage().getGreedyStoredAmount(view.sample());
-            if (greedyAmt > 0) {
-                lore.add(Component.text("⚡ In Greedy Buffer: " + Items.formatAmount(greedyAmt), NamedTextColor.GREEN)
-                        .decoration(TextDecoration.ITALIC, false));
-            }
-            long memoryAmt = network.storage().getMemoryStoredAmount(view.sample());
-            if (memoryAmt > 0) {
-                lore.add(Component.text("▣ In DRAM: " + Items.formatAmount(memoryAmt), NamedTextColor.AQUA)
-                        .decoration(TextDecoration.ITALIC, false));
-            }
+            // Desglose por almacenamiento: las partes suman el total, nada se cuenta dos veces.
+            NetworkStorage.Breakdown parts = network.storage().breakdown(view.sample());
+            lore.add(Component.text("Stored in:", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            addPart(lore, "▣ DRAM", parts.memory(), NamedTextColor.AQUA);
+            addPart(lore, "▦ Quantum Cells", parts.cells(), NamedTextColor.YELLOW);
+            addPart(lore, "▤ Infinity Barrels", parts.barrels(), NamedTextColor.LIGHT_PURPLE);
+            addPart(lore, "⚡ Greedy Buffer (reserved)", parts.greedy(), NamedTextColor.GREEN);
+            addPart(lore, "◆ Slimefun Barrels", parts.slimefunBarrels(), NamedTextColor.GOLD);
         } else {
             lore.add(Component.text("⚠ Targeted by Purger", NamedTextColor.RED)
                     .decoration(TextDecoration.ITALIC, false));
@@ -374,6 +372,20 @@ public class TerminalMenu extends MenuHolder {
             icon.setItemMeta(meta);
         }
         return icon;
+    }
+
+    private static void addPart(List<Component> lore, String label, long amount, NamedTextColor color) {
+        if (amount <= 0) {
+            return;
+        }
+        lore.add(Component.text(" " + label + ": ", color).append(Component.text(exact(amount), NamedTextColor.WHITE))
+                .decoration(TextDecoration.ITALIC, false));
+    }
+
+    /** 2500 → "2,500"; large amounts also get the short form: "1,250,000 (1.3M)". */
+    private static String exact(long amount) {
+        String full = String.format(java.util.Locale.ROOT, "%,d", amount);
+        return amount >= 10_000 ? full + " (" + Items.formatAmount(amount) + ")" : full;
     }
 
     private ItemStack purgerToggleIcon() {
@@ -887,12 +899,14 @@ public class TerminalMenu extends MenuHolder {
         if (meta != null) {
             if (meta.hasLore() && meta.lore() != null) {
                 List<Component> lore = new ArrayList<>(meta.lore());
-                while (!lore.isEmpty()) {
-                    Component last = lore.get(lore.size() - 1);
-                    String str = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(last);
-                    if (str.startsWith(AMOUNT_PREFIX) || str.contains("Greedy Buffer") || str.contains("In DRAM") || str.contains("Purger") || str.isBlank()) {
-                        lore.remove(lore.size() - 1);
-                    } else {
+                // Todo lo que anadio la cuadricula va desde la linea en blanco anterior a la ultima
+                // linea "Amount:" hasta el final; se corta entero.
+                for (int i = lore.size() - 1; i >= 0; i--) {
+                    String str = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(lore.get(i));
+                    if (str.startsWith(AMOUNT_PREFIX)) {
+                        int cut = i > 0 && net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                                .serialize(lore.get(i - 1)).isBlank() ? i - 1 : i;
+                        lore = new ArrayList<>(lore.subList(0, cut));
                         break;
                     }
                 }

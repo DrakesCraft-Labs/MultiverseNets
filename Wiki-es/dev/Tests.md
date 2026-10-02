@@ -51,7 +51,7 @@ A tener en cuenta:
 - `src/test/java/dev/espi/protectionstones/PSRegion.java` es un stub de la API de ProtectionStones que
   los tests del provider cargan por reflexión.
 
-## 3. Resumen: 35 clases, 261 tests
+## 3. Resumen: 35 clases, 262 tests
 
 | Clase (paquete `com.chagui68.multiversenets` salvo que se indique) | Tests | Cubre |
 | --- | --- | --- |
@@ -60,7 +60,7 @@ A tener en cuenta:
 | `CellGuiTest` | 9 | Menú de la Celda Cuántica: plantilla, depósito rápido, retirada, capacidad, sin duplicación al correr el ticker. |
 | `ChickenSorterTest` | 3 | Los genes de GeneticChickengineering se leen como en el addon (producto, nivel, fuerza, pureza, edad, especies especiales); todas las reglas deben cumplirse; el clasificador solo mueve los pollos que cumplen, solo si está activo, y nunca otros ítems. |
 | `CrafterGuiTest` | 10 | Menú del crafter: instalar/desinstalar/limpiar; los crafters de Slimefun aceptan Blueprints de Slimefun y vanilla, los estándar rechazan los de Slimefun. |
-| `DramBayTest` | 7 | Un módulo en un DRAM Bay guarda ítems; un módulo expulsado lleva su stock a otra red; romper el bay suelta el módulo con su stock; el Fluid DRAM guarda varios fluidos y viaja con ellos; un controlador ya no acepta módulos; un módulo antiguo del controlador espera en el Terminal como ítem temporal y vuelve con sus ítems; el lore del Terminal muestra la cantidad en DRAM; romper un controlador suelta los módulos no recogidos. |
+| `DramBayTest` | 8 | Un módulo en un DRAM Bay guarda ítems; un módulo expulsado lleva su stock a otra red; romper el bay suelta el módulo con su stock; el Fluid DRAM guarda varios fluidos y viaja con ellos; un controlador ya no acepta módulos; un módulo antiguo del controlador espera en el Terminal como ítem temporal y vuelve con sus ítems; el lore del Terminal muestra el total y su desglose por almacenamiento (celdas + Greedy suman, contadas una vez); romper un controlador suelta los módulos no recogidos. |
 | `DeviceTypeTest` | 7 | Clasificación de `DeviceType`: dispositivos con filtro, la Greedy Cell no es celda, ítems de mano, dispositivos direccionales, request y crafters de Slimefun. |
 | `FilterGuiTest` | 15 | Menú de filtro: añadir/quitar plantillas, whitelist/blacklist, shift+clic, caras, limpiar. |
 | `FluidAndRequesterTest` | 13 | Almacenamiento de fluidos e interacción rápida con la celda, Liquid Pump, página de fluidos del terminal, Request Terminal (pedidos, cantidad por chat, cadenas recursivas, ignora Auto-Crafters, Slimefun Request Crafter), Slimefun Auto-Crafter. |

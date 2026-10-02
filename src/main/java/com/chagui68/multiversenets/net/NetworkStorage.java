@@ -681,6 +681,70 @@ public class NetworkStorage {
         return total;
     }
 
+    /**
+     * EN: Where the units of one item are kept, by kind of storage. The parts add up to the
+     * Terminal's total: nothing is counted twice.
+     * ES: Dónde están las unidades de un ítem, por tipo de almacenamiento. Las partes suman el total
+     * del Terminal: nada se cuenta dos veces.
+     */
+    public record Breakdown(long memory, long cells, long barrels, long greedy, long slimefunBarrels) {
+        public long total() {
+            return memory + cells + barrels + greedy + slimefunBarrels;
+        }
+    }
+
+    /** One pass over every storage of the network for {@code item}. */
+    public synchronized Breakdown breakdown(ItemStack item) {
+        if (item == null) {
+            return new Breakdown(0, 0, 0, 0, 0);
+        }
+        List<CellState> states = load();
+        long memory = 0;
+        for (VirtualCacheState vCache : loadVirtualCaches()) {
+            if (vCache.blob.virtualSamples == null) {
+                continue;
+            }
+            for (int i = 0; i < vCache.blob.virtualSamples.size(); i++) {
+                ItemStack sample = vCache.blob.virtualSamples.get(i);
+                Long amt = vCache.blob.virtualAmounts.get(i);
+                if (sample != null && amt != null && amt > 0 && StackUtils.itemsMatch(sample, item)) {
+                    memory += amt;
+                }
+            }
+        }
+        long cellTotal = 0;
+        long barrelTotal = 0;
+        long greedyTotal = 0;
+        for (CellState state : states) {
+            if (state.greedy) {
+                if (state.blob.greedySamples == null || state.blob.greedyAmounts == null) {
+                    continue;
+                }
+                for (int i = 0; i < state.blob.greedySamples.size(); i++) {
+                    ItemStack sample = state.blob.greedySamples.get(i);
+                    Long amt = state.blob.greedyAmounts.get(i);
+                    if (sample != null && amt != null && amt > 0 && StackUtils.itemsMatch(sample, item)) {
+                        greedyTotal += amt;
+                    }
+                }
+            } else if (!blobEmpty(state.blob) && StackUtils.itemsMatch(state.blob.cellSample, item)) {
+                if (state.barrel) {
+                    barrelTotal += state.blob.cellAmount;
+                } else {
+                    cellTotal += state.blob.cellAmount;
+                }
+            }
+        }
+        long sf = 0;
+        for (Block barrel : loadSfBarrels()) {
+            ItemStack sample = SlimefunBridge.getBarrelStoredItem(barrel);
+            if (sample != null && StackUtils.itemsMatch(sample, item)) {
+                sf += SlimefunBridge.getBarrelStoredAmount(barrel);
+            }
+        }
+        return new Breakdown(memory, cellTotal, barrelTotal, greedyTotal, sf);
+    }
+
     /** Units of {@code item} held by memory modules (DRAM Bays), for the Terminal's lore. */
     public synchronized long getMemoryStoredAmount(ItemStack item) {
         if (item == null) {

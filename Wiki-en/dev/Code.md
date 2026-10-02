@@ -183,6 +183,8 @@ item module, plus a legacy module inside the Controller), **Quantum Cells**, **I
   Greedy suction and both bridge directions pass `includeGreedy = false`; terminals, crafting and the
   API use the 2-argument form (Greedy included). An Infinity Barrel keeps its `cellSample` when it
   reaches 0; a cell forgets it.
+- `breakdown(item)` — one pass returning where an item is kept (memory, cells, barrels, Greedy,
+  Slimefun barrels); the Terminal lists it under the total.
 - `count`, `remainingQuota`, `view()` (500 ms cache, merged with `StackUtils.itemsMatch`),
   `getPurgedItemsView`, `isItemPurged`, counters.
 

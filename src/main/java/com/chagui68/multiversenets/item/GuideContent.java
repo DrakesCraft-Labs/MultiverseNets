@@ -230,12 +230,12 @@ public final class GuideContent {
                         + "cells, barriles de Slimefun) y una página de fluidos.",
                 "Left-click takes 1, right-click a stack, shift-click to your inventory. Shift-click your items "
                         + "(or drop them in the input slot) to store them. Search, sort and pages. Buckets and honey "
-                        + "bottles go to the fluid storage. The lore shows how much is in a Greedy Buffer and in "
-                        + "DRAM. Recovered modules from an old controller are shown first: click to take them.",
+                        + "bottles go to the fluid storage. Each item shows its total in the network and how much of it "
+                        + "is in DRAM, cells, barrels and Greedy Buffers. Recovered modules from an old controller are shown first: click to take them.",
                 "Clic izquierdo saca 1, clic derecho un stack, shift+clic al inventario. Shift+clic en tus ítems "
                         + "(o déjalos en la ranura de entrada) para guardarlos. Búsqueda, orden y páginas. Cubos y "
-                        + "botellas de miel van al almacenamiento de fluidos. El lore indica cuánto hay en un Greedy "
-                        + "Buffer y en DRAM. Los módulos recuperados de un controlador antiguo salen primero: clic "
+                        + "botellas de miel van al almacenamiento de fluidos. Cada ítem muestra su total en la red y "
+                        + "cuánto hay en DRAM, celdas, barriles y Greedy Buffers. Los módulos recuperados de un controlador antiguo salen primero: clic "
                         + "para recogerlos.");
         add(DeviceType.MVN_WIRELESS_TERMINAL, Category.CORE, "Terminal Inalámbrico",
                 "Opens the Network Terminal from a distance.",

@@ -187,6 +187,8 @@ Bay con módulo de ítems, más un módulo antiguo dentro del Controlador), las 
   Pushers, la succión de la Greedy y las dos direcciones del puente pasan `includeGreedy = false`;
   terminales, crafteo y la API usan la forma de 2 argumentos (Greedy incluida). Un Infinity Barrel
   conserva su `cellSample` al llegar a 0; una celda lo olvida.
+- `breakdown(item)` — una pasada que devuelve dónde está un ítem (memoria, celdas, barriles, Greedy,
+  barriles de Slimefun); el Terminal lo lista bajo el total.
 - `count`, `remainingQuota`, `view()` (caché de 500 ms, agrupado con `StackUtils.itemsMatch`),
   `getPurgedItemsView`, `isItemPurged`, contadores.
 

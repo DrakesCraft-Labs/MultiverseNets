@@ -220,6 +220,17 @@ class DramBayTest {
         assertEquals(77, net.storage().count(i -> i.getType() == Material.EMERALD), "installed in a bay, the items are back");
     }
 
+    private java.util.List<String> terminalLore(Network net) {
+        new com.chagui68.multiversenets.gui.TerminalMenu(plugin, player, net).openMenu();
+        ItemStack icon = player.getOpenInventory().getTopInventory().getItem(0);
+        assertNotNull(icon);
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        for (Component line : icon.getItemMeta().lore()) {
+            lines.add(PlainTextComponentSerializer.plainText().serialize(line));
+        }
+        return lines;
+    }
+
     @Test
     void theTerminalTellsHowMuchOfAnItemIsInDram() {
         Block controller = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
@@ -228,17 +239,31 @@ class DramBayTest {
         rightClick(bay, Items.create(DeviceType.MVN_CACHE_L1));
         net.storage().deposit(new ItemStack(Material.DIRT, 10));
 
-        new com.chagui68.multiversenets.gui.TerminalMenu(plugin, player, net).openMenu();
-        ItemStack icon = player.getOpenInventory().getTopInventory().getItem(0);
-        assertNotNull(icon);
-        boolean found = false;
-        for (Component line : icon.getItemMeta().lore()) {
-            String text = PlainTextComponentSerializer.plainText().serialize(line);
-            if (text.contains("In DRAM: 10")) {
-                found = true;
-            }
-        }
-        assertTrue(found, "the lore shows the amount kept in DRAM, like the Greedy Buffer line");
+        java.util.List<String> lore = terminalLore(net);
+        assertTrue(lore.contains("Amount: 10 in the network"), lore.toString());
+        assertTrue(lore.contains(" ▣ DRAM: 10"), lore.toString());
+    }
+
+    @Test
+    void theTerminalBreaksTheTotalDownByStorage() {
+        Block controller = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
+        Block cell = place(1, 64, 0, DeviceType.MVN_CELL_T1);
+        Block greedy = place(2, 64, 0, DeviceType.MVN_GREEDY_CELL);
+        Network net = network(controller);
+        NodeBlob cellBlob = NodeStore.get(cell);
+        cellBlob.cellSample = new ItemStack(Material.DIRT);
+        cellBlob.cellAmount = 2500;
+        NodeStore.put(cell, cellBlob);
+        NodeBlob greedyBlob = NodeStore.get(greedy);
+        greedyBlob.addGreedyItem(new ItemStack(Material.DIRT), 2500);
+        NodeStore.put(greedy, greedyBlob);
+        net.storage().invalidate();
+
+        java.util.List<String> lore = terminalLore(net);
+        assertTrue(lore.contains("Amount: 5,000 in the network"), "the total is the sum, counted once: " + lore);
+        assertTrue(lore.contains(" ▦ Quantum Cells: 2,500"), lore.toString());
+        assertTrue(lore.contains(" ⚡ Greedy Buffer (reserved): 2,500"), lore.toString());
+        assertTrue(lore.stream().noneMatch(l -> l.contains("DRAM")), "storages with nothing are not listed");
     }
 
     @Test
