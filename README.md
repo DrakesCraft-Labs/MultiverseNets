@@ -429,8 +429,10 @@ The jar is generated at `target/MultiverseNets-v<version>.jar`.
 > global scheduler and assume the main thread owns the blocks they touch. Install it on Paper or
 > Purpur.
 
-## 📜 License
-
-This project is licensed under the terms of the **GNU General Public License Version 3 (GPL-3.0)**. See the [LICENSE](LICENSE) file for details.
-
 ---
+
+## 📄 License & Sovereign Authorship
+
+Copyright © 2026 [**Chagui68**](https://github.com/Chagui68) · [**DrakesCraft Labs**](https://github.com/DrakesCraft-Labs).
+
+This project is an **original sovereign creation** engineered by **Chagui68** for the DrakesCraft network. All intellectual authorship belongs to Chagui68. Commercial resale, repackaging in paid setups, or removing creator attribution is strictly prohibited.
