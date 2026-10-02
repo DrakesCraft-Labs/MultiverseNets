@@ -78,7 +78,7 @@ if (!proyecto) {
     license_id: process.env.PROJECT_LICENSE || 'GPL-3.0-only',
     source_url: `https://github.com/DrakesCraft-Labs/${SLUG}`,
     issues_url: `https://github.com/DrakesCraft-Labs/${SLUG}/issues`,
-    discord_url: 'https://discord.gg/rR7FbfCt9Y',
+    discord_url: 'https://discord.gg/6M8cz86vN7',
     initial_versions: [],
   };
 
@@ -119,7 +119,7 @@ try {
   const patchData = {
     source_url: `https://github.com/DrakesCraft-Labs/${SLUG}`,
     issues_url: `https://github.com/DrakesCraft-Labs/${SLUG}/issues`,
-    discord_url: 'https://discord.gg/rR7FbfCt9Y'
+    discord_url: 'https://discord.gg/6M8cz86vN7'
   };
   await fetch(`${V2}/project/${proyecto.id}`, {
     method: 'PATCH',
