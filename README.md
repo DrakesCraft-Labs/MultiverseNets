@@ -9,7 +9,7 @@
 
 **Standalone digital logistics networks and massive storage for Paper — no Slimefun.**
 
-<img src="https://img.shields.io/badge/Paper-1.21.11-38BDF8?style=for-the-badge&logo=minecraft&logoColor=white" alt="Paper 1.21.11"/>
+<img src="https://img.shields.io/badge/Paper-1.21.11%20%7C%2026.1%20%7C%2026.2-38BDF8?style=for-the-badge&logo=minecraft&logoColor=white" alt="Paper 1.21.11 | 26.1 | 26.2"/>
 <img src="https://img.shields.io/badge/Java-21-F89820?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java 21"/>
 <img src="https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge" alt="GPLv3"/>
 <img src="https://img.shields.io/badge/Author-Chagui68-22C55E?style=for-the-badge" alt="Chagui68"/>
@@ -417,14 +417,33 @@ The price is that scanning costs one BFS over up to `max-nodes` blocks every
 mvn clean package
 ```
 
+That builds the release jar (1.21.11 API, Java 21 bytecode, runs on 1.21.11, 26.1 and 26.2). To
+check the code against the newer APIs (needs JDK 25):
+
+```bash
+mvn -P api-26.1 clean compile
+mvn -P api-26.2 clean compile
+```
+
 The jar is generated at `target/MultiverseNets-v<version>.jar`.
 
 ## 📋 Compatibility
 
 | Parameter | Requirement |
 |---|---|
-| **Server** | Paper / Purpur 1.21.11 |
-| **Java** | Java 21 LTS |
+| **Server** | Paper / Purpur **1.21.11**, **26.1** (26.1 – 26.1.2) and **26.2** — the same jar for all three |
+| **Java** | The one your server needs: Java 21 on 1.21.11, Java 25 on 26.1 and 26.2 |
+
+How each version is checked before a release (`.github/workflows/verify.yml`):
+
+| Version | Check |
+|---|---|
+| 1.21.11 | The jar is built against this API and the whole test suite runs on it. |
+| 26.1 | The same sources compile against the Paper 26.1.2 API (`mvn -P api-26.1 clean compile`, JDK 25). |
+| 26.2 | The same sources compile against the Paper 26.2 API (`mvn -P api-26.2 clean compile`, JDK 25). |
+
+The test server (MockBukkit) only exists for 1.21, so on 26.x the check is that every call the
+plugin makes exists there; nothing it uses is marked for removal in those versions.
 | **Dependencies** | None (Slimefun and protection plugins are optional) |
 
 > **Not Folia-compatible.** The network ticker, the topology scan and every GUI run on Paper's

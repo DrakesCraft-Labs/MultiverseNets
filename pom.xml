@@ -6,7 +6,7 @@
 
     <groupId>com.chagui68</groupId>
     <artifactId>MultiverseNets</artifactId>
-    <version>5.0</version>
+    <version>5.2</version>
     <packaging>jar</packaging>
 
     <name>MultiverseNets</name>
@@ -120,4 +120,31 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <!--
+        Supported servers: Paper / Purpur 1.21.11, 26.1 and 26.2.
+        The release jar is built against the 1.21.11 API with Java 21 bytecode, so the same jar
+        runs on all three. The two extra profiles compile the same sources against the newer Paper
+        APIs, so a call that does not exist there is caught before release (they need JDK 25,
+        like those servers):
+            mvn -P api-26.1 clean compile
+            mvn -P api-26.2 clean compile
+        Servidores soportados: Paper / Purpur 1.21.11, 26.1 y 26.2. El jar se compila contra la API
+        1.21.11 con bytecode de Java 21 y funciona en las tres; los perfiles compilan el mismo
+        codigo contra las APIs nuevas para detectar antes de publicar lo que alli no existe.
+    -->
+    <profiles>
+        <profile>
+            <id>api-26.1</id>
+            <properties>
+                <paper.version>26.1.2.build.74-stable</paper.version>
+            </properties>
+        </profile>
+        <profile>
+            <id>api-26.2</id>
+            <properties>
+                <paper.version>26.2.build.129-stable</paper.version>
+            </properties>
+        </profile>
+    </profiles>
 </project>

@@ -10,7 +10,7 @@ organiza el proyecto.
 ## Raíz del proyecto
 ```
 MultiverseNets/
-├─ .github/              # CI: workflow de publicación en Modrinth y sus scripts
+├─ .github/              # CI: verify.yml (tests en 1.21.11, compilación en 26.1/26.2) y publicación en Modrinth
 ├─ docs/                 # Imágenes de documentación (banners, icono)
 ├─ src/
 │   ├─ main/
@@ -31,7 +31,7 @@ MultiverseNets/
 │   │   │   └─ util/         # Keys, PosUtil, Settings, StackUtils, Text
 │   │   └─ resources/        # config.yml y plugin.yml
 │   └─ test/java/            # Tests JUnit 5 + MockBukkit (mismos paquetes que main, más stubs)
-├─ pom.xml                   # Build de Maven (Java 21, Paper API, MockBukkit)
+├─ pom.xml                   # Build de Maven (Java 21, API Paper 1.21.11, MockBukkit; perfiles api-26.1 / api-26.2)
 ├─ README.md                 # Documentación principal (inglés)
 ├─ Wiki-en/                  # Wiki en inglés (mismos archivos)
 └─ Wiki-es/                  # Wiki en español

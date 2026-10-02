@@ -17,6 +17,11 @@ mvn test
 
 Un build completo (`mvn clean package`) también los ejecuta. Requisitos: JDK 21 y Maven.
 
+Los tests corren sobre la API 1.21.11 (MockBukkit solo existe para 1.21). Para 26.1 y 26.2 la CI
+(`.github/workflows/verify.yml`) compila el mismo código contra esas APIs de Paper con JDK 25:
+`mvn -P api-26.1 clean compile` y `mvn -P api-26.2 clean compile`. Ejecutar la suite con esos
+perfiles no está soportado: MockBukkit no puede arrancar un servidor 1.21 sobre la API 26.x.
+
 ## 2. Infraestructura: MockBukkit
 
 La mayoría de tests usan **[MockBukkit](https://github.com/MockBukkit/MockBukkit)**, un servidor

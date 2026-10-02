@@ -44,7 +44,9 @@ public class GuiListener implements Listener {
                 || type == ClickType.CONTROL_DROP
                 || type == ClickType.CREATIVE
                 || action == InventoryAction.COLLECT_TO_CURSOR
-                || action == InventoryAction.HOTBAR_MOVE_AND_READD
+                // Por nombre: HOTBAR_MOVE_AND_READD esta marcada para borrarse en Paper 26.x y
+                // referenciarla directamente romperia el plugin el dia que desaparezca.
+                || "HOTBAR_MOVE_AND_READD".equals(action.name())
                 || action == InventoryAction.HOTBAR_SWAP
                 || action == InventoryAction.DROP_ALL_CURSOR
                 || action == InventoryAction.DROP_ALL_SLOT

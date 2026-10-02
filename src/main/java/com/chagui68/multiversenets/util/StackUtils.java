@@ -243,10 +243,15 @@ public final class StackUtils {
             }
         }
         if (am instanceof TropicalFishBucketMeta at && bm instanceof TropicalFishBucketMeta bt) {
-            if (!at.hasVariant() || !bt.hasVariant()
-                    || at.getPattern() != bt.getPattern()
-                    || at.getBodyColor() != bt.getBodyColor()
-                    || at.getPatternColor() != bt.getPatternColor()) {
+            // Sin hasVariant(), marcada para borrarse en Paper 26.x: un cubo sin variante lanza al
+            // leerla, y dos cubos que no se pueden comparar no se dan por iguales.
+            try {
+                if (at.getPattern() != bt.getPattern()
+                        || at.getBodyColor() != bt.getBodyColor()
+                        || at.getPatternColor() != bt.getPatternColor()) {
+                    return false;
+                }
+            } catch (RuntimeException noVariant) {
                 return false;
             }
         }

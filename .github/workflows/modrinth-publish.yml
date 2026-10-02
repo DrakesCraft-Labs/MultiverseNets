@@ -264,8 +264,13 @@ jobs:
             paper
             purpur
             spigot
+          # Versiones soportadas: el jar (API 1.21.11, bytecode Java 21) funciona en las tres.
           game-versions: |
-            1.21.x
+            1.21.11
+            26.1
+            26.1.1
+            26.1.2
+            26.2
           changelog: ${{ needs.decidir.outputs.motivo }}
           # No fallar si algun campo opcional falta.
           modrinth-featured: false

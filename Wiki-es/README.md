@@ -475,14 +475,33 @@ trabajo predecible y acotado a cambio de no tener estado que se pueda corromper.
 mvn clean package
 ```
 
+Eso genera el jar de publicación (API 1.21.11, bytecode de Java 21, funciona en 1.21.11, 26.1 y
+26.2). Para comprobar el código contra las APIs nuevas (necesita JDK 25):
+
+```bash
+mvn -P api-26.1 clean compile
+mvn -P api-26.2 clean compile
+```
+
 El jar se genera en `target/MultiverseNets-v<versión>.jar`.
 
 ## 📋 Compatibilidad
 
 | Parámetro | Requisito |
 |---|---|
-| **Servidor** | Paper / Purpur 1.21.11 |
-| **Java** | Java 21 LTS |
+| **Servidor** | Paper / Purpur **1.21.11**, **26.1** (26.1 – 26.1.2) y **26.2** — el mismo jar para las tres |
+| **Java** | El que pida tu servidor: Java 21 en 1.21.11, Java 25 en 26.1 y 26.2 |
+
+Cómo se comprueba cada versión antes de publicar (`.github/workflows/verify.yml`):
+
+| Versión | Comprobación |
+|---|---|
+| 1.21.11 | El jar se compila contra esta API y toda la suite de tests corre sobre ella. |
+| 26.1 | El mismo código compila contra la API de Paper 26.1.2 (`mvn -P api-26.1 clean compile`, JDK 25). |
+| 26.2 | El mismo código compila contra la API de Paper 26.2 (`mvn -P api-26.2 clean compile`, JDK 25). |
+
+El servidor de tests (MockBukkit) solo existe para 1.21, así que en 26.x la comprobación es que cada
+llamada del plugin existe allí; nada de lo que usa está marcado para borrarse en esas versiones.
 | **Dependencias** | Ninguna (Slimefun y los plugins de protección son opcionales) |
 
 > **No es compatible con Folia.** El ticker de red, el escaneo de topología y todos los menús corren
