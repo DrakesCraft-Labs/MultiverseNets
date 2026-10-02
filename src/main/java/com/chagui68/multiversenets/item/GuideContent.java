@@ -299,10 +299,12 @@ public final class GuideContent {
                         + "otro almacenamiento, saca más de la red cada ciclo y los empuja a los contenedores de al "
                         + "lado (no a bloques de la red). Guarda varios tipos. Sin filtro: almacenamiento de "
                         + "desbordamiento.",
-                "Right-click to set the filter and see its buffer. Its stock is reserved: Pushers and the wireless "
-                        + "bridge never take items from it (terminals and crafting can).",
-                "Clic derecho para poner el filtro y ver su búfer. Su stock está reservado: los Pushers y el puente "
-                        + "inalámbrico nunca sacan de ella (terminales y crafteo sí).");
+                "Right-click to set the filter and see its buffer. It is an internal filter: an item defined in it "
+                        + "always keeps 1 unit inside, even when Pushers take the rest. A Pusher with that item in its "
+                        + "whitelist releases it: the Greedy Cell moves all of it to the cells and stops taking it.",
+                "Clic derecho para poner el filtro y ver su búfer. Es un filtro interno: un ítem definido en él "
+                        + "siempre deja 1 unidad dentro, aunque los Pushers saquen el resto. Un Pusher con ese ítem en "
+                        + "su whitelist lo libera: la Greedy Cell pasa todo a las celdas y deja de tomarlo.");
         add(DeviceType.MVN_QUANTUM_WORKBENCH, Category.STORAGE, "Mesa Cuántica",
                 "Upgrades a Quantum Cell T1-T5 to the next tier keeping its cargo.",
                 "Sube una Celda Cuántica T1-T5 al siguiente nivel conservando su carga.",

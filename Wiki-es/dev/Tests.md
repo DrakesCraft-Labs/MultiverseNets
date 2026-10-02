@@ -51,7 +51,7 @@ A tener en cuenta:
 - `src/test/java/dev/espi/protectionstones/PSRegion.java` es un stub de la API de ProtectionStones que
   los tests del provider cargan por reflexión.
 
-## 3. Resumen: 35 clases, 262 tests
+## 3. Resumen: 36 clases, 265 tests
 
 | Clase (paquete `com.chagui68.multiversenets` salvo que se indique) | Tests | Cubre |
 | --- | --- | --- |
@@ -67,6 +67,7 @@ A tener en cuenta:
 | `GuideMenuTest` | 6 | Cada dispositivo está documentado en los dos idiomas y se encuentra su receta; `/mvnets guide en|es` abre el menú (sin libro); navegar a un dispositivo muestra su receta real; el cambio de idioma conserva la página; los ingredientes que son dispositivos abren su página; no se puede sacar nada. |
 | `GrabberQuotaTest` | 8 | `extractMatching`: respeta toda la cuota por ciclo (también HT), junta ranuras del mismo ítem, no toca otros ítems. |
 | `GreedyCellTest` | 8 | Greedy Cell: almacenamiento multi-ítem, capacidad compartida, menú e integración con el terminal. |
+| `GreedyReserveTest` | 3 | Un Pusher saca de una Greedy Cell pero deja 1 de un ítem definido; cualquier retirada deja esa unidad; un Pusher con el ítem en su whitelist vacía la Greedy Cell hacia las celdas, los depósitos nuevos se la saltan y sin ese Pusher la Greedy Cell vuelve a tomar el ítem. |
 | `GuiDupeGuardTest` | 3 | `GuiListener` cancela los clics peligrosos (también en los menús de celda y barril); los depósitos con shift+clic nunca duplican. |
 | `GuiFlowsTest` | 10 | Flujos de Terminal, Encoder, Auto-Crafter (crafteo atómico), Crafting Grid y Monitor. |
 | `InfinityBarrelTest` | 4 | Capacidad del barril, menú, integración con la red y persistencia al romper/colocar. |

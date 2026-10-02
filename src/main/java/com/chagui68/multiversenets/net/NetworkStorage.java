@@ -292,9 +292,13 @@ public class NetworkStorage {
         long rejectedByQuota = item.getAmount() - amountToDeposit;
         long remaining = amountToDeposit;
 
+        // Un item que un Pusher de la red tiene en su whitelist ya no se guarda en Greedy Cells:
+        // va a las celdas, de donde ese Pusher lo exporta.
+        boolean released = releasedByPushers(item);
+
         // 1. Greedy cells
         for (CellState state : states) {
-            if (!state.greedy) continue;
+            if (!state.greedy || released) continue;
             long space = state.capacity - state.blob.totalGreedyAmount();
             if (space <= 0) continue;
             boolean matchesExisting = state.blob.indexOfGreedySample(item) >= 0;
@@ -385,7 +389,7 @@ public class NetworkStorage {
         }
 
         // 8. Open Greedy cells (fallback when greedy cell has no filter configured: acts as shared general storage)
-        if (remaining > 0) {
+        if (remaining > 0 && !released) {
             for (CellState state : states) {
                 if (!state.greedy) continue;
                 boolean hasFilter = (state.blob.filterMaterials != null && !state.blob.filterMaterials.isEmpty())
@@ -403,6 +407,61 @@ public class NetworkStorage {
 
         flush(states, vCaches);
         return (int) (remaining + rejectedByQuota);
+    }
+
+    /**
+     * EN: Units of {@code sample} a Greedy Cell must keep: 1 when the item is defined in its filter
+     * (whitelist, or not listed in a blacklist), 0 otherwise. That last unit is the Greedy's internal
+     * marker for "this item stays out of the cells"; only a release by a Pusher moves it out.
+     *
+     * ES: Unidades de {@code sample} que una Greedy Cell debe conservar: 1 si el ítem está definido en
+     * su filtro, 0 si no. Esa última unidad es la marca interna de la Greedy de "este ítem no va a las
+     * celdas"; solo la liberación por un Pusher la saca.
+     */
+    public static long greedyReserve(NodeBlob greedy, ItemStack sample) {
+        boolean hasFilter = (greedy.filterMaterials != null && !greedy.filterMaterials.isEmpty())
+                || (greedy.filterItems != null && !greedy.filterItems.isEmpty());
+        return hasFilter && NetworkManager.filterPredicate(greedy).test(sample) ? 1 : 0;
+    }
+
+    /**
+     * EN: True when a Pusher of this network has {@code item} in its whitelist. Greedy Cells then
+     * release that item completely to the other storages and stop taking it, so the Pusher exports
+     * it from there. Blacklist Pushers never release anything.
+     *
+     * ES: True si un Pusher de esta red tiene {@code item} en su whitelist. Las Greedy Cells sueltan
+     * entonces todo ese ítem al resto del almacenamiento y dejan de tomarlo, así el Pusher lo exporta
+     * desde allí. Los Pushers en blacklist nunca liberan nada.
+     */
+    public synchronized boolean releasedByPushers(ItemStack item) {
+        if (item == null || item.getType().isAir()) {
+            return false;
+        }
+        List<Long> pushers = new ArrayList<>();
+        synchronized (network.nodes()) {
+            for (var entry : network.nodes().entrySet()) {
+                if (entry.getValue() == DeviceType.MVN_PUSHER || entry.getValue() == DeviceType.MVN_PUSHER_HT) {
+                    pushers.add(entry.getKey());
+                }
+            }
+        }
+        for (long pos : pushers) {
+            int cx = PosUtil.unpackX(pos) >> 4;
+            int cz = PosUtil.unpackZ(pos) >> 4;
+            if (!network.world().isChunkLoaded(cx, cz)) {
+                continue;
+            }
+            NodeBlob blob = NodeStore.canonical(network.block(pos));
+            if (blob == null || blob.filterBlacklist) {
+                continue;
+            }
+            boolean hasFilter = (blob.filterMaterials != null && !blob.filterMaterials.isEmpty())
+                    || (blob.filterItems != null && !blob.filterItems.isEmpty());
+            if (hasFilter && NetworkManager.filterPredicate(blob).test(item)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static long pour(CellState state, ItemStack item, long remaining) {
@@ -524,12 +583,18 @@ public class NetworkStorage {
                     if (sample == null || amount == null || amount <= 0 || !matcher.test(sample)) {
                         continue;
                     }
-                    if (result == null) {
-                        result = StackUtils.getAsQuantity(sample, 0);
-                    } else if (!StackUtils.itemsMatch(result, sample)) {
+                    if (result != null && !StackUtils.itemsMatch(result, sample)) {
                         continue;
                     }
-                    long take = Math.min(want - got, amount);
+                    // Un item definido en el filtro de la Greedy Cell deja siempre 1 dentro: es el
+                    // filtro interno que lo mantiene fuera de las celdas.
+                    long take = Math.min(want - got, amount - greedyReserve(state.blob, sample));
+                    if (take <= 0) {
+                        continue;
+                    }
+                    if (result == null) {
+                        result = StackUtils.getAsQuantity(sample, 0);
+                    }
                     long removed = state.blob.removeGreedyItem(i, take);
                     got += removed;
                     state.dirty = true;

@@ -310,8 +310,10 @@ G H G
     every cycle it pulls up to 512 more from the network and pushes up to 256 into adjacent
     **non-network** containers (chests, Slimefun machines). Ideal for feeding a machine line.
   - **Without a filter** it is general overflow storage, used only when everything else is full.
-  - Its stock is reserved: Pushers and the wireless bridge never take items out of it (terminals
-    and crafting can).
+  - **Internal filter**: Pushers, terminals and crafting can take from it, but an item defined in
+    its filter always keeps 1 unit inside. A Pusher with that item in its whitelist releases it: the
+    Greedy Cell moves all of it to the cells and stops taking it. The wireless bridge never takes
+    from it.
 
 ---
 

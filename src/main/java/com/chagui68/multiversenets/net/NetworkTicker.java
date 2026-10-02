@@ -472,7 +472,9 @@ public class NetworkTicker {
             int attempts = kinds > 1 ? 1 : 4;
             for (int attempt = 0; attempt < attempts && budget > 0; attempt++) {
                 Predicate<ItemStack> pred = base.and(item -> notTried(tried, item));
-                ItemStack stack = net.storage().withdraw(pred, budget, -1L, false);
+                // Los Pushers tambien sacan de las Greedy Cells (que siempre conservan 1 de cada
+                // item definido en su filtro).
+                ItemStack stack = net.storage().withdraw(pred, budget, -1L, true);
                 if (stack == null) {
                     break;
                 }
@@ -784,7 +786,8 @@ public class NetworkTicker {
             boolean hasFilter = (blob.filterMaterials != null && !blob.filterMaterials.isEmpty())
                     || (blob.filterItems != null && !blob.filterItems.isEmpty());
             if (hasFilter) {
-                Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
+                Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob)
+                        .and(item -> !net.storage().releasedByPushers(item));
                 long space = cap - currentTotal;
                 int want = (int) Math.min(space, (long) Settings.itemsPerOp() * 4);
                 ItemStack got = net.storage().withdraw(pred, want, pos, false);
@@ -805,7 +808,10 @@ public class NetworkTicker {
                 if (sample == null || amount <= 0) {
                     continue;
                 }
-                int want = (int) Math.min(amount, (long) (maxTake - movedTotal));
+                int want = (int) Math.min(amount - NetworkStorage.greedyReserve(blob, sample), (long) (maxTake - movedTotal));
+                if (want <= 0) {
+                    continue;
+                }
                 int roundMoved = 0;
                 for (BlockFace face : facesFor(blob)) {
                     Block target = block.getRelative(face);
@@ -856,6 +862,47 @@ public class NetworkTicker {
 
         if (changed) {
             NodeStore.put(block, blob);
+        }
+        releaseToPushers(net, block);
+    }
+
+    /**
+     * EN: Items a Pusher of the network whitelists leave the Greedy Cell completely (the reserved
+     * unit included) and go to the other storages, where the Pusher exports them. What the network
+     * cannot take stays in the Greedy Cell.
+     *
+     * ES: Los ítems que un Pusher de la red tiene en su whitelist salen enteros de la Greedy Cell (la
+     * unidad reservada incluida) y van al resto del almacenamiento, de donde el Pusher los exporta.
+     * Lo que la red no admite se queda en la Greedy Cell.
+     */
+    private void releaseToPushers(Network net, Block block) {
+        NodeBlob blob = NodeStore.get(block);
+        if (blob == null || blob.greedySamples == null || blob.greedySamples.isEmpty()) {
+            return;
+        }
+        for (int i = blob.greedySamples.size() - 1; i >= 0; i--) {
+            ItemStack sample = blob.greedySamples.get(i);
+            long amount = blob.greedyAmounts.get(i);
+            if (sample == null || amount <= 0 || !net.storage().releasedByPushers(sample)) {
+                continue;
+            }
+            blob.removeGreedyItem(i, amount);
+            NodeStore.put(block, blob);
+            long left = 0;
+            long toMove = amount;
+            while (toMove > 0) {
+                int chunk = (int) Math.min(Integer.MAX_VALUE, toMove);
+                left += net.storage().deposit(StackUtils.getAsQuantity(sample, chunk));
+                toMove -= chunk;
+            }
+            blob = NodeStore.get(block);
+            if (left > 0 && blob != null) {
+                blob.addGreedyItem(sample, left);
+                NodeStore.put(block, blob);
+            }
+            if (blob == null) {
+                return;
+            }
         }
     }
 

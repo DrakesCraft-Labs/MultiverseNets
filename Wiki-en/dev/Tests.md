@@ -49,7 +49,7 @@ Things to know:
 - `src/test/java/dev/espi/protectionstones/PSRegion.java` is a stub of the ProtectionStones API that
   the provider tests load by reflection.
 
-## 3. Overview: 35 classes, 262 tests
+## 3. Overview: 36 classes, 265 tests
 
 | Class (package `com.chagui68.multiversenets` unless stated) | Tests | Covers |
 | --- | --- | --- |
@@ -65,6 +65,7 @@ Things to know:
 | `GuideMenuTest` | 6 | Every device is documented in both languages and its recipe is found; `/mvnets guide en|es` opens the menu (no book); navigation to a device shows its real recipe; the language toggle keeps the page; device ingredients open their own page; nothing can be taken out. |
 | `GrabberQuotaTest` | 8 | `extractMatching`: honours the full per-cycle quota (including HT), merges slots of one item, leaves other items alone. |
 | `GreedyCellTest` | 8 | Greedy Cell multi-item storage, shared capacity, menu and terminal integration. |
+| `GreedyReserveTest` | 3 | A Pusher takes from a Greedy Cell but leaves 1 of a defined item; any withdrawal leaves that unit; a Pusher whitelisting the item empties the Greedy Cell into the cells, new deposits skip it, and without that Pusher the Greedy Cell takes the item again. |
 | `GuiDupeGuardTest` | 3 | `GuiListener` cancels dangerous clicks (also in cell and barrel menus); shift-click deposits never duplicate. |
 | `GuiFlowsTest` | 10 | Terminal, Encoder, Auto-Crafter (atomic crafting), Crafting Grid and Monitor flows. |
 | `InfinityBarrelTest` | 4 | Barrel capacity, menu, network integration and break/place persistence. |

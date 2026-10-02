@@ -183,9 +183,12 @@ Bay con módulo de ítems, más un módulo antiguo dentro del Controlador), las 
   tipo → (5) espacio libre de los módulos de memoria → (6) barriles de Slimefun vacíos → (7) celdas/barriles
   vacíos (adoptan el tipo) → (8) Greedy Cells sin filtro. Nunca modifica el argumento.
 - **`withdraw(matcher, want, excludePos, includeGreedy)`** — módulos de memoria → celdas y barriles →
-  barriles de Slimefun → Greedy Cells (solo si `includeGreedy`). Devuelve un único tipo de ítem. Los
-  Pushers, la succión de la Greedy y las dos direcciones del puente pasan `includeGreedy = false`;
-  terminales, crafteo y la API usan la forma de 2 argumentos (Greedy incluida). Un Infinity Barrel
+  barriles de Slimefun → Greedy Cells (solo si `includeGreedy`). Devuelve un único tipo de ítem. La
+  succión de la Greedy y las dos direcciones del puente pasan `includeGreedy = false`; Pushers,
+  terminales, crafteo y la API incluyen las Greedy Cells. Una Greedy Cell nunca da su última unidad de
+  un ítem definido en su filtro (`greedyReserve`). `releasedByPushers(item)` es true si un Pusher tiene
+  el ítem en su whitelist: los depósitos se saltan las Greedy Cells, la succión lo ignora y
+  `NetworkTicker.releaseToPushers` pasa todo el stock de la Greedy Cell (reserva incluida) al resto. Un Infinity Barrel
   conserva su `cellSample` al llegar a 0; una celda lo olvida.
 - `breakdown(item)` — una pasada que devuelve dónde está un ítem (memoria, celdas, barriles, Greedy,
   barriles de Slimefun); el Terminal lo lista bajo el total.

@@ -179,9 +179,12 @@ item module, plus a legacy module inside the Controller), **Quantum Cells**, **I
   memory module free space → (6) empty Slimefun barrels → (7) empty cells/barrels (they adopt the
   type) → (8) Greedy Cells without a filter. Never mutates the argument.
 - **`withdraw(matcher, want, excludePos, includeGreedy)`** — memory modules → cells and barrels →
-  Slimefun barrels → Greedy Cells (only if `includeGreedy`). Returns a single item type. Pushers,
-  Greedy suction and both bridge directions pass `includeGreedy = false`; terminals, crafting and the
-  API use the 2-argument form (Greedy included). An Infinity Barrel keeps its `cellSample` when it
+  Slimefun barrels → Greedy Cells (only if `includeGreedy`). Returns a single item type. Greedy
+  suction and both bridge directions pass `includeGreedy = false`; Pushers, terminals, crafting and the
+  API include Greedy Cells. A Greedy Cell never gives its last unit of an item defined in its filter
+  (`greedyReserve`). `releasedByPushers(item)` is true when a Pusher whitelists the item: deposits then
+  skip Greedy Cells, Greedy suction ignores it and `NetworkTicker.releaseToPushers` moves the Greedy
+  Cell's whole stock of it (reserve included) to the other storages. An Infinity Barrel keeps its `cellSample` when it
   reaches 0; a cell forgets it.
 - `breakdown(item)` — one pass returning where an item is kept (memory, cells, barrels, Greedy,
   Slimefun barrels); the Terminal lists it under the total.

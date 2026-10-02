@@ -312,8 +312,9 @@ G H G
     vecinos **que no son de la red** (cofres, máquinas de Slimefun). Ideal para alimentar una línea
     de máquinas.
   - **Sin filtro** es almacenamiento de desbordamiento, solo cuando todo lo demás está lleno.
-  - Su stock está reservado: ni los Pushers ni el puente inalámbrico sacan ítems de ella (terminales
-    y crafteo sí).
+  - **Filtro interno**: Pushers, terminales y crafteo pueden sacar de ella, pero un ítem definido en
+    su filtro siempre deja 1 unidad dentro. Un Pusher con ese ítem en su whitelist lo libera: la
+    Greedy Cell pasa todo a las celdas y deja de tomarlo. El puente inalámbrico nunca saca de ella.
 
 ---
 

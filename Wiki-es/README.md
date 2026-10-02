@@ -70,7 +70,7 @@ Las cantidades son los valores por defecto de `config.yml`; todas se pueden conf
 |---|---|---|---|
 | **Celda Cuántica T1–T6** | `mvn_cell_t1` … `mvn_cell_t6` · Terracota (normal, naranja, amarilla, lima, cian, morada) | Guarda **un tipo de ítem** cada una: 65.536 / 262.144 / 1.048.576 / 16.777.216 / 268.435.456 / 2.000.000.000 ítems. Una celda vacía adopta el primer tipo que no tenga otro sitio. | Conéctala. Clic derecho para ver o gestionar su contenido. Al romperla la carga queda en el ítem. Se mejora un nivel en la Quantum Workbench o en la mesa de crafteo (celda rodeada de 8 diamantes) conservando la carga. |
 | **Infinity Barrel** | `mvn_infinity_barrel` · Barril | Igual que una celda — un tipo de ítem — con `barrel.capacity` (2.000.000.000), pero **sigue registrado** a su ítem cuando se vacía. Los ítems con id propio (Slimefun y otros plugins) se reconocen por su id y su texto visible, así un ítem que sacas siempre vuelve a entrar aunque su nombre o lore se hayan guardado de otra forma. | Clic derecho: clic en *Set Item* con un ítem en el cursor para registrarlo; clic derecho en *Set Item* con el cursor vacío borra el registro (solo si está vacío). Las tolvas **no** interactúan con él (ver abajo). |
-| **Greedy Cell** | `mvn_greedy_cell` · Bloque de slime | Con filtro: un **sumidero prioritario**. Los ítems que entran y pasan su filtro van a ella antes que a cualquier otro almacenamiento; cada ciclo extrae hasta 512 más de la red y empuja hasta 256 a los contenedores vecinos **que no son de la red** (cofres, máquinas de Slimefun). Guarda varios tipos, hasta `greedy.capacity` (262.144) en total. Sin filtro: almacenamiento de desbordamiento, solo cuando todo lo demás está lleno. | Clic derecho para poner el filtro y ver su búfer. Su stock está reservado: ni los Pushers ni el puente inalámbrico sacan ítems de una Greedy Cell (terminales y crafteo sí). |
+| **Greedy Cell** | `mvn_greedy_cell` · Bloque de slime | Con filtro: un **sumidero prioritario**. Los ítems que entran y pasan su filtro van a ella antes que a cualquier otro almacenamiento; cada ciclo extrae hasta 512 más de la red y empuja hasta 256 a los contenedores vecinos **que no son de la red** (cofres, máquinas de Slimefun). Guarda varios tipos, hasta `greedy.capacity` (262.144) en total. Sin filtro: almacenamiento de desbordamiento, solo cuando todo lo demás está lleno. | Clic derecho para poner el filtro y ver su búfer. Funciona como **filtro interno**: un ítem definido en su filtro siempre conserva **1 unidad** dentro, lo saque quien lo saque (Pushers, terminal, crafteo, su propio reparto a contenedores). Si un Pusher de la red tiene ese ítem en su **whitelist**, la Greedy Cell suelta **todo** (también la última unidad) a las celdas y deja de tomarlo mientras ese Pusher exista. El puente inalámbrico nunca saca de ella. |
 | **Quantum Workbench** | `mvn_quantum_workbench` · Bloque de coral cerebro | Sube una Celda Cuántica T1–T5 al siguiente nivel conservando la carga. | Celda en el centro, 8 diamantes alrededor, pulsa *Entangle & Upgrade* y recoge el resultado. |
 
 ### 💧 Fluidos
@@ -194,9 +194,11 @@ consulta los **Quota Limiters** y luego llena en este orden:
 Lo que no cabe vuelve a quien lo depositó (nunca se borra).
 
 Las retiradas leen en este orden: módulos de memoria → Celdas Cuánticas / Infinity Barrels →
-barriles de Slimefun → Greedy Cells. Los Pushers, la succión de la propia Greedy Cell y el puente
-inalámbrico **se saltan las Greedy Cells**, así el stock reservado para una línea de máquinas nunca
-se exporta a otro sitio; terminales, crafteo y la API sí pueden usarlo.
+barriles de Slimefun → Greedy Cells. Pushers, terminales, crafteo y la API pueden sacar de las Greedy
+Cells, pero una Greedy Cell siempre conserva **1 unidad** de cada ítem definido en su filtro (su
+filtro interno). Un Pusher que tiene el ítem en su **whitelist** lo libera: la Greedy Cell pasa todo
+al resto del almacenamiento y deja de tomarlo mientras ese Pusher exista. La succión de la propia
+Greedy Cell y el puente inalámbrico nunca sacan de Greedy Cells.
 
 Una retirada devuelve siempre **un solo** tipo de ítem (el primero que coincide). Un pusher con una
 whitelist de varios ítems hace una retirada por ítem, por turnos, dentro del mismo ciclo.
