@@ -73,7 +73,7 @@ public enum DeviceType {
     MVN_SF_ENCODER(Material.ENCHANTING_TABLE, "Slimefun Recipe Encoder", true, -1),
     /** Interactive network crafting grid / Mesa de crafteo integrada con la red */
     MVN_CRAFTING_GRID(Material.CARTOGRAPHY_TABLE, "Network Crafting Grid", true, -1),
-    /** Item disassembly and duplication workbench / Mesa de desensamblaje cuántico */
+    /** Quantum Cell tier-upgrade workbench (keeps cargo) / Mesa para subir de nivel Celdas Cuánticas (conserva la carga) */
     MVN_QUANTUM_WORKBENCH(Material.BRAIN_CORAL_BLOCK, "Quantum Workbench", true, -1),
     /** Wireless cross-network transmitter / Transmisor inalámbrico entre redes */
     MVN_TRANSMITTER(Material.CONDUIT, "Network Wireless Transmitter", true, -1),

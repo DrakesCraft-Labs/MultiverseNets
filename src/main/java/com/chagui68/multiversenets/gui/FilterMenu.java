@@ -316,7 +316,15 @@ public class FilterMenu extends MenuHolder {
                                 player.sendMessage(Text.msg("The transmitter's world is not loaded.", NamedTextColor.RED));
                                 return;
                             }
-                            Network net = plugin.networks().networkAt(world.getBlockAt(blob.txX, blob.txY, blob.txZ));
+                            org.bukkit.block.Block txBlock = world.getBlockAt(blob.txX, blob.txY, blob.txZ);
+                            // El receptor abre la terminal de OTRA red, posiblemente en otra base:
+                            // hay que poder usar esa red, no solo el bloque del receptor.
+                            if (!com.chagui68.multiversenets.listen.DeviceInteractions
+                                    .canAccessNetwork(player, txBlock.getLocation())) {
+                                player.sendMessage(Text.msg("You do not have permission to access the linked network.", NamedTextColor.RED));
+                                return;
+                            }
+                            Network net = plugin.networks().networkAt(txBlock);
                             if (net == null) {
                                 player.sendMessage(Text.msg("The linked transmitter has no active network.", NamedTextColor.RED));
                                 return;

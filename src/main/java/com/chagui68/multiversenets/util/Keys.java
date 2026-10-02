@@ -32,6 +32,8 @@ public final class Keys {
     public static NamespacedKey BLUEPRINT_DATA;
     /** EN: Copied filter and direction settings in Configuration Wrench / ES: Configuración copiada en la llave inglesa. */
     public static NamespacedKey CONFIG_DATA;
+    /** EN: Exact filter item templates copied by the Configuration Wrench / ES: Plantillas exactas de filtro copiadas por la llave. */
+    public static NamespacedKey CONFIG_ITEMS;
     /** EN: Remaining durability uses of Network Rake / ES: Usos restantes de durabilidad del Network Rake. */
     public static NamespacedKey RAKE_USES;
     /** EN: Marker identifying blueprints encoded with Slimefun recipes / ES: Marca de plano codificado con receta de Slimefun. */
@@ -57,6 +59,7 @@ public final class Keys {
         CELL_CARGO = new NamespacedKey(plugin, "cell_cargo");
         BLUEPRINT_DATA = new NamespacedKey(plugin, "blueprint_data");
         CONFIG_DATA = new NamespacedKey(plugin, "config_data");
+        CONFIG_ITEMS = new NamespacedKey(plugin, "config_items");
         RAKE_USES = new NamespacedKey(plugin, "rake_uses");
         SF_BLUEPRINT = new NamespacedKey(plugin, "sf_blueprint");
     }

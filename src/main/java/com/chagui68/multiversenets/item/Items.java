@@ -58,12 +58,12 @@ public final class Items {
                 lore.add(Component.text("Includes search filtering, sorting, and fluid storage access.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_MONITOR -> {
-                lore.add(Component.text("Wall display showing real-time item stock in the network.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-                lore.add(Component.text("Right-click to select target item and display mode.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Diagnostic panel: nodes by type, storage usage and network health.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Right-click to open; refreshes live while open.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_ROUTER -> {
-                lore.add(Component.text("Antenna that broadcasts network signals across chunks and dimensions.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-                lore.add(Component.text("Enables global Wireless Terminal connectivity.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Antenna that lifts the Wireless Terminal range and world limits.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Without it, Wireless Terminals only work nearby, in the same world.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_CELL_T1, MVN_CELL_T2, MVN_CELL_T3, MVN_CELL_T4, MVN_CELL_T5, MVN_CELL_T6 -> {
                 lore.add(Component.text("High-capacity digital storage cell for a single item type.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
@@ -74,8 +74,8 @@ public final class Items {
                 lore.add(Component.text("Capacity: " + formatAmount(capacityOf(type)) + " items", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_INFINITY_BARREL -> {
-                lore.add(Component.text("Deep-storage barrel with infinite capacity for a single item type.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-                lore.add(Component.text("Capacity: Unlimited", NamedTextColor.LIGHT_PURPLE).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Deep-storage barrel for a single item type.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Capacity: " + formatAmount(Settings.barrelCapacity()) + " items", NamedTextColor.LIGHT_PURPLE).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_GRABBER -> {
                 lore.add(Component.text("Omnidirectional node importing items from adjacent containers.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
@@ -119,13 +119,13 @@ public final class Items {
                 lore.add(Component.text("Interactive 3x3 crafting grid directly connected to network storage.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_QUANTUM_WORKBENCH -> {
-                lore.add(Component.text("Workbench for quantum item disassembly and energy synthesis.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Upgrades a Quantum Cell one tier (cell + 8 diamonds), keeping its cargo.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_TRANSMITTER -> {
-                lore.add(Component.text("Transmits wireless cross-network bridge signal.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Wireless bridge end. Link it to a Receiver to send filtered items.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_RECEIVER -> {
-                lore.add(Component.text("Receives wireless bridge connection from a paired Transmitter.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Wireless bridge end. Link it to a Transmitter to pull filtered items.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_WIRELESS_TERMINAL -> {
                 lore.add(Component.text("Handheld device granting remote access to network storage.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
@@ -139,7 +139,7 @@ public final class Items {
                 lore.add(Component.text("Recipe pattern blueprint for Auto-Crafter machines.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_CONFIGURATOR -> {
-                lore.add(Component.text("Network wrench to rotate nodes, toggle faces, and check states.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Shift+right-click a device to copy its filter; right-click to paste it.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_RAKE -> {
                 lore.add(Component.text("Instantly dismantles and recovers network nodes without damage.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
@@ -279,6 +279,50 @@ public final class Items {
                                 + (mats.isEmpty() ? "(empty)" : String.join(", ", mats)),
                         NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
         item.setItemMeta(meta);
+    }
+
+    /**
+     * EN: Stores the exact filter templates (custom names, Slimefun items, MultiverseNets devices)
+     * next to the material list, so a pasted filter matches what the source device matched.
+     *
+     * ES: Guarda las plantillas exactas del filtro (nombres, ítems de Slimefun, dispositivos) junto
+     * a la lista de materiales, para que el filtro pegado coincida con el del dispositivo origen.
+     */
+    public static void saveConfigItems(ItemStack item, java.util.List<ItemStack> templates) {
+        var meta = item.getItemMeta();
+        var pdc = meta.getPersistentDataContainer();
+        if (templates == null || templates.isEmpty()) {
+            pdc.remove(Keys.CONFIG_ITEMS);
+        } else {
+            com.chagui68.multiversenets.persist.NodeBlob carrier =
+                    com.chagui68.multiversenets.persist.NodeBlob.create("MVN_CONFIGURATOR");
+            carrier.filterItems = new ArrayList<>(templates);
+            pdc.set(Keys.CONFIG_ITEMS, PersistentDataType.STRING,
+                    com.chagui68.multiversenets.persist.NodeStore.encode(carrier));
+        }
+        item.setItemMeta(meta);
+    }
+
+    /**
+     * EN: Exact filter templates copied by the wrench; empty for wrenches copied before this existed.
+     *
+     * ES: Plantillas exactas copiadas por la llave; vacío en llaves copiadas antes de que existiera.
+     */
+    public static java.util.List<ItemStack> readConfigItems(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) {
+            return new ArrayList<>();
+        }
+        String data = item.getItemMeta().getPersistentDataContainer()
+                .get(Keys.CONFIG_ITEMS, PersistentDataType.STRING);
+        if (data == null) {
+            return new ArrayList<>();
+        }
+        com.chagui68.multiversenets.persist.NodeBlob carrier =
+                com.chagui68.multiversenets.persist.NodeStore.decode(data);
+        if (carrier == null || carrier.filterItems == null) {
+            return new ArrayList<>();
+        }
+        return new ArrayList<>(carrier.filterItems);
     }
 
     /**

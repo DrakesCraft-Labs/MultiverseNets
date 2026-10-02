@@ -379,25 +379,6 @@ public class DeviceInteractions {
         }
     }
 
-    private void openReceiver(Player player, Block receiverBlock) {
-        NodeBlob blob = NodeStore.get(receiverBlock);
-        if (blob == null || blob.txWorld == null) {
-            player.sendMessage(Text.msg("Unlinked: shift+click this item on a Transmitter first.", NamedTextColor.YELLOW));
-            return;
-        }
-        org.bukkit.World world = plugin.getServer().getWorld(java.util.UUID.fromString(blob.txWorld));
-        if (world == null) {
-            player.sendMessage(Text.msg("The transmitter's world is not loaded.", NamedTextColor.RED));
-            return;
-        }
-        Network net = manager.networkAt(world.getBlockAt(blob.txX, blob.txY, blob.txZ));
-        if (net == null) {
-            player.sendMessage(Text.msg("The linked transmitter has no active network.", NamedTextColor.RED));
-            return;
-        }
-        new TerminalMenu(plugin, player, net).openMenu();
-    }
-
     private void openTerminal(Player player, Block nodeBlock) {
         Network net = manager.networkAt(nodeBlock);
         if (net == null) {
@@ -443,7 +424,7 @@ public class DeviceInteractions {
      * resto se topa con la misma regla de protección de tierras que usa el bucle de red, con el
      * provider pudiendo certificar al jugador como dueño o miembro de la tierra.
      */
-    public boolean canAccessNetwork(Player player, Location loc) {
+    public static boolean canAccessNetwork(Player player, Location loc) {
         if (player.hasPermission("multiversenets.admin")) {
             return true;
         }

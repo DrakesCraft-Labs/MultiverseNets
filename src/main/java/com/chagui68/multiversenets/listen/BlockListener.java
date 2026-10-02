@@ -221,8 +221,8 @@ public class BlockListener implements Listener {
         } else if (type == DeviceType.MVN_FLUID_CELL && blob.fluidType != null && blob.fluidAmount > 0) {
             lore.add(Component.text("Fluid: " + blob.fluidType + " (" + Items.formatAmount(blob.fluidAmount) + " mB / "
                     + (blob.fluidAmount / 1000) + " Buckets)", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
-        } else if (type == DeviceType.MVN_LIQUID_PUMP && blob.pumpMode != null) {
-            lore.add(Component.text("Mode: " + blob.pumpMode + (blob.pumpFluid != null ? " (" + blob.pumpFluid + ")" : ""),
+        } else if (type == DeviceType.MVN_LIQUID_PUMP && blob.pumpFluid != null) {
+            lore.add(Component.text("Fluid filter: " + blob.pumpFluid,
                     NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
         }
         meta.lore(lore);
@@ -243,6 +243,9 @@ public class BlockListener implements Listener {
                 && blob.virtualCacheTier <= 0
                 && blob.totalVirtualAmount() <= 0
                 && blob.filterMaterials.isEmpty()
+                && (blob.filterItems == null || blob.filterItems.isEmpty())
+                && blob.targetFace == null
+                && (blob.transitBuffer == null || blob.transitBuffer.getAmount() <= 0)
                 && blob.recipes.isEmpty()
                 && blob.blueprintData.isEmpty()
                 && matrixEmpty
@@ -250,7 +253,8 @@ public class BlockListener implements Listener {
                 && blob.quotaLimit <= 0
                 && blob.txWorld == null
                 && (blob.fluidType == null || blob.fluidAmount <= 0)
-                && blob.pumpMode == null;
+                && blob.pumpMode == null
+                && blob.pumpFluid == null;
     }
 
     /**
@@ -280,7 +284,11 @@ public class BlockListener implements Listener {
         actual.greedySamples = loaded.greedySamples;
         actual.greedyAmounts = loaded.greedyAmounts;
         actual.filterMaterials = loaded.filterMaterials;
+        // filterItems manda sobre filterMaterials en NetworkManager.filterPredicate: sin
+        // restaurarlo, un filtro de un item de Slimefun o con nombre volvia como "solo material".
+        actual.filterItems = loaded.filterItems != null ? new ArrayList<>(loaded.filterItems) : new ArrayList<>();
         actual.filterBlacklist = loaded.filterBlacklist;
+        actual.targetFace = loaded.targetFace;
         actual.recipes = loaded.recipes;
         actual.blueprintData = loaded.blueprintData;
         actual.craftingMatrix = loaded.craftingMatrix;
@@ -467,14 +475,26 @@ public class BlockListener implements Listener {
             player.sendMessage(Text.msg("The rake cannot remove a controller.", NamedTextColor.RED));
             return;
         }
-        if ((type.isCell() || type == DeviceType.MVN_GREEDY_CELL || type == DeviceType.MVN_INFINITY_BARREL)
-                && (blob.cellAmount > 0 || blob.totalGreedyAmount() > 0)) {
+        if ((type.isCell() || type == DeviceType.MVN_GREEDY_CELL || type == DeviceType.MVN_INFINITY_BARREL
+                || type == DeviceType.MVN_FLUID_CELL)
+                && (blob.cellAmount > 0 || blob.totalGreedyAmount() > 0 || blob.fluidAmount > 0)) {
             player.sendMessage(Text.msg("The storage has cargo; empty it before raking.", NamedTextColor.RED));
             return;
+        }
+        // El rastrillo desmonta y RECUPERA el nodo, como en Networks: antes ponia el bloque en aire
+        // y el dispositivo (con su filtro o sus planos) se perdia sin dejar nada.
+        ItemStack recovered = createDropItem(type, blob);
+        if (type.isCell() && Settings.compatSlimefun() && SlimefunBridge.isAvailable()) {
+            SlimefunBridge.unregisterCell(block);
         }
         block.setType(Material.AIR);
         NodeStore.remove(block);
         manager.invalidateNear(block);
+        if (player.getGameMode() != org.bukkit.GameMode.CREATIVE) {
+            for (ItemStack overflow : player.getInventory().addItem(recovered).values()) {
+                player.getWorld().dropItemNaturally(player.getLocation(), overflow);
+            }
+        }
         player.sendMessage(Text.msg(type.display() + " removed.", NamedTextColor.YELLOW));
         ItemStack rake = event.getItem();
         if (!Items.spendRakeUse(rake)) {
@@ -502,6 +522,7 @@ public class BlockListener implements Listener {
         }
         if (player.isSneaking()) {
             Items.saveConfig(wrench, blob.filterMaterials, blob.filterBlacklist);
+            Items.saveConfigItems(wrench, blob.filterItems);
             player.sendMessage(Text.msg("Configuration copied (" + blob.filterMaterials.size()
                     + " materials, " + (blob.filterBlacklist ? "blacklist" : "whitelist") + ").",
                     NamedTextColor.GREEN));
@@ -520,6 +541,9 @@ public class BlockListener implements Listener {
                 blob.filterMaterials.add(data[i]);
             }
         }
+        // filterItems tiene prioridad sobre filterMaterials en el predicado de filtro: si no se
+        // sustituye, el destino conservaba su filtro anterior y el pegado no tenia efecto.
+        blob.filterItems = Items.readConfigItems(wrench);
         blob.filterBlacklist = "bl".equals(mode);
         NodeStore.put(block, blob);
         player.sendMessage(Text.msg("Configuration applied.", NamedTextColor.GREEN));
