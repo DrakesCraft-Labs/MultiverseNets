@@ -126,13 +126,40 @@ public final class CraftingSupport {
         for (var entry : reqs) {
             ItemStack got = net.storage().withdraw(entry.getKey()::test, entry.getValue());
             if (got == null || got.getAmount() < entry.getValue()) {
-                net.storage().depositAll(taken);
+                if (got != null) {
+                    taken.add(got);
+                }
+                returnOrDrop(net, taken);
                 return false;
             }
             taken.add(got);
         }
-        net.storage().deposit(recipe.getResult().clone());
+        // El crafteo ya ocurrio: lo que no quepa en la red cae junto al controlador, no desaparece.
+        returnOrDrop(net, List.of(recipe.getResult().clone()));
         return true;
+    }
+
+    /**
+     * EN: Puts every stack back into the network and drops ONLY what did not fit next to the
+     * controller. Dropping the whole stack after a partial deposit would duplicate the part that
+     * did get stored, which is what the old rollback did.
+     *
+     * ES: Devuelve cada stack a la red y suelta SOLO lo que no cupo junto al controlador. Soltar el
+     * stack entero tras un depósito parcial duplicaría la parte que sí entró, que es lo que hacía
+     * el rollback anterior.
+     */
+    static void returnOrDrop(Network net, List<ItemStack> stacks) {
+        for (ItemStack stack : stacks) {
+            if (stack == null || stack.getAmount() <= 0) {
+                continue;
+            }
+            int leftover = net.storage().deposit(stack);
+            if (leftover > 0) {
+                var controller = net.block(net.controllerPos());
+                controller.getWorld().dropItemNaturally(controller.getLocation().add(0.5, 1.0, 0.5),
+                        StackUtils.getAsQuantity(stack, leftover));
+            }
+        }
     }
 
     /**
@@ -213,31 +240,34 @@ public final class CraftingSupport {
                 if (got != null) {
                     taken.add(got);
                 }
-                int unreturned = net.storage().depositAll(taken);
-                if (unreturned > 0) {
-                    for (ItemStack s : taken) {
-                        if (s != null && s.getAmount() > 0) {
-                            net.block(net.controllerPos()).getWorld().dropItemNaturally(
-                                    net.block(net.controllerPos()).getLocation().add(0.5, 1.0, 0.5), s);
-                        }
-                    }
-                }
+                returnOrDrop(net, taken);
                 return false;
             }
             taken.add(got);
         }
 
+        int resultAmount = result.getAmount();
         int leftover = net.storage().deposit(result);
         if (leftover > 0) {
-            int unreturned = net.storage().depositAll(taken);
-            if (unreturned > 0) {
-                for (ItemStack s : taken) {
-                    if (s != null && s.getAmount() > 0) {
-                        net.block(net.controllerPos()).getWorld().dropItemNaturally(
-                                net.block(net.controllerPos()).getLocation().add(0.5, 1.0, 0.5), s);
+            // No cupo entero. Se retira lo que si entro del resultado y se devuelven los
+            // ingredientes: o el crafteo ocurre entero o no ocurre. Antes la parte depositada se
+            // quedaba en la red ADEMAS de los ingredientes devueltos.
+            int stored = resultAmount - leftover;
+            if (stored > 0) {
+                ItemStack sample = StackUtils.getAsQuantity(result, 1);
+                ItemStack back = net.storage().withdraw(item -> StackUtils.itemsMatch(item, sample), stored);
+                int recovered = back == null ? 0 : back.getAmount();
+                if (recovered < stored) {
+                    // La red ya no devuelve todo el resultado (algo lo consumio en medio): el
+                    // crafteo se da por hecho y los ingredientes no vuelven.
+                    if (back != null) {
+                        returnOrDrop(net, List.of(back));
                     }
+                    returnOrDrop(net, List.of(StackUtils.getAsQuantity(result, leftover)));
+                    return true;
                 }
             }
+            returnOrDrop(net, taken);
             return false;
         }
         return true;

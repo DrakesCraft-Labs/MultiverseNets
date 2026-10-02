@@ -84,10 +84,21 @@ public class NetworkTicker {
         transferIn -= 5;
         vacuumIn -= 5;
         craftIn -= 5;
-        for (Network net : manager.all()) {
+        List<Network> networks = manager.all();
+        // Orden estable: decide que red trabaja un nodo compartido (ver assignSharedNodes).
+        networks.sort(java.util.Comparator
+                .comparing((Network n) -> n.world().getUID())
+                .thenComparingLong(Network::controllerPos));
+        for (Network net : networks) {
             if (net.isDirty() || scanIn <= 0) {
                 net.scan();
             }
+        }
+        boolean operating = transferIn <= 0 || vacuumIn <= 0 || craftIn <= 0;
+        if (operating) {
+            assignSharedNodes(networks);
+        }
+        for (Network net : networks) {
             if (transferIn <= 0) {
                 doTransfers(net);
             }
@@ -97,7 +108,7 @@ public class NetworkTicker {
             if (craftIn <= 0) {
                 doCrafting(net);
             }
-            NetworkHologramManager.updateHologram(net);
+            updateHologramSafely(net);
         }
         if (scanIn <= 0) {
             scanIn = Settings.scanIntervalTicks();
@@ -113,18 +124,86 @@ public class NetworkTicker {
         }
     }
 
+    private boolean hologramFailureLogged;
+
+    /**
+     * EN: The hologram is cosmetic. An exception while spawning or updating it (an entity removed by
+     * another plugin, an unsupported server) used to abort the whole cycle, so every network after
+     * this one skipped its transfers. It is logged once and the loop goes on.
+     *
+     * ES: El holograma es cosmético. Una excepción al crearlo o actualizarlo cortaba el ciclo entero
+     * y las redes siguientes se quedaban sin transferencias. Se registra una vez y el bucle sigue.
+     */
+    private void updateHologramSafely(Network net) {
+        try {
+            NetworkHologramManager.updateHologram(net);
+        } catch (RuntimeException error) {
+            if (!hologramFailureLogged) {
+                hologramFailureLogged = true;
+                plugin.getLogger().warning("Controller hologram could not be updated: " + error);
+            }
+        }
+    }
+
+    /**
+     * EN: Two Controllers joined by the same cables produce two networks that index the same
+     * devices. Without this, every grabber, pusher, purger, pump and crafter on that bus worked
+     * twice per cycle (once per network). Each shared node is handed to exactly one network: the
+     * first one in the stable order of {@link #run()}. Storage is still visible from both, which is
+     * what a player expects from cells that are physically wired to both controllers.
+     *
+     * ES: Dos Controladores unidos por los mismos cables producen dos redes que indexan los mismos
+     * dispositivos. Sin esto, cada grabber, pusher, purgador, bomba y crafter de ese bus trabajaba
+     * dos veces por ciclo (una por red). Cada nodo compartido se asigna a una sola red: la primera
+     * en el orden estable de {@link #run()}. El almacenamiento sigue visible desde ambas.
+     */
+    private final java.util.Map<UUID, java.util.Map<Long, Network>> sharedOwners = new java.util.HashMap<>();
+
+    private void assignSharedNodes(List<Network> networks) {
+        sharedOwners.clear();
+        for (Network net : networks) {
+            if (!net.touchesForeignController()) {
+                continue;
+            }
+            java.util.Map<Long, Network> owners =
+                    sharedOwners.computeIfAbsent(net.world().getUID(), key -> new java.util.HashMap<>());
+            synchronized (net.nodes()) {
+                for (Long pos : net.nodes().keySet()) {
+                    owners.putIfAbsent(pos, net);
+                }
+            }
+        }
+    }
+
+    private boolean worksHere(Network net, long pos) {
+        if (!net.touchesForeignController()) {
+            return true;
+        }
+        java.util.Map<Long, Network> owners = sharedOwners.get(net.world().getUID());
+        Network owner = owners == null ? null : owners.get(pos);
+        return owner == null || owner == net;
+    }
+
+    private void forEachWorked(Network net, DeviceType type, java.util.function.LongConsumer action) {
+        net.forEach(type, (pos, t) -> {
+            if (worksHere(net, pos)) {
+                action.accept(pos);
+            }
+        });
+    }
+
     private void doTransfers(Network net) {
         int base = Settings.itemsPerOp();
         int ht = base * Settings.htMultiplier();
-        net.forEach(DeviceType.MVN_GRABBER, (pos, type) -> grabOnce(net, pos, base));
-        net.forEach(DeviceType.MVN_GRABBER_HT, (pos, type) -> grabOnce(net, pos, ht));
-        net.forEach(DeviceType.MVN_PUSHER, (pos, type) -> pushOnce(net, pos, base));
-        net.forEach(DeviceType.MVN_PUSHER_HT, (pos, type) -> pushOnce(net, pos, ht));
-        net.forEach(DeviceType.MVN_GREEDY_CELL, (pos, type) -> greedyTick(net, pos));
-        net.forEach(DeviceType.MVN_PURGER, (pos, type) -> purgeOnce(net, pos, base));
-        net.forEach(DeviceType.MVN_RECEIVER, (pos, type) -> bridgeOnce(net, pos, base));
-        net.forEach(DeviceType.MVN_TRANSMITTER, (pos, type) -> transmitOnce(net, pos, base));
-        net.forEach(DeviceType.MVN_LIQUID_PUMP, (pos, type) -> pumpTick(net, pos));
+        forEachWorked(net, DeviceType.MVN_GRABBER, pos -> grabOnce(net, pos, base));
+        forEachWorked(net, DeviceType.MVN_GRABBER_HT, pos -> grabOnce(net, pos, ht));
+        forEachWorked(net, DeviceType.MVN_PUSHER, pos -> pushOnce(net, pos, base));
+        forEachWorked(net, DeviceType.MVN_PUSHER_HT, pos -> pushOnce(net, pos, ht));
+        forEachWorked(net, DeviceType.MVN_GREEDY_CELL, pos -> greedyTick(net, pos));
+        forEachWorked(net, DeviceType.MVN_PURGER, pos -> purgeOnce(net, pos, base));
+        forEachWorked(net, DeviceType.MVN_RECEIVER, pos -> bridgeOnce(net, pos, base));
+        forEachWorked(net, DeviceType.MVN_TRANSMITTER, pos -> transmitOnce(net, pos, base));
+        forEachWorked(net, DeviceType.MVN_LIQUID_PUMP, pos -> pumpTick(net, pos));
     }
 
     private NodeBlob blobOf(Network net, long pos) {
@@ -187,6 +266,11 @@ public class NetworkTicker {
                 Block pBlock = net.block(pos);
                 for (BlockFace face : facesFor(pBlob)) {
                     Block target = pBlock.getRelative(face);
+                    // El desvio de sobrantes es un pusher mas: la misma puerta de proteccion que
+                    // pushOnce, o el sobrante de un grabber acabaria dentro del cofre de otro.
+                    if (denied(net, target)) {
+                        continue;
+                    }
                     if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
                         int unhoused = SlimefunBridge.insert(target, currentStack);
                         currentStack.setAmount(unhoused);
@@ -345,6 +429,20 @@ public class NetworkTicker {
         NodeBlob blob = blobOf(net, pos);
         if (blob == null) {
             return;
+        }
+
+        // Lo que un ciclo anterior no pudo devolver a la red espera aqui. Se reintenta primero y,
+        // mientras no se vacie, el pusher no saca nada mas: si no, ese buffer nunca se procesaba y
+        // los items quedaban atrapados en el bloque.
+        if (blob.transitBuffer != null && blob.transitBuffer.getAmount() > 0) {
+            int stuck = net.storage().deposit(blob.transitBuffer);
+            if (stuck > 0) {
+                blob.transitBuffer.setAmount(stuck);
+                NodeStore.put(net.block(pos), blob);
+                return;
+            }
+            blob.transitBuffer = null;
+            NodeStore.put(net.block(pos), blob);
         }
 
         boolean hasItems = blob.filterItems != null && !blob.filterItems.isEmpty();
@@ -565,26 +663,21 @@ public class NetworkTicker {
     }
 
     /**
-     * El puente inalambrico: el RECEPTOR tira de la red del TRANSMISOR enlazado hacia la suya.
+     * EN: Wireless Bridge: pulls matching filtered items from the linked Transmitter network into
+     * this Receiver's network. Only what passes the RECEIVER's filter crosses. An empty whitelist
+     * moves nothing (opening a bridge without deciding what crosses would merge two whole networks
+     * by accident); an empty blacklist is the explicit "everything". Greedy Cells of the remote
+     * network are not drained, the same rule Pushers follow, because their stock is reserved for
+     * the machines next to them.
      *
-     * Espejo del transmisor/receptor de NetworksV6, con el enlace guardado en el receptor (aqui
-     * el enlace se fija haciendo shift+click con el receptor sobre el transmisor). Solo cruzan
-     * items que pasen el filtro DEL RECEPTOR, y con filtro vacio no cruza nada: abrir un puente
-     * sin decidir que pasa mezclaria dos redes enteras sin querer.
-     */
-    /**
-     * EN: Wireless Bridge: pulls matching filtered items from the linked Transmitter network into this Receiver's network.
-     *
-     * ES: Puente inalámbrico: el Receptor extrae ítems filtrados de la red del Transmisor vinculado hacia la suya.
+     * ES: Puente inalámbrico: el Receptor extrae ítems filtrados de la red del Transmisor vinculado
+     * hacia la suya. Solo cruza lo que pase el filtro DEL RECEPTOR. Una whitelist vacía no mueve
+     * nada; una blacklist vacía es el "todo" explícito. Las Greedy Cells de la red remota no se
+     * vacían, igual que con los Pushers, porque su stock está reservado.
      */
     private void bridgeOnce(Network net, long pos, int rate) {
         NodeBlob blob = blobOf(net, pos);
-        if (blob == null || blob.txWorld == null) {
-            return;
-        }
-        boolean hasItems = blob.filterItems != null && !blob.filterItems.isEmpty();
-        boolean hasMats = blob.filterMaterials != null && !blob.filterMaterials.isEmpty();
-        if (!blob.filterBlacklist && !hasItems && !hasMats) {
+        if (blob == null || blob.txWorld == null || !bridgeFilterSet(blob)) {
             return;
         }
         UUID worldId;
@@ -616,15 +709,35 @@ public class NetworkTicker {
             return;
         }
         Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
-        ItemStack stack = remote.storage().withdraw(pred, rate);
+        ItemStack stack = remote.storage().withdraw(pred, rate, -1L, false);
         if (stack == null) {
             return;
         }
+        int moved = stack.getAmount();
         int leftover = net.storage().deposit(stack);
         if (leftover > 0) {
+            moved -= leftover;
             stack.setAmount(leftover);
-            remote.storage().deposit(stack);
+            int unreturned = remote.storage().deposit(stack);
+            if (unreturned > 0) {
+                // Ni la red local ni la remota lo admiten: al suelo junto al receptor, nunca al aire.
+                stack.setAmount(unreturned);
+                dropAt(net.block(pos), stack);
+            }
         }
+        if (moved > 0) {
+            net.throughput().recordFlow(pos, moved);
+        }
+    }
+
+    private static boolean hasFilter(NodeBlob blob) {
+        return (blob.filterMaterials != null && !blob.filterMaterials.isEmpty())
+                || (blob.filterItems != null && !blob.filterItems.isEmpty());
+    }
+
+    /** Whitelist con algo dentro, o blacklist (vacia = todo). Whitelist vacia = puente cerrado. */
+    private static boolean bridgeFilterSet(NodeBlob blob) {
+        return blob.filterBlacklist || hasFilter(blob);
     }
 
     /**
@@ -634,12 +747,7 @@ public class NetworkTicker {
      */
     private void transmitOnce(Network net, long pos, int rate) {
         NodeBlob blob = blobOf(net, pos);
-        if (blob == null || blob.txWorld == null) {
-            return;
-        }
-        boolean hasItems = blob.filterItems != null && !blob.filterItems.isEmpty();
-        boolean hasMats = blob.filterMaterials != null && !blob.filterMaterials.isEmpty();
-        if (!blob.filterBlacklist && !hasItems && !hasMats) {
+        if (blob == null || blob.txWorld == null || !bridgeFilterSet(blob)) {
             return;
         }
         UUID worldId;
@@ -668,14 +776,25 @@ public class NetworkTicker {
             return;
         }
         Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
-        ItemStack stack = net.storage().withdraw(pred, rate);
+        // Mismas reglas que bridgeOnce en sentido contrario: sin vaciar Greedy Cells y sin perder
+        // nada si ninguna de las dos redes acepta la vuelta.
+        ItemStack stack = net.storage().withdraw(pred, rate, -1L, false);
         if (stack == null) {
             return;
         }
+        int moved = stack.getAmount();
         int leftover = remote.storage().deposit(stack);
         if (leftover > 0) {
+            moved -= leftover;
             stack.setAmount(leftover);
-            net.storage().deposit(stack);
+            int unreturned = net.storage().deposit(stack);
+            if (unreturned > 0) {
+                stack.setAmount(unreturned);
+                dropAt(net.block(pos), stack);
+            }
+        }
+        if (moved > 0) {
+            net.throughput().recordFlow(pos, moved);
         }
     }
 
@@ -686,7 +805,7 @@ public class NetworkTicker {
      */
     private void doVacuum(Network net) {
         double radius = Settings.vacuumRadius();
-        net.forEach(DeviceType.MVN_VACUUM, (pos, type) -> {
+        forEachWorked(net, DeviceType.MVN_VACUUM, pos -> {
             NodeBlob blob = blobOf(net, pos);
             if (blob == null) {
                 return;
@@ -744,17 +863,23 @@ public class NetworkTicker {
             }
         };
 
-        net.forEach(DeviceType.MVN_CRAFTER, (pos, type) -> ticker.accept(pos));
-        net.forEach(DeviceType.MVN_SF_CRAFTER, (pos, type) -> ticker.accept(pos));
+        forEachWorked(net, DeviceType.MVN_CRAFTER, ticker::accept);
+        // sf-crafter.enabled=false ya impedia abrir el menu; ahora tambien detiene el autocrafteo
+        // de los que quedaron colocados, que era lo que el ajuste prometia.
+        if (Settings.sfCrafterEnabled()) {
+            forEachWorked(net, DeviceType.MVN_SF_CRAFTER, ticker::accept);
+        }
     }
 
     /**
-     * EN: Executes fluid pumping operations (DRAIN from world/cauldrons or FILL to cauldrons/containers).
-     * ES: Ejecuta operaciones de bombeo de fluidos (drenar o llenar).
-     */
-    /**
-     * Ticks a Liquid Pump node.
-     * Extracts water or lava source blocks directly from the block underneath the pump.
+     * EN: Ticks a Liquid Pump node: drains one water or lava SOURCE block directly below the pump
+     * into the network's fluid cells (1 source = 1,000 mB). The block is only removed if the whole
+     * 1,000 mB fit; {@link NetworkFluidStorage#deposit} is all-or-nothing, so a nearly full network
+     * can never keep part of the fluid and the source block at the same time.
+     *
+     * ES: Procesa una Bomba de Líquidos: drena un bloque FUENTE de agua o lava justo debajo hacia
+     * las celdas de fluidos de la red (1 fuente = 1.000 mB). El bloque solo desaparece si cupieron
+     * los 1.000 mB enteros.
      */
     private void pumpTick(Network net, long pos) {
         Block pumpBlock = net.block(pos);

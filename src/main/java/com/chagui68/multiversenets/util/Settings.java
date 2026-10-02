@@ -362,12 +362,4 @@ public final class Settings {
     public static long fluidCellCapacity() {
         return cfg != null ? Math.max(1000L, cfg.getLong("fluids.cell-capacity-mb", 64000L)) : 64000L;
     }
-
-    /**
-     * EN: Pumping speed in millibuckets (mB) per operation for Liquid Pumps.
-     * ES: Velocidad de bombeo en mB por operación para las Bombas de Líquidos.
-     */
-    public static long fluidPumpRate() {
-        return cfg != null ? Math.max(1L, cfg.getLong("fluids.pump-rate-mb", 1000L)) : 1000L;
-    }
 }

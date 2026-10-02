@@ -739,7 +739,15 @@ public class TerminalMenu extends MenuHolder {
                 int mb = "HONEY".equals(fluid) ? 250 : 1000;
                 Material empty = "HONEY".equals(fluid) ? Material.GLASS_BOTTLE : Material.BUCKET;
                 if (fluid != null && network.fluidStorage().deposit(fluid, mb) == 0) {
-                    inv.setItem(INPUT_SLOT, new ItemStack(empty));
+                    // Las botellas de miel apilan hasta 16: solo se vacia una por ciclo, el resto
+                    // del stack se queda en la ranura. Antes el stack entero se cambiaba por una
+                    // sola botella vacia y se perdian las demas.
+                    if (input.getAmount() > 1) {
+                        input.setAmount(input.getAmount() - 1);
+                        giveOrDrop(new ItemStack(empty));
+                    } else {
+                        inv.setItem(INPUT_SLOT, new ItemStack(empty));
+                    }
                 }
             } else {
                 int leftover = network.storage().deposit(input);

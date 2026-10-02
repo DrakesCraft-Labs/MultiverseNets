@@ -131,9 +131,10 @@ fluids:
   # [EN] Storage capacity in millibuckets (mB) per Quantum Fluid Cell (64,000 mB = 64 Buckets).
   # [ES] Capacidad de almacenamiento en mB por Celda Cuántica de Fluidos (64,000 mB = 64 Cubos).
   cell-capacity-mb: 64000
-  # [EN] Pumping speed in millibuckets (mB) per operation for Liquid Pumps (1,000 mB = 1 Bucket).
-  # [ES] Velocidad de bombeo en mB por operación para las Bombas de Líquidos (1,000 mB = 1 Cubo).
-  pump-rate-mb: 1000
+  # [EN] Liquid Pumps always drain one whole source block (1,000 mB) per transfer cycle
+  #      (network.op-interval-ticks.transfer); there is no separate pump rate.
+  # [ES] Las Bombas de Líquidos drenan un bloque fuente entero (1.000 mB) por ciclo de
+  #      transferencia (network.op-interval-ticks.transfer); no hay velocidad de bombeo aparte.
 
 # -------------------------------------------------------------------------------------
 #  Quantum Storage Cells / Celdas Cuánticas de Almacenamiento

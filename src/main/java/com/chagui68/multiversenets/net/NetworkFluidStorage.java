@@ -92,11 +92,17 @@ public class NetworkFluidStorage {
     }
 
     /**
-     * Deposits a given volume of fluid into available fluid cells.
+     * EN: Deposits a volume of fluid, all or nothing. Every caller (pump, terminal, input slot)
+     * consumes a whole bucket, bottle or source block only when the result is 0, so a partial fill
+     * used to keep part of the fluid in the cells AND the bucket in the player's hand.
+     *
+     * ES: Deposita un volumen de fluido, todo o nada. Cada llamante (bomba, terminal, ranura de
+     * entrada) solo consume el cubo, la botella o el bloque fuente si el resultado es 0, así que un
+     * llenado parcial dejaba parte del fluido en las celdas Y el cubo en la mano del jugador.
      *
      * @param fluidType Fluid type name (e.g. "WATER", "LAVA", "MILK", "HONEY")
      * @param amountMb  Volume to deposit in millibuckets (mB)
-     * @return Leftover volume in mB that could not fit into storage (0 if fully deposited).
+     * @return 0 if everything was stored, otherwise {@code amountMb} (nothing was stored).
      */
     public synchronized long deposit(String fluidType, long amountMb) {
         if (fluidType == null || amountMb <= 0) {
@@ -106,6 +112,9 @@ public class NetworkFluidStorage {
         long capacity = Settings.fluidCellCapacity();
         long remaining = amountMb;
         List<FluidCellRef> cells = loadCells();
+        if (spaceFor(target, cells, capacity) < amountMb) {
+            return amountMb;
+        }
 
         // Pass 1: Fill existing cells of matching fluid type
         for (FluidCellRef ref : cells) {
@@ -134,6 +143,18 @@ public class NetworkFluidStorage {
         }
 
         return remaining;
+    }
+
+    private static long spaceFor(String target, List<FluidCellRef> cells, long capacity) {
+        long space = 0L;
+        for (FluidCellRef ref : cells) {
+            if (ref.blob.fluidAmount <= 0 || ref.blob.fluidType == null) {
+                space += capacity;
+            } else if (target.equalsIgnoreCase(ref.blob.fluidType)) {
+                space += Math.max(0, capacity - ref.blob.fluidAmount);
+            }
+        }
+        return space;
     }
 
     /**

@@ -29,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class NetworkHologramManager {
 
-    private static final Map<Long, UUID> HOLOGRAM_ENTITIES = new ConcurrentHashMap<>();
+    private static final Map<String, UUID> HOLOGRAM_ENTITIES = new ConcurrentHashMap<>();
     private static NamespacedKey HOLO_KEY;
 
     private NetworkHologramManager() {}
@@ -49,7 +49,8 @@ public final class NetworkHologramManager {
         }
 
         Location controllerLoc = net.block(pos).getLocation();
-        UUID entityId = HOLOGRAM_ENTITIES.get(pos);
+        String key = key(world, pos);
+        UUID entityId = HOLOGRAM_ENTITIES.get(key);
         TextDisplay textDisplay = null;
 
         if (entityId != null) {
@@ -57,7 +58,7 @@ public final class NetworkHologramManager {
             if (entity instanceof TextDisplay td && entity.isValid()) {
                 textDisplay = td;
             } else {
-                HOLOGRAM_ENTITIES.remove(pos);
+                HOLOGRAM_ENTITIES.remove(key);
             }
         }
 
@@ -78,7 +79,7 @@ public final class NetworkHologramManager {
                 td.setPersistent(false);
                 td.getPersistentDataContainer().set(HOLO_KEY, PersistentDataType.BYTE, (byte) 1);
             });
-            HOLOGRAM_ENTITIES.put(pos, textDisplay.getUniqueId());
+            HOLOGRAM_ENTITIES.put(key, textDisplay.getUniqueId());
         }
 
         int nodeCount = net.size();
@@ -150,8 +151,13 @@ public final class NetworkHologramManager {
         textDisplay.text(text);
     }
 
+    /** Mundo + posicion: dos controladores en las mismas coordenadas de mundos distintos compartian holograma. */
+    private static String key(World world, long pos) {
+        return world.getUID() + "|" + pos;
+    }
+
     public static void removeHologram(World world, long pos) {
-        UUID entityId = HOLOGRAM_ENTITIES.remove(pos);
+        UUID entityId = world == null ? null : HOLOGRAM_ENTITIES.remove(key(world, pos));
         if (entityId != null && world != null) {
             Entity entity = world.getEntity(entityId);
             if (entity != null) {
@@ -174,7 +180,7 @@ public final class NetworkHologramManager {
     }
 
     public static void clearAll(MultiverseNets plugin) {
-        for (Map.Entry<Long, UUID> entry : HOLOGRAM_ENTITIES.entrySet()) {
+        for (Map.Entry<String, UUID> entry : HOLOGRAM_ENTITIES.entrySet()) {
             for (World world : plugin.getServer().getWorlds()) {
                 Entity entity = world.getEntity(entry.getValue());
                 if (entity != null) {

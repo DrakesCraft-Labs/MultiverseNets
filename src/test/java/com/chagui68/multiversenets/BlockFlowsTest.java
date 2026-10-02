@@ -595,11 +595,16 @@ class BlockFlowsTest {
 
     private void assertExtractsFromChest(String worldName, Material payload, int amount, String label) {
         WorldMock dimension = server.addSimpleWorld(worldName);
+        // Controlador y celda necesitan su blob, igual que al colocarlos de verdad. Sin el, el scan
+        // ve un "controller missing" y la red queda vacia; antes no se notaba porque el ticker moria
+        // en el holograma (no implementado en MockBukkit) y el test acababa como "skipped".
         Block ctrl = dimension.getBlockAt(0, 64, 0);
         ctrl.setType(DeviceType.MVN_CONTROLLER.material());
+        NodeStore.put(ctrl, NodeBlob.create(DeviceType.MVN_CONTROLLER.name()));
         plugin.networks().registerController(ctrl);
         Block cell = dimension.getBlockAt(1, 64, 0);
         cell.setType(DeviceType.MVN_CELL_T1.material());
+        NodeStore.put(cell, NodeBlob.create(DeviceType.MVN_CELL_T1.name()));
         plugin.networks().invalidateNear(cell);
         Block grabber = dimension.getBlockAt(0, 64, 1);
         grabber.setType(DeviceType.MVN_GRABBER_HT.material());

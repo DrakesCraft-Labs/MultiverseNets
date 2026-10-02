@@ -671,7 +671,12 @@ public class RequestTerminalMenu extends MenuHolder {
                     }
                 }
             }
-            if (result == null && stepOpt.blueprintData.output != null) {
+            // Misma regla que el Auto-Crafter (CraftingSupport.tryCraftBlueprint): fiarse de la
+            // salida guardada en el plano solo vale para recetas de Slimefun. Un plano vanilla cuya
+            // receta ya no resuelve no fabrica nada en vez de entregar su salida a ciegas.
+            if (result == null && stepOpt.blueprintData.output != null
+                    && (SlimefunBridge.isSlimefunItem(stepOpt.blueprintData.output)
+                    || SlimefunBridge.getId(stepOpt.blueprintData.output) != null)) {
                 result = stepOpt.blueprintData.output.clone();
             }
         } else if (stepOpt.vanillaRecipe != null) {

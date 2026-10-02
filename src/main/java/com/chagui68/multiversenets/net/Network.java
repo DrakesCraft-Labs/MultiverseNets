@@ -50,6 +50,8 @@ public class Network {
     private volatile java.util.UUID owner;
     /** How many links the last scan refused because the land was somebody else's. */
     private volatile int blockedByProtection;
+    /** True when the last scan ran into another network's controller, i.e. both share cables. */
+    private volatile boolean touchesForeignController;
     public String error;
 
     public Network(com.chagui68.multiversenets.MultiverseNets plugin, org.bukkit.World world, long controllerPos) {
@@ -119,6 +121,17 @@ public class Network {
         return blockedByProtection;
     }
 
+    /**
+     * EN: True when this network's cables reach another Controller. Both networks then index the
+     * same cables and devices, and the ticker must make sure each device still works only once.
+     *
+     * ES: True si los cables de esta red alcanzan otro Controlador. Ambas redes indexan entonces los
+     * mismos cables y dispositivos, y el ticker debe asegurar que cada dispositivo trabaje una vez.
+     */
+    public boolean touchesForeignController() {
+        return touchesForeignController;
+    }
+
     public boolean isDirty() {
         return dirty;
     }
@@ -164,6 +177,7 @@ public class Network {
         List<String> errors = new ArrayList<>();
         sfBarrels.clear();
         blockedByProtection = 0;
+        boolean foreignController = false;
 
         // No cargar chunks a la fuerza: si el controlador esta en uno sin cargar, la red se queda
         // como estaba y el proximo scan (o la carga del chunk) lo resuelve. Antes el BFS llamaba
@@ -247,6 +261,7 @@ public class Network {
                 }
                 if (type == DeviceType.MVN_CONTROLLER && next != controllerPos) {
                     errors.add("foreign controller at " + coordString(next));
+                    foreignController = true;
                     continue;
                 }
                 found.put(next, type);
@@ -266,6 +281,7 @@ public class Network {
             errors.add(blockedByProtection + " link(s) stopped at protected land");
         }
         this.error = String.join("; ", errors);
+        this.touchesForeignController = foreignController;
         this.version++;
         this.lastScanMs = System.currentTimeMillis();
         this.dirty = false;
