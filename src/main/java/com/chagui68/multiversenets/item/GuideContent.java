@@ -154,11 +154,15 @@ public final class GuideContent {
                 "Every deposit fills in this order: Greedy Cells whose filter matches, memory modules that "
                         + "already hold the item, Slimefun barrels, cells and barrels that hold it, free memory, "
                         + "empty Slimefun barrels, empty cells (they adopt the item) and finally Greedy Cells without "
-                        + "a filter. Quota Limiters cap everything. What does not fit goes back; nothing is deleted.",
+                        + "a filter. A Greedy Cell keeps 1 of each item defined in its filter, unless a Pusher whitelists "
+                        + "that item: then it goes to the cells. Quota Limiters cap everything. What does not fit goes "
+                        + "back; nothing is deleted.",
                 "Cada depósito llena en este orden: Greedy Cells cuyo filtro coincide, módulos de memoria que ya "
                         + "tienen el ítem, barriles de Slimefun, celdas y barriles que lo tienen, memoria libre, "
                         + "barriles de Slimefun vacíos, celdas vacías (adoptan el ítem) y por último Greedy Cells sin "
-                        + "filtro. Los Quota Limiters ponen tope a todo. Lo que no cabe vuelve; nada se borra.");
+                        + "filtro. Una Greedy Cell conserva 1 de cada ítem definido en su filtro, salvo que un Pusher "
+                        + "tenga ese ítem en su whitelist: entonces va a las celdas. Los Quota Limiters ponen tope a "
+                        + "todo. Lo que no cabe vuelve; nada se borra.");
         topic(Material.HOPPER, "Filters", "Filtros",
                 "Filters decide WHICH items move, never where to. Whitelist: only the listed items. Blacklist: "
                         + "everything except the listed items (they stay in the network). An empty whitelist on a "
@@ -388,9 +392,13 @@ public final class GuideContent {
                 "Exporta de la red a los contenedores y máquinas de al lado por LAS SEIS caras (sin selector de "
                         + "cara). Nunca a otro bloque de la red, nunca más de un stack por ranura.",
                 "The filter decides what leaves: empty whitelist = idle, blacklist = everything except the listed "
-                        + "items. A whitelist of several items shares the target's slots between them.",
+                        + "items. A whitelist of several items shares the target's slots between them. It can take "
+                        + "from Greedy Cells (they keep 1 of each defined item); an item in its whitelist is released "
+                        + "from Greedy Cells to the cells.",
                 "El filtro decide qué sale: whitelist vacía = inactivo, blacklist = todo menos lo listado. Una "
-                        + "whitelist de varios ítems reparte las ranuras del destino entre ellos.");
+                        + "whitelist de varios ítems reparte las ranuras del destino entre ellos. Puede sacar de las "
+                        + "Greedy Cells (conservan 1 de cada ítem definido); un ítem de su whitelist se libera de las "
+                        + "Greedy Cells hacia las celdas.");
         add(DeviceType.MVN_PUSHER_HT, Category.TRANSPORT, "Pusher Avanzado",
                 "Same as the Simple Pusher but 8 times faster, and with a face selected it delivers ONLY to that "
                         + "side. The right tool to feed one machine with its ingredients.",
