@@ -48,28 +48,35 @@ Las cantidades son los valores por defecto de `config.yml`; todas se pueden conf
 
 | Dispositivo | id · bloque | Qué hace | Cómo se usa |
 |---|---|---|---|
-| **Controlador de Red** | `mvn_controller` · Magnetita | La raíz de la red. Cada escaneo empieza aquí (en anchura por los bloques conectados, hasta `network.max-nodes`). Guarda a su dueño (quien lo colocó), muestra un holograma con estado, nodos y totales almacenados, y puede llevar una **Caché Virtual de CPU**. | Clic derecho: estado, uso de la caché, estado del router. Clic derecho con un Módulo de Caché para instalarlo. Un solo controlador por red: un segundo cableado a los mismos cables se reporta como `foreign controller` (ver [Buses compartidos](#buses-compartidos)). |
+| **Controlador de Red** | `mvn_controller` · Magnetita | La raíz de la red. Cada escaneo empieza aquí (en anchura por los bloques conectados, hasta `network.max-nodes`). Guarda a su dueño (quien lo colocó) y muestra un holograma con estado, nodos y totales almacenados. Los módulos de memoria ya **no** van en el controlador: van en un **DRAM Bay**. | Clic derecho: estado y estado del router. Un controlador antiguo que aún tenga un módulo dentro lo sigue usando; en su menú, clic en *Legacy Memory Module* lo saca **con sus ítems** para llevarlo a un DRAM Bay. Un solo controlador por red: un segundo cableado a los mismos cables se reporta como `foreign controller` (ver [Buses compartidos](#buses-compartidos)). |
 | **Cable de Red** | `mvn_cable` · Vidrio | Conecta dispositivos. Sin lógica propia. | Clic derecho para ver si llega a un controlador (y el tamaño de la red). Con un bloque en la mano, el clic derecho coloca el bloque. |
 | **Terminal de Red** | `mvn_terminal` · Faro | La cuadrícula de almacenamiento: todos los ítems de la red (caché, celdas, barriles, greedy cells, barriles de Slimefun) y una segunda página para fluidos. | Clic izquierdo saca 1, clic derecho un stack, shift+clic al inventario. Shift+clic izquierdo en tus ítems (o déjalos en la ranura de entrada) para guardarlos. Botones de búsqueda, orden y páginas. Los cubos y botellas de miel van al almacenamiento de fluidos. |
 | **Terminal Inalámbrico** | `mvn_wireless_terminal` · ítem (Estrella del Nether) | Abre el Terminal de Red a distancia. | Shift+clic derecho en un Controlador o Terminal para vincularlo, luego clic derecho al aire. Sin **Network Router** solo funciona en el mismo mundo y a `wireless.local-range-without-router` (64) bloques. Nunca durante 10 s tras un combate, y solo si puedes acceder al terreno de la red. |
 | **Network Router** | `mvn_router` · Pararrayos | Quita los límites del Terminal Inalámbrico para su red: cualquier distancia y cualquier mundo. | Conéctalo en cualquier punto de la red. |
 | **Network Monitor** | `mvn_monitor` · Nexo de reaparición | Panel de diagnóstico en vivo: nodos por tipo, uso de almacenamiento, errores. | Clic derecho; se actualiza mientras está abierto. |
 | **Network Probe** | `mvn_probe` · ítem (Catalejo) | Responde "¿esto está conectado?": tamaño de la red, posición del controlador, errores del escaneo y cortes por protección del bloque que pulses. | Clic derecho en cualquier bloque. |
-| **Módulos de Caché de CPU** | `mvn_cache_l1` · `_l2` · `_l3` · `_dram` · `_quantum` · ítems | Convierten el controlador en almacenamiento multi-ítem: 2.048 / 8.192 / 32.768 / 131.072 / 524.288 ítems en total, de cualquier mezcla de tipos. El contenido viaja dentro del ítem del controlador al romperlo. | Clic derecho al controlador con el módulo. Solo se aceptan mejoras; el módulo se consume y el inferior ya instalado no se devuelve. |
+
+### 🧠 Memoria: DRAM Bay y módulos
+
+| Dispositivo | id · bloque | Qué hace | Cómo se usa |
+|---|---|---|---|
+| **DRAM Bay** | `mvn_dram_bay` · Bombilla de cobre encerada | Bloque de red que aloja **un módulo de memoria**. El módulo es el almacenamiento: mientras está instalado, su stock forma parte de la red. Puedes poner tantos bays como quieras. | Clic derecho con un módulo en la mano (bay vacío) para instalarlo, o clic derecho para abrir su menú: ver el stock, instalar desde el cursor o con shift+clic, y **Eject Module**. Romperlo (o el Rake) suelta el bay y el módulo **con todo su stock**. |
+| **Módulos de memoria de ítems** | `mvn_cache_l1` · `_l2` · `_l3` · `_dram` · `_quantum` · ítems | Almacenamiento multi-ítem: 2.048 / 8.192 / 32.768 / 131.072 / 524.288 ítems en total (`virtual-cache.tier-1` … `tier-5`), de cualquier mezcla de tipos. | Instálalo en un DRAM Bay. **Al sacarlo se lleva todos sus ítems**: desaparecen de esa red y aparecen en la red del DRAM Bay donde lo instales. Mejorar un módulo cargado en la mesa de crafteo conserva sus ítems. |
+| **Fluid DRAM Module** | `mvn_fluid_dram` · ítem (Corazón del mar) | Módulo **exclusivo para fluidos**: guarda varios fluidos a la vez hasta `fluids.dram-capacity-mb` (512.000 mB = 512 cubos) en total. | Igual que los de ítems: va en un DRAM Bay, suma su capacidad al almacenamiento de fluidos de la red y al sacarlo se lleva sus fluidos a otra red. |
 
 ### 📦 Almacenamiento de ítems
 
 | Dispositivo | id · bloque | Qué hace | Cómo se usa |
 |---|---|---|---|
 | **Celda Cuántica T1–T6** | `mvn_cell_t1` … `mvn_cell_t6` · Terracota (normal, naranja, amarilla, lima, cian, morada) | Guarda **un tipo de ítem** cada una: 65.536 / 262.144 / 1.048.576 / 16.777.216 / 268.435.456 / 2.000.000.000 ítems. Una celda vacía adopta el primer tipo que no tenga otro sitio. | Conéctala. Clic derecho para ver o gestionar su contenido. Al romperla la carga queda en el ítem. Se mejora un nivel en la Quantum Workbench o en la mesa de crafteo (celda rodeada de 8 diamantes) conservando la carga. |
-| **Infinity Barrel** | `mvn_infinity_barrel` · Barril | Igual que una celda — un tipo de ítem — con `barrel.capacity` (2.000.000.000), pero **sigue registrado** a su ítem cuando se vacía. Las tolvas pueden meter el ítem registrado y sacarlo de uno en uno; las tolvas no pueden tocar ningún otro bloque de MultiverseNets. | Clic derecho: clic en *Set Item* con un ítem en el cursor para registrarlo; clic derecho en *Set Item* con el cursor vacío borra el registro (solo si está vacío). |
+| **Infinity Barrel** | `mvn_infinity_barrel` · Barril | Igual que una celda — un tipo de ítem — con `barrel.capacity` (2.000.000.000), pero **sigue registrado** a su ítem cuando se vacía. Los ítems con id propio (Slimefun y otros plugins) se reconocen por su id y su texto visible, así un ítem que sacas siempre vuelve a entrar aunque su nombre o lore se hayan guardado de otra forma. | Clic derecho: clic en *Set Item* con un ítem en el cursor para registrarlo; clic derecho en *Set Item* con el cursor vacío borra el registro (solo si está vacío). Las tolvas **no** interactúan con él (ver abajo). |
 | **Greedy Cell** | `mvn_greedy_cell` · Bloque de slime | Con filtro: un **sumidero prioritario**. Los ítems que entran y pasan su filtro van a ella antes que a cualquier otro almacenamiento; cada ciclo extrae hasta 512 más de la red y empuja hasta 256 a los contenedores vecinos **que no son de la red** (cofres, máquinas de Slimefun). Guarda varios tipos, hasta `greedy.capacity` (262.144) en total. Sin filtro: almacenamiento de desbordamiento, solo cuando todo lo demás está lleno. | Clic derecho para poner el filtro y ver su búfer. Su stock está reservado: ni los Pushers ni el puente inalámbrico sacan ítems de una Greedy Cell (terminales y crafteo sí). |
 | **Quantum Workbench** | `mvn_quantum_workbench` · Bloque de coral cerebro | Sube una Celda Cuántica T1–T5 al siguiente nivel conservando la carga. | Celda en el centro, 8 diamantes alrededor, pulsa *Entangle & Upgrade* y recoge el resultado. |
 
 ### 💧 Fluidos
 
-Los fluidos tienen su propio almacenamiento, separado de los ítems, y solo en Celdas Cuánticas de
-Fluidos.
+Los fluidos tienen su propio almacenamiento, separado de los ítems: las Celdas Cuánticas de Fluidos y
+los Fluid DRAM Modules instalados en DRAM Bays.
 
 | Dispositivo | id · bloque | Qué hace | Cómo se usa |
 |---|---|---|---|
@@ -80,10 +87,10 @@ Fluidos.
 
 | Dispositivo | id · bloque | Qué hace | Cómo se usa |
 |---|---|---|---|
-| **Simple Grabber** | `mvn_grabber` · Observador | Importa de los contenedores vecinos a la red: hasta 128 ítems de un tipo por ciclo, por las seis caras. | Clic derecho para el filtro (whitelist/blacklist). Filtro vacío = todo. |
+| **Simple Grabber** | `mvn_grabber` · Observador | Importa de los contenedores vecinos a la red: hasta 128 ítems de un tipo por ciclo, por **las seis caras**. De un horno solo saca el resultado. | Clic derecho para el filtro (whitelist/blacklist). Filtro vacío = todo. |
 | **Advanced Grabber** | `mvn_grabber_ht` · Pistón pegajoso | Igual, ×8 (`transfer.ht-multiplier`): 1.024 por ciclo, y se puede limitar a **una cara**. | Menú de filtro + selector de cara. |
-| **Simple Pusher** | `mvn_pusher` · Diana | Exporta de la red a los contenedores vecinos: hasta 128 ítems de un tipo por ciclo. No hace nada si no tiene un contenedor al lado. | El filtro decide qué sale. **Whitelist vacía = inactivo** (un pusher recién puesto nunca vacía la red); blacklist vacía = cualquier cosa. |
-| **Advanced Pusher** | `mvn_pusher_ht` · Pistón | Igual, ×8, con selección de cara. | Menú de filtro + selector de cara. |
+| **Simple Pusher** | `mvn_pusher` · Diana | Exporta de la red a los contenedores vecinos: hasta 128 ítems por ciclo, por **las seis caras** (no tiene selector de cara: si quieres una sola, usa el Advanced Pusher). Nunca mete nada en otro bloque de la red. | El filtro decide **qué ítems** salen, no a dónde. **Whitelist vacía = inactivo** (un pusher recién puesto nunca vacía la red); **blacklist = todo menos lo listado**: lo que pongas en la blacklist se queda en la red. |
+| **Advanced Pusher** | `mvn_pusher_ht` · Pistón | Igual, ×8, y con el selector de cara **solo** entrega a ese lado. | Menú de filtro + selector de cara. Para una máquina, elige la cara de la máquina. |
 | **Network Vacuum** | `mvn_vacuum` · Esponja | Cada 10 ticks recoge los ítems del suelo en `vacuum.radius` (4 bloques) hacia la red. | Filtro opcional. Lo que no cabe se queda en el suelo. |
 | **Network Purger** | `mvn_purger` · Bloque de magma | Borra hasta 128 ítems por ciclo que pasen su filtro. | **Sin filtro no borra nada**, a propósito. |
 | **Network Quota Limiter** | `mvn_limiter` · Diana | Limita cuánto de un ítem puede guardar la red. Todo depósito (grabbers, vacuum, terminal, resultados de crafteo, puente inalámbrico) se detiene en el tope. | Clic derecho: ítem objetivo, límite y activado/desactivado. Varios limitadores sobre el mismo ítem: gana el más bajo. |
@@ -93,7 +100,27 @@ Fluidos.
 Contenedores con los que trabajan Grabbers, Pushers y Greedy Cells: cofres, cofres trampa, barriles,
 tolvas, dispensadores, soltadores, hornos, altos hornos, ahumadores, soportes de pociones, estanterías
 cinceladas, cajas de shulker y — con Slimefun instalado — máquinas de Slimefun (solo las ranuras que
-la máquina declara de entrada/salida).
+la máquina declara de entrada/salida). Nunca otro bloque de MultiverseNets.
+
+**Cómo entrega un Pusher** (pensado para alimentar máquinas como una Fundición de Slimefun):
+
+* Como mucho **un stack por ranura**. Antes un ciclo de 128 o 1.024 ítems podía acabar en una sola
+  ranura y lo que pasaba de un stack se perdía: eso es lo que vaciaba redes enteras.
+* Con una **whitelist de varios ítems** (p. ej. los tres ingredientes de una aleación), cada ítem
+  recibe su parte de las ranuras del destino (9 ranuras / 3 ingredientes = 3 cada uno) y se sirven por
+  turnos en el mismo ciclo. Así el primer ingrediente ya no llena la máquina y bloquea la receta.
+* En un **horno**, alto horno o ahumador: desde arriba todo va a la entrada; desde un lado el
+  combustible va a su ranura y lo demás a la entrada. Nunca a la ranura de resultado.
+* Lo que no cabe vuelve a la red; nada se pierde.
+
+**Consejo para máquinas que reciben y devuelven en el mismo bloque** (la Fundición mete el resultado
+en el dispensador si no tiene cofre de salida): pon un cofre de salida, apunta el Advanced Grabber a
+ese cofre y el Advanced Pusher al dispensador. Si el grabber mira al dispensador, también sacará los
+ingredientes que acabas de meter.
+
+**Tolvas:** las tolvas (y vagonetas con tolva) **no interactúan con ningún bloque de MultiverseNets**,
+ni para meter ni para sacar. Antes una tolva encima de un Infinity Barrel podía borrar su stack
+entero.
 
 ### 🛠️ Crafteo
 
@@ -101,11 +128,11 @@ la máquina declara de entrada/salida).
 |---|---|---|---|
 | **Blueprint** | `mvn_blueprint` · ítem (Libro) | Una receta: cuadrícula 3×3 + resultado en su PDC. Craftear nunca lo consume. | Codifícalo en un Recipe Encoder e instálalo en un crafter. Instalarlo lo mueve al crafter; quitarlo, reemplazarlo o *Clear All* lo devuelve. |
 | **Recipe Encoder** | `mvn_encoder` · Mesa de herrería | Monta una receta en una plantilla 3×3 (hacer clic solo marca huecos, no gasta ítems) y la escribe en un Blueprint (en blanco o ya codificado). | Rellena la plantilla, pon un Blueprint en la ranura azul y pulsa *Encode*. Clic en un Blueprint codificado carga su receta en la plantilla. Los Blueprints que dejes en sus ranuras se guardan en el bloque (solo un jugador a la vez los ve). |
-| **Slimefun Recipe Encoder** | `mvn_sf_encoder` · Mesa de encantamientos | Igual para recetas de Slimefun. | Necesita Slimefun; se desactiva con `sf-encoder.enabled`. |
-| **Auto-Crafter** | `mvn_crafter` · Mesa de crafteo | Cada 20 ticks intenta una vez cada Blueprint vanilla instalado (hasta `crafter.max-recipes`, 18). Todo o nada: si falta un ingrediente no se toca nada, y si el resultado no cabe el crafteo entero se deshace. | Clic derecho y clic en los Blueprints para instalarlos. |
-| **Slimefun Auto-Crafter** | `mvn_sf_crafter` · Obsidiana llorosa | Igual, solo Blueprints de Slimefun. | `sf-crafter.enabled: false` lo desactiva por completo (menú y crafteo). |
+| **Slimefun Recipe Encoder** | `mvn_sf_encoder` · Mesa de encantamientos | Igual para recetas de Slimefun. También guarda en el bloque los Blueprints que dejes en sus ranuras, así no hay que traer planos en blanco cada vez. | Necesita Slimefun; se desactiva con `sf-encoder.enabled`. |
+| **Auto-Crafter** | `mvn_crafter` · Mesa de crafteo | Cada 20 ticks intenta una vez cada Blueprint vanilla instalado (hasta `crafter.max-recipes`, 18). Todo o nada: si falta un ingrediente no se toca nada, y si el resultado no cabe el crafteo entero se deshace. | Clic derecho y clic en los Blueprints para instalarlos. Rechaza Blueprints de Slimefun. |
+| **Slimefun Auto-Crafter** | `mvn_sf_crafter` · Obsidiana llorosa | Igual, y acepta **Blueprints de Slimefun y vanilla**: puedes mezclar ambos en la misma máquina. | `sf-crafter.enabled: false` lo desactiva por completo (menú y crafteo). |
 | **Request Crafter** | `mvn_request_crafter` · Mesa de flechas | Guarda Blueprints vanilla que **solo** se craftean bajo demanda desde un Request Terminal (nunca automáticamente). | Instala Blueprints igual que en un Auto-Crafter. |
-| **Slimefun Request Crafter** | `mvn_sf_request_crafter` · Pilar de púrpura | Igual para Blueprints de Slimefun. | — |
+| **Slimefun Request Crafter** | `mvn_sf_request_crafter` · Pilar de púrpura | Igual, con Blueprints de Slimefun y vanilla. | — |
 | **Request Terminal** | `mvn_request_terminal` · Atril | Lista todo lo que pueden fabricar los Request Crafters de la red y lo craftea bajo demanda, resolviendo cadenas (troncos → tablones → mesa de crafteo) con el stock de la red. | Clic izquierdo 1 lote, shift+clic izquierdo 10, clic derecho 64, shift+clic derecho pide un número por chat. Alterna la entrega a tu inventario o a la red. |
 | **Network Crafting Grid** | `mvn_crafting_grid` · Mesa de cartografía | Una mesa de crafteo que saca los ingredientes de la red; la plantilla queda guardada en el bloque. | Clic derecho, monta la plantilla, craftea. |
 
@@ -115,6 +142,15 @@ la máquina declara de entrada/salida).
 |---|---|---|---|
 | **Configuration Wrench** | `mvn_configurator` · ítem (Comparador) | Copia un filtro (plantillas exactas, materiales y modo whitelist/blacklist) de un dispositivo a otro. | Shift+clic derecho en un dispositivo con filtro para copiar, clic derecho en otro para pegar. |
 | **Network Rake** | `mvn_rake` · ítem (Arbusto seco) | Desmonta un nodo al instante y te lo devuelve con su estado (filtro, Blueprints, enlace). 250 usos (`rake.uses`). | Clic derecho en un nodo. Rechaza controladores y almacenamientos que aún tengan ítems o fluido. |
+
+### 🐔 GeneticChickengineering
+
+| Dispositivo | id · bloque | Qué hace | Cómo se usa |
+|---|---|---|---|
+| **Genetic Chicken Sorter** | `mvn_chicken_sorter` · Bala de heno | Máquina dedicada **solo** a los pollos de bolsillo del addon GeneticChickengineering. Lee sus genes y mueve únicamente los pollos que cumplen **todas** sus reglas; cualquier otro ítem se ignora. Hasta 16 pollos por ciclo. | Clic derecho. **Push**: de la red al bloque al que mira (p. ej. un Roost o una máquina del addon). **Pull**: de ese bloque a la red. Reglas: lista de productos (clic con un pollo en el cursor o shift+clic a uno del inventario; vacía = cualquiera), nivel mínimo/máximo (genes recesivos; especies especiales 7-9), fuerza de ADN mínima (0-6), solo genes puros (sin Aa), ADN conocido/desconocido y edad (adulto/bebé). Selector de cara. **Empieza parado**: actívalo cuando esté configurado. |
+
+Con este addon instalado, cada pollo es un ítem único (lleva su propio ADN). La red ya no fusiona dos
+pollos distintos en un solo stack: antes un pollo podía salir con el ADN de otro.
 
 Dispositivos con filtro: Grabbers, Pushers, Vacuum, Purger, Greedy Cell, Transmisor y Receptor.
 Todos admiten modo whitelist y blacklist, y en los menús de Grabber/Pusher hacer clic en el botón de
@@ -147,23 +183,23 @@ consulta los **Quota Limiters** y luego llena en este orden:
 | # | A dónde van los ítems | Condición |
 |---|---|---|
 | 1 | **Greedy Cells** | su filtro coincide, o ya guardan ese ítem |
-| 2 | **Caché Virtual de CPU** | ya guarda ese tipo de ítem |
+| 2 | **Módulos de memoria** (DRAM Bays) | ya guardan ese tipo de ítem |
 | 3 | **Barriles de Slimefun** | ya guardan ese tipo de ítem |
 | 4 | **Celdas Cuánticas / Infinity Barrels** | ya guardan ese tipo de ítem |
-| 5 | **Caché Virtual de CPU** | espacio libre, tipo nuevo |
+| 5 | **Módulos de memoria** (DRAM Bays) | espacio libre, tipo nuevo |
 | 6 | **Barriles de Slimefun** | vacíos |
 | 7 | **Celdas Cuánticas / Infinity Barrels** | vacías (la celda adopta el tipo) |
 | 8 | **Greedy Cells sin filtro** | desbordamiento general |
 
 Lo que no cabe vuelve a quien lo depositó (nunca se borra).
 
-Las retiradas leen en este orden: Caché Virtual de CPU → Celdas Cuánticas / Infinity Barrels →
+Las retiradas leen en este orden: módulos de memoria → Celdas Cuánticas / Infinity Barrels →
 barriles de Slimefun → Greedy Cells. Los Pushers, la succión de la propia Greedy Cell y el puente
 inalámbrico **se saltan las Greedy Cells**, así el stock reservado para una línea de máquinas nunca
 se exporta a otro sitio; terminales, crafteo y la API sí pueden usarlo.
 
-Una retirada devuelve siempre **un solo** tipo de ítem (el primero que coincide); por eso un pusher
-con un filtro de cinco ítems exporta uno de ellos por ciclo.
+Una retirada devuelve siempre **un solo** tipo de ítem (el primero que coincide). Un pusher con una
+whitelist de varios ítems hace una retirada por ítem, por turnos, dentro del mismo ciclo.
 
 ### 3. Un ciclo, paso a paso
 
@@ -171,8 +207,9 @@ Cada 5 ticks el ticker ejecuta esto por red (cada familia con su intervalo confi
 
 | Intervalo | Dispositivo | Por dispositivo |
 |---|---|---|
-| transfer (5 t) | Grabber / Advanced Grabber | Hasta 128 / 1.024 de un tipo de la primera cara que dé algo. Si la red rechaza parte: primero se ofrece directamente a los Pushers cuyo filtro lo acepta, luego vuelve al contenedor de origen, y solo si también está lleno espera en el **búfer de tránsito** del grabber (el grabber se pausa hasta vaciarlo; el búfer sobrevive a romper el bloque). |
-| transfer | Pusher / Advanced Pusher | Solo con un contenedor al lado: saca hasta 128 / 1.024 de un tipo y los mete en los contenedores vecinos; lo que no cabe vuelve a la red, o espera en el búfer de tránsito del pusher si la red se llenó entretanto (se reintenta primero en el siguiente ciclo). |
+| transfer (5 t) | Grabber / Advanced Grabber | Hasta 128 / 1.024 de un tipo de la primera cara que dé algo. Si la red rechaza parte: primero se ofrece directamente a los Pushers cuyo filtro lo acepta y, si sigue sobrando, espera en el **búfer de tránsito** del grabber (el grabber se pausa hasta vaciarlo; el búfer sobrevive a romper el bloque). Nunca se devuelve a la máquina: sus ranuras de entrada lo volverían a procesar. |
+| transfer | Pusher / Advanced Pusher | Solo con un contenedor al lado: saca hasta 128 / 1.024 ítems (una whitelist de varios ítems, por turnos) y los mete en los contenedores vecinos con las reglas de arriba; lo que no cabe vuelve a la red, o espera en el búfer de tránsito del pusher si la red se llenó entretanto (se reintenta primero en el siguiente ciclo). |
+| transfer | Genetic Chicken Sorter | Hasta 16 pollos que cumplan sus reglas, en el sentido elegido (push/pull). |
 | transfer | Greedy Cell | Extrae hasta 512 ítems coincidentes, empuja hasta 256 a contenedores vecinos que no son de la red. |
 | transfer | Purger | Borra hasta 128 ítems coincidentes (solo con filtro). |
 | transfer | Wireless Receiver / Transmitter | Trae / envía hasta 128 ítems coincidentes por el puente (ver abajo). |
@@ -221,23 +258,28 @@ reportan como `foreign controller at x,y,z`. Mientras dure:
   redes (orden estable por mundo y posición del controlador). Antes cada grabber, pusher, purgador,
   bomba y crafter compartido trabajaba dos veces por ciclo.
 * Las celdas compartidas se ven desde ambos terminales.
-* Cada controlador conserva su propia Caché Virtual de CPU, que solo ve su red.
+* Los DRAM Bays compartidos se ven desde ambas redes, igual que las celdas. El módulo antiguo de un
+  controlador solo lo ve su propia red.
 
 Lo limpio es tener un controlador por red, y usar un par Transmisor/Receptor si de verdad quieres que
 dos redes intercambien ítems.
 
 ### 6. Fluidos
 
-El almacenamiento de fluidos es aparte: solo las Quantum Fluid Cells guardan fluidos, y solo los
-mueven la Liquid Pump, la página de fluidos del Terminal, su ranura de entrada y los clics directos a
-una celda de fluidos. Los depósitos son **todo o nada**: un cubo, una botella o un bloque fuente solo
+El almacenamiento de fluidos es aparte: lo forman las Quantum Fluid Cells y los Fluid DRAM Modules
+(en DRAM Bays), y solo lo mueven la Liquid Pump, la página de fluidos del Terminal, su ranura de
+entrada y los clics directos a una celda de fluidos. Un depósito llena primero las celdas que ya
+tienen ese fluido, luego los Fluid DRAM y por último las celdas vacías. Los depósitos son **todo o nada**: un cubo, una botella o un bloque fuente solo
 se consume si cabe su volumen entero, así una red casi llena nunca se queda con el fluido y el cubo.
 
 ### 7. No se pierde nada, no se duplica nada
 
-* Romper un nodo guarda su estado en el ítem (carga de la celda, contenido de la caché, filtros, cara,
-  búfer de tránsito, Blueprints, plantilla, enlace del puente, limitador, fluido, filtro de la bomba)
-  y colocarlo lo restaura. El Rake hace lo mismo.
+* Romper un nodo guarda su estado en el ítem (carga de la celda, filtros, cara, búfer de tránsito,
+  Blueprints, plantilla, enlace del puente, limitador, fluido, filtro de la bomba, reglas del
+  clasificador de pollos) y colocarlo lo restaura. El Rake hace lo mismo. Un DRAM Bay suelta su módulo
+  aparte, con todo su stock dentro.
+* Los pushers nunca dejan más de un stack en una ranura y nunca meten nada en otro nodo de la red.
+* Las tolvas no pueden tocar ningún dispositivo.
 * Todos los menús tienen protección anti-dupe y devuelven al cerrar lo que quede en ranuras reales.
 * El crafteo es todo o nada, también cuando solo cabe parte del resultado.
 * Los nodos son inmunes a pistones y explosiones.
@@ -264,7 +306,13 @@ el acceso de jugadores).
 ## 🍳 Recetas (mesa de crafteo)
 
 Cada dispositivo se fabrica en una mesa de crafteo 3×3 estándar. `·` marca un hueco vacío. La lista
-completa con la función de cada ítem está en [Recetas y funciones](Recipes.md). Los tres dispositivos
+completa con la función de cada ítem está en [Recetas y funciones](Recipes.md).
+
+Cuando una receta pide **otro dispositivo** (celda anterior, módulo anterior, cable, celda de fluidos,
+Advanced Pusher), tiene que ser ese dispositivo: el material simple (terracota, lingote de cobre,
+vidrio…) no vale. Las mejoras de celdas y de módulos conservan su carga; cualquier otra receta rechaza
+un dispositivo que aún guarde algo, así nada se pierde crafteando. Y ningún dispositivo sirve como
+ingrediente de una receta vanilla (un Terminal Inalámbrico ya no se gasta como Estrella del Nether). Los tres dispositivos
 de Slimefun (Slimefun Recipe Encoder, Slimefun Auto-Crafter, Slimefun Request Crafter) solo tienen
 receta mientras `sf-encoder.enabled` / `sf-crafter.enabled` estén en `true`.
 
@@ -274,7 +322,7 @@ receta mientras `sf-encoder.enabled` / `sf-crafter.enabled` estén en `true`.
 | Cable ×16 | <pre>G G G<br/>G R G<br/>G G G</pre> | G = Vidrio · R = Redstone |
 | Terminal | <pre>G E G<br/>E B E<br/>G E G</pre> | G = Vidrio · E = Perla de ender · B = Faro |
 | Celda T1 | <pre>G G G<br/>G D G<br/>G G G</pre> | G = Vidrio · D = Diamante |
-| Celda Tn+1 | <pre>D D D<br/>D P D<br/>D D D</pre> | D = Diamante · P = Celda anterior (ítem exacto) |
+| Celda Tn+1 | <pre>D D D<br/>D P D<br/>D D D</pre> | D = Diamante · P = Celda anterior (con o sin carga; la conserva) |
 | Simple Grabber | <pre>I O I<br/>O R O<br/>I O I</pre> | I = Lingote de hierro · O = Observador · R = Bloque de redstone |
 | Simple Pusher | <pre>I D I<br/>D R D<br/>I D I</pre> | I = Lingote de hierro · D = Soltador · R = Bloque de redstone |
 | Network Vacuum | <pre>S R S<br/>R H R<br/>S R S</pre> | S = Hilo · R = Redstone · H = Tolva |
@@ -297,10 +345,13 @@ receta mientras `sf-encoder.enabled` / `sf-crafter.enabled` estén en `true`.
 | Infinity Barrel | <pre>N D N<br/>D B D<br/>N D N</pre> | N = Lingote de netherita · D = Bloque de diamante · B = Barril |
 | Network Router | <pre>· L ·<br/>· C ·<br/>· R ·</pre> | L = Pararrayos · C = Cable de Red · R = Bloque de redstone |
 | L1 CPU Cache | <pre>C R C<br/>R C R<br/>C R C</pre> | C = Lingote de cobre · R = Redstone |
-| L2 CPU Cache | <pre>G L G<br/>L P L<br/>G L G</pre> | G = Lingote de oro · L = Lapislázuli · P = L1 CPU Cache |
+| L2 CPU Cache | <pre>G L G<br/>L P L<br/>G L G</pre> | G = Lingote de oro · L = Lapislázuli · P = L1 CPU Cache (conserva sus ítems) |
 | L3 CPU Cache | <pre>D A D<br/>A P A<br/>D A D</pre> | D = Diamante · A = Fragmento de amatista · P = L2 CPU Cache |
 | DRAM Module | <pre>N E N<br/>E P E<br/>N E N</pre> | N = Lingote de netherita · E = Ojo de ender · P = L3 CPU Cache |
 | Quantum Cache Matrix | <pre>N S N<br/>S P S<br/>N S N</pre> | N = Bloque de netherita · S = Estrella del Nether · P = DRAM Module |
+| DRAM Bay | <pre>I Q I<br/>R C R<br/>I Q I</pre> | I = Lingote de hierro · Q = Cuarzo · R = Redstone · C = Bloque de cobre |
+| Fluid DRAM Module | <pre>D B D<br/>F E F<br/>D B D</pre> | D = Diamante · B = Cubo · E = Ojo de ender · F = Quantum Fluid Cell (vacía) |
+| Genetic Chicken Sorter | <pre>F E F<br/>C P C<br/>F E F</pre> | F = Pluma · E = Huevo · C = Comparador · P = Advanced Pusher |
 | Slimefun Recipe Encoder | <pre>E P E<br/>P B P<br/>E P E</pre> | E = Perla de ender · P = Papel · B = Mesa de encantamientos |
 | Network Quota Limiter | <pre>R C R<br/>C T C<br/>R C R</pre> | R = Redstone · C = Comparador · T = Diana |
 | Quantum Fluid Cell | <pre>G B G<br/>G L G<br/>G G G</pre> | G = Vidrio · B = Cubo · L = Bloque de lapislázuli |
@@ -316,7 +367,7 @@ receta mientras `sf-encoder.enabled` / `sf-crafter.enabled` estén en `true`.
 |---|---|---|
 | `/mvnets help` | Lista de comandos | `multiversenets.use` |
 | `/mvnets info` | Versión | `multiversenets.use` |
-| `/mvnets guide [en\|es\|both]` | Libro guía interactivo | `multiversenets.use` |
+| `/mvnets guide [en\|es]` | Abre el menú de la guía: cada dispositivo con su receta, qué hace y cómo se usa, más cómo funcionan las redes. Botón para cambiar entre inglés y español | `multiversenets.use` |
 | `/mvnets devices` | Lista los ids de dispositivos | `multiversenets.use` |
 | `/mvnets give <id> [n]` | Da un dispositivo | `multiversenets.admin` |
 | `/mvnets doctor` | Reescanea y diagnostica todas las redes (y dice si la integración con Slimefun está activa) | `multiversenets.admin` |
@@ -341,9 +392,10 @@ español):
 | `transfer.items-per-op` | 128 | Ítems por operación de Grabber/Pusher/Purger/puente |
 | `transfer.ht-multiplier` | 8 | Multiplicador de los Grabbers/Pushers avanzados |
 | `cells.capacities` | 65.536 … 2.000.000.000 | Capacidad por nivel de celda |
-| `virtual-cache.tier-1` … `tier-5` | 2.048 … 524.288 | Capacidad de la caché de CPU |
+| `virtual-cache.tier-1` … `tier-5` | 2.048 … 524.288 | Capacidad de cada nivel de módulo de memoria de ítems |
 | `greedy.capacity` / `barrel.capacity` | 262.144 / 2.000.000.000 | Capacidad de Greedy Cell / Infinity Barrel |
 | `fluids.cell-capacity-mb` | 64.000 | Capacidad de la celda de fluidos |
+| `fluids.dram-capacity-mb` | 512.000 | Capacidad total de un Fluid DRAM Module |
 | `vacuum.radius` | 4.0 | Radio del vacuum |
 | `crafter.max-recipes` | 18 | Blueprints por crafter |
 | `wireless.local-range-without-router` | 64 | Alcance del Terminal Inalámbrico sin Router |
@@ -388,7 +440,7 @@ integración está activa.
 | Permisos | `multiversenets.*` | `networks.*` |
 | Ítems | propios, por PDC, con recetas vanilla | los de Slimefun (`NTW_*`) |
 
-Networks no registra recetas vanilla (las suyas van por la mesa de Slimefun), así que las 43 de aquí
+Networks no registra recetas vanilla (las suyas van por la mesa de Slimefun), así que las 46 de aquí
 tampoco chocan. Cinco tests en `NetworksCoexistenceTest` fijan los identificadores, porque lo que
 rompe la convivencia es un identificador renombrado sin querer, no el código.
 

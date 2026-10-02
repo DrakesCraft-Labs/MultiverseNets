@@ -193,9 +193,9 @@ public class CrafterMenu extends MenuHolder {
                 .decoration(TextDecoration.ITALIC, false));
         if (sfMachine) {
             metaHelp.lore(List.of(
-                    Component.text("• Encode recipes using the Slimefun Recipe Encoder.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                    Component.text("• Shift-Click or place Slimefun Blueprints here to install.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                    Component.text("• Only Slimefun blueprints are accepted by this machine.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("• Encode recipes with the Slimefun or the vanilla Recipe Encoder.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("• Shift-Click or place Blueprints here to install.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                    Component.text("• Accepts both Slimefun and vanilla blueprints.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
                     Component.text("• Click any installed recipe above to uninstall it.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false)));
         } else {
             metaHelp.lore(List.of(
@@ -245,11 +245,9 @@ public class CrafterMenu extends MenuHolder {
             }
             DeviceType devType = NodeStore.getType(block);
             boolean isSfMachine = devType != null && devType.isSlimefunCrafter();
+            // El crafter de Slimefun es un superconjunto: acepta recetas de Slimefun y vanilla. El
+            // estandar sigue sin poder craftear recetas de Slimefun.
             boolean isSfRec = isSlimefunRecipe(data, mover);
-            if (isSfMachine && !isSfRec) {
-                player.sendMessage(Text.msg("Slimefun Crafters only accept Slimefun recipes. Use a standard Auto-Crafter for vanilla recipes.", NamedTextColor.RED));
-                return;
-            }
             if (!isSfMachine && isSfRec) {
                 player.sendMessage(Text.msg("Standard Crafters cannot craft Slimefun recipes. Use a Slimefun Auto-Crafter.", NamedTextColor.RED));
                 return;
@@ -326,17 +324,10 @@ public class CrafterMenu extends MenuHolder {
                 boolean isSfMachine = devType != null && devType.isSlimefunCrafter();
                 if (data != null) {
                     boolean isSfRec = isSlimefunRecipe(data, cursor);
-                    if (isSfMachine && !isSfRec) {
-                        player.sendMessage(Text.msg("Slimefun Crafters only accept Slimefun recipes. Use a standard Auto-Crafter for vanilla recipes.", NamedTextColor.RED));
-                        return;
-                    }
                     if (!isSfMachine && isSfRec) {
                         player.sendMessage(Text.msg("Standard Crafters cannot craft Slimefun recipes. Use a Slimefun Auto-Crafter.", NamedTextColor.RED));
                         return;
                     }
-                } else if (legacyKey != null && isSfMachine) {
-                    player.sendMessage(Text.msg("Slimefun Crafters only accept Slimefun blueprints.", NamedTextColor.RED));
-                    return;
                 }
 
                 if (raw < total) {

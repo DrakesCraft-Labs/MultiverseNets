@@ -7,6 +7,12 @@ transfer cycle (`network.op-interval-ticks.transfer`, 5 ticks).
 > In the grids, `·` marks an empty slot. Every item can also be given with `/mvnets give <id>`.
 > Back to the [wiki index](README.md).
 
+> **Devices as ingredients.** When a recipe asks for another device (previous cell, previous
+> module, cable, fluid cell, Advanced Pusher) it must be that device: the plain material underneath
+> (terracotta, copper ingot, glass, prismarine bricks, piston) does not count. Cell and module
+> upgrades keep the cargo of the ingredient; every other recipe refuses a device that still stores
+> something. No device can be used as an ingredient of a vanilla recipe.
+
 ---
 
 ## 🖥️ Core and access
@@ -24,9 +30,10 @@ I I I
 - **Result**: 1× Network Controller (Lodestone)
 - **Function**: Root of the network. Every scan starts here and walks through every connected
   MultiverseNets block. Whoever places it becomes the network's **owner** (used by land protection).
-  Shows a floating hologram with status, node count and stored totals, and can hold a **CPU Virtual
-  Cache** (see the cache modules below). Right-click opens its status menu. Only one controller per
-  network: a second one wired to the same cables is reported as `foreign controller`.
+  Shows a floating hologram with status, node count and stored totals. Memory modules go in a
+  **DRAM Bay**, not in the controller; a controller that still holds an old module keeps using it, and
+  its menu can take that module out with its items. Right-click opens its status menu. Only one
+  controller per network: a second one wired to the same cables is reported as `foreign controller`.
 
 ---
 
@@ -131,12 +138,31 @@ A S A
 
 ---
 
-### CPU Virtual Cache Modules · `mvn_cache_l1` … `mvn_cache_quantum`
+### DRAM Bay · `mvn_dram_bay`
 
-Installed into the **Network Controller** by right-clicking it with the module. They turn the
-controller into multi-item storage (any mix of item types). Only upgrades are accepted: the module
-is consumed and a lower module already installed is not returned. The contents travel inside the
-controller item when it is broken.
+```
+I Q I
+R C R
+I Q I
+```
+
+> I = **Iron Ingot** · Q = **Quartz** · R = **Redstone** · C = **Copper Block**
+
+- **Result**: 1× DRAM Bay (Waxed Copper Bulb)
+- **Function**: Network block that holds **one memory module** (any item module below, or the Fluid
+  DRAM). While installed, the module's stock is part of the network. Right-click an empty bay with a
+  module in hand to install it, or right-click to open its menu (stock, install from the cursor or
+  with shift+click, **Eject Module**). An ejected module keeps its whole stock: install it in a DRAM
+  Bay of another network and the stock appears there and is gone from the first one. Breaking the bay
+  drops it and its module (with the stock) separately.
+
+---
+
+### Memory Modules · `mvn_cache_l1` … `mvn_cache_quantum`
+
+Item modules for the **DRAM Bay**: multi-item storage, any mix of item types, capacity per tier in
+`virtual-cache.tier-1` … `tier-5`. A module keeps its items when it is taken out of the bay. Each
+tier is crafted from the previous one; upgrading a module that holds items keeps them.
 
 #### L1 CPU Cache Module — 2,048 items
 
@@ -190,6 +216,24 @@ N S N
 
 ---
 
+### Fluid DRAM Module · `mvn_fluid_dram`
+
+```
+D B D
+F E F
+D B D
+```
+
+> D = **Diamond** · B = **Bucket** · E = **Eye of Ender** · F = **Quantum Fluid Cell** (empty)
+
+- **Result**: 1× Fluid DRAM Module (hand item, Heart of the Sea)
+- **Function**: **Fluid-only** memory module for the DRAM Bay. It holds several fluids at once, up to
+  `fluids.dram-capacity-mb` (512,000 mB = 512 buckets) in total, and adds that to the network's fluid
+  storage. Like the item modules, taking it out of the bay carries its fluids to whichever network
+  you install it in next.
+
+---
+
 ## 📦 Item storage
 
 ### Quantum Cell T1 – T6 · `mvn_cell_t1` … `mvn_cell_t6`
@@ -212,7 +256,7 @@ D P D
 D D D
 ```
 
-> D = **Diamond** · P = **Previous cell** (exact item)
+> D = **Diamond** · P = **Previous cell** (with or without cargo)
 
 - **Result**: 1× cell of the next tier (terracotta: plain, orange, yellow, lime, cyan, purple)
 - **Function**: Stores **one item type** each. An empty cell adopts the first item type that has
@@ -245,7 +289,8 @@ N D N
 - **Function**: Like a cell, one item type, with `barrel.capacity` (2,000,000,000). It **stays
   registered** to its item when it empties. In its menu, click *Set Item* with an item on the cursor
   to register it; right-click *Set Item* with an empty cursor clears the registration (only when it
-  is empty). Hoppers can insert the registered item and pull it out one by one.
+  is empty). Items with their own id (Slimefun and other plugins) are recognised by that id and
+  their visible text, so whatever you take out goes back in. Hoppers do not interact with it.
 
 ---
 
@@ -370,10 +415,14 @@ I D I
 > I = **Iron Ingot** · D = **Dropper** · R = **Redstone Block**
 
 - **Result**: 1× Simple Pusher (Target)
-- **Function**: Exports from the network into adjacent containers: up to 128 items of one type per
-  cycle, only when a container is next to it. **An empty whitelist does nothing** (a fresh pusher
-  never empties the network); an empty blacklist exports anything. What does not fit goes back to the
-  network.
+- **Function**: Exports from the network into adjacent containers through **all six faces** (it has
+  no face selector): up to 128 items per cycle, only when a container is next to it, never into
+  another network block. **An empty whitelist does nothing** (a fresh pusher never empties the
+  network); a **blacklist exports everything except what is listed** (the listed items stay in the
+  network). At most one stack per slot; a whitelist of several items gives each item its share of
+  the target's slots and serves them in turn, so one ingredient cannot fill a machine. Furnaces get
+  fuel in the fuel slot and the rest in the input, never in the result slot. What does not fit goes
+  back to the network.
 
 ---
 
@@ -386,7 +435,8 @@ D P D
 > D = **Dropper** · P = **Piston**
 
 - **Result**: 1× Advanced Pusher (Piston)
-- **Function**: Same as the Simple Pusher ×8 (1,024 per cycle), with face selection.
+- **Function**: Same as the Simple Pusher ×8 (1,024 per cycle). With a face selected it delivers
+  **only** to that side; use it to feed one machine.
 
 ---
 
@@ -526,8 +576,9 @@ E P E
 > E = **Ender Pearl** · P = **Paper** · B = **Enchanting Table**
 
 - **Result**: 1× Slimefun Recipe Encoder (Enchanting Table)
-- **Function**: Same as the Recipe Encoder for Slimefun recipes. Needs Slimefun. Its recipe and menu
-  exist only while `sf-encoder.enabled: true`.
+- **Function**: Same as the Recipe Encoder for Slimefun recipes. Blueprints left in its slots stay
+  stored in the block when you close it. Needs Slimefun. Its recipe and menu exist only while
+  `sf-encoder.enabled: true`.
 
 ---
 
@@ -560,8 +611,8 @@ R C R
 > R = **Ender Pearl** · C = **Crying Obsidian** · I = **Iron Ingot** · T = **Target**
 
 - **Result**: 1× Slimefun Auto-Crafter (Crying Obsidian)
-- **Function**: Same as the Auto-Crafter, Slimefun Blueprints only. `sf-crafter.enabled: false`
-  removes its recipe, its menu and its crafting.
+- **Function**: Same as the Auto-Crafter and accepts **both Slimefun and vanilla Blueprints**.
+  `sf-crafter.enabled: false` removes its recipe, its menu and its crafting.
 
 ---
 
@@ -592,7 +643,7 @@ R C R
 > R = **Ender Pearl** · C = **Purpur Pillar** · I = **Iron Ingot** · L = **Lectern**
 
 - **Result**: 1× Slimefun Request Crafter (Purpur Pillar)
-- **Function**: Same as the Request Crafter for Slimefun Blueprints. Depends on
+- **Function**: Same as the Request Crafter, with Slimefun and vanilla Blueprints. Depends on
   `sf-crafter.enabled`.
 
 ---
@@ -629,6 +680,29 @@ C R C
 - **Result**: 1× Network Crafting Grid (Cartography Table)
 - **Function**: A crafting table that pulls ingredients from the network transactionally. The
   template grid is stored in the block; *Craft 1* / *Craft All* hand you the result.
+
+---
+
+## 🐔 GeneticChickengineering
+
+### Genetic Chicken Sorter · `mvn_chicken_sorter`
+
+```
+F E F
+C P C
+F E F
+```
+
+> F = **Feather** · E = **Egg** · C = **Comparator** · P = **Advanced Pusher**
+
+- **Result**: 1× Genetic Chicken Sorter (Hay Bale)
+- **Function**: Moves **only** the pocket chickens of the GeneticChickengineering addon, chosen by
+  their genes; every other item is ignored. **Push** sends matching chickens from the network to the
+  block it faces; **Pull** brings them from that block into the network (up to 16 per cycle). Rules,
+  all of which must pass: accepted products (add one by clicking with a chicken on the cursor or
+  shift-clicking one in your inventory; empty list = any), min/max tier, minimum DNA strength, pure
+  genes only, known/unknown DNA, adult/baby. It starts **stopped** so it cannot empty a network
+  before you configure it.
 
 ---
 

@@ -103,7 +103,10 @@ antiguos) con campos públicos:
 | `encoderBlank` / `encoderOutput` | `ItemStack` | Blueprints dejados en las ranuras del Recipe Encoder. |
 | `txWorld` / `txX` / `txY` / `txZ` | `String` / `int` | Enlace del puente de un Receptor o Transmisor (el otro extremo). |
 | `greedySamples` / `greedyAmounts` | `List<ItemStack>` / `List<Long>` | Búfer multi-ítem de la Greedy Cell. |
-| `virtualCacheTier` / `virtualSamples` / `virtualAmounts` | `int` / listas | Caché Virtual de CPU del controlador. |
+| `virtualCacheTier` / `virtualSamples` / `virtualAmounts` | `int` / listas | Stock de un módulo de memoria de ítems: un DRAM Bay con módulo de ítems, o la caché antigua de un Controlador. |
+| `installedModule` | `String` | DRAM Bay: nombre del `DeviceType` del módulo instalado, null si está vacío. |
+| `dramFluids` / `dramFluidAmounts` | `List<String>` / `List<Long>` | DRAM Bay con Fluid DRAM Module: varios fluidos (mB). |
+| `chickenActive` / `chickenPull` / `chickenProducts` / `chickenMinTier` / `chickenMaxTier` / `chickenKnown` / `chickenAge` / `chickenMinStrength` / `chickenPureOnly` | varios | Reglas del Genetic Chicken Sorter (ver §19). |
 | `quotaSample` / `quotaLimit` / `quotaActive` | `ItemStack` / `long` / `boolean` | Quota Limiter. |
 | `fluidType` / `fluidAmount` | `String` / `long` | Quantum Fluid Cell (mB). |
 | `pumpFluid` (`pumpMode` heredado) | `String` | Filtro de la Liquid Pump (`WATER`, `LAVA`, null = cualquiera). |
@@ -160,21 +163,25 @@ las redes a partir de él al arrancar.
 - Filtros: `filterPredicate(blob)` (filtro vacío → acepta todo; si no, whitelist o blacklist),
   `matchesFilter(template, item)` (orden: DeviceType → id de Slimefun → nombre visible → material),
   `extractMatching(Inventory, …)` (un tipo de ítem, juntando todas las ranuras hasta la cuota),
-  `insertInto(Inventory, …)`.
+  `insertInto(Inventory, …)` (por trozos de un stack, así una ranura nunca recibe más de lo que el
+  ítem admite) e `insertSmart(inv, muestra, cantidad, cara, kinds)` (la inserción del Pusher: un
+  stack por ranura, entrada/combustible del horno según la cara y nunca la ranura de resultado, y con
+  `kinds > 1` cada entrada de la whitelist ocupa como mucho `ranuras / kinds`). `extractMatching` de
+  un horno solo saca el resultado.
 
 ## 7. Almacenamiento de ítems: `NetworkStorage`
 
-Una sola "bóveda" sobre todo el almacenamiento de la red: la **Caché Virtual de CPU** del
-controlador, las **Celdas Cuánticas**, los **Infinity Barrels**, las **Greedy Cells** y los
+Una sola "bóveda" sobre todo el almacenamiento de la red: los **módulos de memoria** (uno por DRAM
+Bay con módulo de ítems, más un módulo antiguo dentro del Controlador), las **Celdas Cuánticas**, los **Infinity Barrels**, las **Greedy Cells** y los
 **barriles de Slimefun**. Todos los métodos son `synchronized`; los blobs se leen con
 `NodeStore.canonical` y solo se reescriben los modificados.
 
 - **`deposit(ItemStack)` → sobrante**. Primero los **Quota Limiters** recortan la cantidad (gana el
   límite más bajo), luego 8 pasadas: (1) Greedy Cells cuyo filtro coincide o que ya tienen el ítem →
-  (2) caché virtual con ese tipo → (3) barriles de Slimefun con ese tipo → (4) celdas/barriles con ese
-  tipo → (5) espacio libre de la caché virtual → (6) barriles de Slimefun vacíos → (7) celdas/barriles
+  (2) módulos de memoria con ese tipo → (3) barriles de Slimefun con ese tipo → (4) celdas/barriles con ese
+  tipo → (5) espacio libre de los módulos de memoria → (6) barriles de Slimefun vacíos → (7) celdas/barriles
   vacíos (adoptan el tipo) → (8) Greedy Cells sin filtro. Nunca modifica el argumento.
-- **`withdraw(matcher, want, excludePos, includeGreedy)`** — caché virtual → celdas y barriles →
+- **`withdraw(matcher, want, excludePos, includeGreedy)`** — módulos de memoria → celdas y barriles →
   barriles de Slimefun → Greedy Cells (solo si `includeGreedy`). Devuelve un único tipo de ítem. Los
   Pushers, la succión de la Greedy y las dos direcciones del puente pasan `includeGreedy = false`;
   terminales, crafteo y la API usan la forma de 2 argumentos (Greedy incluida). Un Infinity Barrel
@@ -185,7 +192,9 @@ controlador, las **Celdas Cuánticas**, los **Infinity Barrels**, las **Greedy C
 ## 8. Almacenamiento de fluidos: `NetworkFluidStorage`
 
 Aparte de los ítems: la suma de todas las `MVN_FLUID_CELL` (un fluido por celda,
-`fluids.cell-capacity-mb` cada una). `deposit(fluid, mB)` es **todo o nada**: devuelve `0` si cupo
+`fluids.cell-capacity-mb` cada una) y de los DRAM Bays con Fluid DRAM Module (varios fluidos,
+`fluids.dram-capacity-mb` en total). Orden de depósito: celdas con ese fluido → Fluid DRAMs → celdas
+vacías. `deposit(fluid, mB)` es **todo o nada**: devuelve `0` si cupo
 todo y la cantidad completa (sin guardar nada) en caso contrario, porque cada llamante — bomba,
 terminal, ranura de entrada — solo consume un cubo, botella o bloque fuente entero cuando recibe `0`.
 `withdraw`, `count`, `getFluids`, `totalCapacity`, `totalStored`.
@@ -203,11 +212,17 @@ terminal, ranura de entrada — solo consume un cubo, botella o bloque fuente en
 - **`doTransfers`** (`items-per-op` = 128, HT = ×`ht-multiplier`):
   - **Grabber** (`grabOnce`): reintenta primero su búfer de tránsito; luego la primera cara que dé
     algo — primero las ranuras de salida de máquinas de Slimefun, después contenedores vanilla.
-    Sobrante → Pushers que lo acepten (`streamToPushers`) → de vuelta al origen → búfer de tránsito.
+    Sobrante → Pushers que lo acepten (`streamToPushers`) → búfer de tránsito. Nunca vuelve al
+    origen: `SlimefunBridge.insert` usa las ranuras de ENTRADA y el producto se volvía a procesar.
     Los grabbers inactivos se relajan (uno de cada tres ciclos tras uno vacío, hasta 30).
-  - **Pusher** (`pushOnce`): reintenta primero su búfer de tránsito; whitelist vacía = inactivo; no
-    hace nada sin un contenedor al lado; retira un tipo (sin Greedy) y lo inserta; el resto vuelve a la
-    red o al búfer de tránsito.
+  - **Pusher** (`pushOnce`): reintenta primero su búfer de tránsito; whitelist vacía = inactivo; los
+    destinos son las caras de `facesFor` con un contenedor o máquina de Slimefun que no sea un nodo de
+    la red (`isPushTarget`). Una whitelist de varias entradas da un predicado por entrada, rotando la
+    primera en cada ciclo (`pushPredicates`); cualquier otro filtro prueba hasta 4 tipos distintos.
+    Cada retirada (sin Greedy) se inserta con `insertToTarget` → `insertSmart` /
+    `SlimefunBridge.insert(…, kinds)`; el resto vuelve a la red o al búfer (`returnToNetwork`).
+  - **Genetic Chicken Sorter** (`chickenSortOnce`): solo con `chickenActive`; saca o mete hasta 16
+    pollos que pasen `ChickenGenetics.matches`.
   - **Greedy Cell** (`greedyTick`): succión hasta `4 × items-per-op`, reparto hasta
     `2 × items-per-op` a contenedores vecinos que no son de la red.
   - **Purger**: solo con filtro no vacío.
@@ -223,12 +238,12 @@ terminal, ranura de entrada — solo consume un cubo, botella o bloque fuente en
 
 ## 10. Dispositivos e ítems (`item/DeviceType`, `item/Items`)
 
-`DeviceType` enumera los **43** dispositivos, módulos y herramientas; cada constante tiene `material`,
+`DeviceType` enumera los **46** dispositivos, módulos y herramientas; cada constante tiene `material`,
 `display`, `placeable` y `cellTier`. Propiedades derivadas: `isCell()`, `isBarrel()`, `isFluidCell()`,
 `isLiquidPump()`, `isRequestTerminal()`, `isAutoCrafter()`, `isRequestCrafter()`,
 `isSlimefunCrafter()`, `filterable()` (grabbers, pushers, vacuum, greedy cell, purger, receptor,
 transmisor), `isImporter()`/`isExporter()`, `isDirectional()`, `isRouter()`, `isCacheModule()`,
-`cacheTier()`. `parse(name)` acepta `MVN_…`, la forma sin prefijo y `wireless`.
+`isMemoryModule()` (módulos de caché + Fluid DRAM), `cacheTier()`. `parse(name)` acepta `MVN_…`, la forma sin prefijo y `wireless`.
 
 | Constante | Material | Nombre visible | Colocable |
 | --- | --- | --- | --- |
@@ -237,7 +252,9 @@ transmisor), `isImporter()`/`isExporter()`, `isDirectional()`, `isRouter()`, `is
 | `MVN_TERMINAL` | BEACON | Network Terminal | ✔ |
 | `MVN_MONITOR` | RESPAWN_ANCHOR | Network Monitor | ✔ |
 | `MVN_ROUTER` | LIGHTNING_ROD | Network Router | ✔ |
-| `MVN_CACHE_L1` … `MVN_CACHE_QUANTUM` | COPPER_INGOT, GOLD_INGOT, DIAMOND, NETHERITE_INGOT, NETHER_STAR | Módulos de Caché de CPU | ✘ (mano) |
+| `MVN_CACHE_L1` … `MVN_CACHE_QUANTUM` | COPPER_INGOT, GOLD_INGOT, DIAMOND, NETHERITE_INGOT, NETHER_STAR | Módulos de memoria de ítems | ✘ (mano) |
+| `MVN_DRAM_BAY` | WAXED_COPPER_BULB | DRAM Bay | ✔ |
+| `MVN_FLUID_DRAM` | HEART_OF_THE_SEA | Fluid DRAM Module | ✘ (mano) |
 | `MVN_CELL_T1` … `MVN_CELL_T6` | Terracota por nivel | Quantum Cell T1…T6 | ✔ |
 | `MVN_GREEDY_CELL` | SLIME_BLOCK | Greedy Cell | ✔ |
 | `MVN_INFINITY_BARREL` | BARREL | Infinity Barrel | ✔ |
@@ -260,6 +277,7 @@ transmisor), `isImporter()`/`isExporter()`, `isDirectional()`, `isRouter()`, `is
 | `MVN_RAKE` | DEAD_BUSH | Network Rake | ✘ (mano) |
 | `MVN_FLUID_CELL` | PRISMARINE_BRICKS | Quantum Fluid Cell | ✔ |
 | `MVN_LIQUID_PUMP` | BLUE_STAINED_GLASS | Liquid Pump | ✔ |
+| `MVN_CHICKEN_SORTER` | HAY_BLOCK | Genetic Chicken Sorter | ✔ |
 
 `Items`:
 - `create(type)` construye el ítem (nombre, lore, `DEVICE_TYPE`); `typeOf(item)` lo lee.
@@ -267,9 +285,15 @@ transmisor), `isImporter()`/`isExporter()`, `isDirectional()`, `isRouter()`, `is
 - Herramientas: `rake()`/`rakeUses`/`spendRakeUse`; `saveConfig`/`readConfig` y
   `saveConfigItems`/`readConfigItems` (llave); `linkReceiver`/`readReceiverBind` (enlace del puente,
   usado tanto en ítems Receptor como Transmisor); `bindWireless`/`readWirelessBind`.
-- `registerRecipes(plugin)` — las **43** recetas con forma (40 siempre, más el codificador y los dos
+- `registerRecipes(plugin)` — las **46** recetas con forma (43 siempre, más el codificador y los dos
   crafters de Slimefun mientras sus `enabled` estén activos). Patrones: [Recipes.md](../Recipes.md).
-- `GuideBook` construye el libro guía (`/mvnets guide en|es|both`).
+  Un dispositivo usado como ingrediente se registra con `device(receta, char, tipo)`: un
+  `MaterialChoice` del material del dispositivo más una entrada en `deviceIngredients(key)` (tipo →
+  cantidad). `isUpgradeRecipe(key)` marca las mejoras de nivel de celdas y módulos.
+- `GuideContent` guarda el texto de la guía del juego en inglés y español: una entrada por
+  dispositivo (nombre en español, qué hace, cómo se usa), su categoría y los temas generales. Las
+  recetas no se escriben ahí: `GuideMenu` las lee de las registradas (`Items.deviceIngredientAt(key,
+  char)` indica qué letras de la cuadrícula son dispositivos).
 
 ## 11. Crafteo (`craft/Blueprints` y `craft/CraftingSupport`)
 
@@ -300,19 +324,22 @@ transmisor), `isImporter()`/`isExporter()`, `isDirectional()`, `isRouter()`, `is
 | Menú | Tamaño | Uso / detalles |
 | --- | --- | --- |
 | `TerminalMenu` | 54 | Terminal (bloque, inalámbrico, botones de transmisor/receptor). Entrada `INPUT_SLOT=8`, vista del purgador `17`, orden `26`, página de fluidos `35`, páginas `44`/`53`; 48 ítems por página. Depósito/retirada de fluidos con cubos y botellas. |
-| `ControllerMenu` | 27 | Estado del controlador, uso de la caché de CPU, estado del router. |
+| `ControllerMenu` | 27 | Estado del controlador y del router; la ranura `11` expulsa un módulo de memoria antiguo con sus ítems. |
+| `DramBayMenu` | 27 | Estadísticas `11`, módulo `13` (instalar desde el cursor/shift-clic, o expulsar), expulsar `15`. Lee el blob en cada clic, así dos jugadores no pueden expulsar a la vez. |
+| `ChickenSorterMenu` | 54 | Productos `0–17`, activo `27`, push/pull `28`, cara `29`, nivel mín/máx `31`/`32`, fuerza `33`, ADN `34`, edad `35`, puros `40`, limpiar `44`, ayuda `49`. |
 | `MonitorMenu` | 27 | Diagnóstico en vivo (tarea de refresco mientras está abierto). |
 | `FilterMenu` | 27 | Grabbers, pushers, vacuum, purger, greedy cell, receptor y transmisor: hasta 17 plantillas, modo `17`, limpiar `25`, ayuda `26`. Ranura `24`: selector de cara en los avanzados, "abrir bloque adyacente" en los simples, "abrir terminal" en Transmisor/Receptor. |
 | `CellMenu` / `BarrelMenu` | 18 | Plantilla `4`, depositar todo `11`, fijar ítem `13`, extraer todo `15`. En el barril, clic derecho en *Set Item* borra el registro si está vacío. |
 | `GreedyMenu` | 54 | 36 ranuras de almacenamiento con páginas, filtro `45`, depósito `46`, monitor `49`, dirección `50`, info `53`. |
 | `CrafterMenu` | 27 | Auto/Request/Slimefun crafters: hasta 18 Blueprints, estado `24`, limpiar todo `25` (los devuelve), ayuda `26`. Instalar consume el Blueprint; desinstalar o reemplazar lo devuelve. |
-| `EncoderMenu` / `SfEncoderMenu` | 45 | Plantilla, ranura de blueprint `19`, codificar `16`, vista previa `25`, salida `34`. El Recipe Encoder guarda en el bloque los Blueprints dejados en `19`/`34`; mientras un menú está abierto solo viven en ese menú. |
+| `EncoderMenu` / `SfEncoderMenu` | 45 | Plantilla, ranura de blueprint `19`, codificar `16`, vista previa `25`, salida `34`. Los dos codificadores guardan en el bloque los Blueprints dejados en `19`/`34`; mientras un menú está abierto solo viven en ese menú. |
 | `CraftingGridMenu` | 54 | Crafteo con la red: resultado `31`, craftear uno `33`, craftear todo `35`, limpiar `38`, páginas `27`/`29`, info `41`. |
 | `RequestTerminalMenu` | 54 | 45 opciones por página, entrega `49`, refrescar `51`, páginas `45`/`53`. |
 | `QuotaLimiterMenu` | 36 | Ítem objetivo `13`, activar/desactivar `22`, límite por chat `31`, botones ±1/10/64/1.000. |
 | `FluidCellMenu` | 27 | Tanque `13`, interacción con cubo `10`, extraer un cubo `15`, vaciar tanque `16` (shift+clic derecho). |
 | `LiquidPumpMenu` | 27 | Filtro de fluido `12` (ANY/WATER/LAVA), fluidos de la red `14`. |
 | `QuantumWorkbenchMenu` | 45 | Mejora de celdas: centro `20`, craftear `23`, salida `25`; ingredientes devueltos al cerrar. |
+| `GuideMenu` | 54 | `/mvnets guide`: inicio (temas `19`, categorías `21–25`, `30–32`), temas, lista de la categoría, página del dispositivo (receta `10-12/19-21/28-30`, resultado `24`, qué hace `15`, cómo se usa `16`, números `33`, ingredientes `34`, anterior/siguiente `48`/`50`, volver `45`, inicio `49`); el botón de idioma `53` conserva la página. Las páginas se reabren un tick después. |
 | `ChatPrompts` | — | Preguntas numéricas por chat (request terminal, limitador). |
 
 ### 12.2 Seguridad: `GuiListener` (anti-dupe)
@@ -326,26 +353,29 @@ cancelan; `onClose` se reenvía.
 
 `BlockListener` lleva el cableado de eventos; `DeviceInteractions` decide qué abre cada dispositivo y
 la puerta de acceso del jugador (`canAccessNetwork`, estático: bypass de admin, providers de
-protección, pertenencia a la isla de BentoBox), instala módulos de caché y gestiona la interacción
-rápida con la celda de fluidos.
+protección, pertenencia a la isla de BentoBox), instala módulos de memoria en un DRAM Bay y gestiona la
+interacción rápida con la celda de fluidos.
 
 | Evento | Comportamiento |
 | --- | --- |
 | `BlockPlaceEvent` | Comprueba mundos bloqueados y `max-nodes-per-chunk`; registra el nodo, restaura el estado embebido (`CELL_CARGO`), aplica el enlace del puente desde el ítem (Receptor o Transmisor), guarda el dueño del Controlador y luego registra el controlador o reescanea los vecinos. |
-| `BlockBreakEvent` | Suelta los Blueprints guardados del Encoder, suelta el dispositivo con su estado embebido (nada en creativo), quita el nodo y reescanea. |
-| `PlayerInteractEvent` | Clic al aire con Terminal Inalámbrico (bloqueo por combate, alcance/mundo salvo con Router, acceso). Clic en bloque: acceso, luego Probe, Rake (devuelve el dispositivo), Llave, vínculos (inalámbrico en controlador/terminal; ítem Receptor en Transmisor e ítem Transmisor en Receptor), agachado nunca abre menús, mensaje de estado del cable, instalación de módulos de caché, interacción rápida con la celda de fluidos, menú del dispositivo. |
-| `InventoryMoveItemEvent` | Las tolvas pueden meter y sacar de un Infinity Barrel (su ítem registrado); el resto de nodos rechaza las tolvas. |
+| `BlockBreakEvent` | Suelta los Blueprints guardados del Encoder y el módulo de un DRAM Bay (con su stock, también en creativo), suelta el dispositivo con su estado embebido (nada en creativo), quita el nodo y reescanea. |
+| `PlayerInteractEvent` | Clic al aire con Terminal Inalámbrico (bloqueo por combate, alcance/mundo salvo con Router, acceso). Clic en bloque: acceso, luego Probe, Rake (devuelve el dispositivo), Llave, vínculos (inalámbrico en controlador/terminal; ítem Receptor en Transmisor e ítem Transmisor en Receptor), agachado nunca abre menús, mensaje de estado del cable, un módulo sobre un Controlador solo muestra un aviso, instalación de módulos en un DRAM Bay vacío, interacción rápida con la celda de fluidos, menú del dispositivo. |
+| `InventoryMoveItemEvent` | Se cancela siempre que el origen o el destino sea un nodo de la red, sin tocar ningún inventario. Las tolvas nunca interactúan con el plugin; el antiguo camino del Infinity Barrel llamaba a `removeItem` mientras Paper había reducido la ranura de la tolva a la cantidad movida, y eso borraba el stack entero. |
 | Pistones / explosiones | Los nodos no se pueden mover y se quitan de las listas de bloques de las explosiones. |
 | `EntityDamageByEntityEvent` | Anota el momento del combate para el bloqueo del Terminal Inalámbrico. |
 
-`CraftingListener` vuelve a registrar las recetas tras recargas, las desbloquea al entrar y mejora una
-celda con carga en una mesa de crafteo normal conservando la carga.
+`CraftingListener` vuelve a registrar las recetas tras recargas y las desbloquea al entrar. En
+`PrepareItemCraftEvent` solo actúa si el servidor casó una receta: en las de este plugin los
+dispositivos de la mesa deben ser exactamente `Items.deviceIngredients(key)`; un dispositivo con
+`CELL_CARGO` solo lo acepta una receta de mejora, cuyo resultado recibe esa carga; cualquier otra
+receta con un dispositivo en la mesa se queda sin resultado.
 
 ## 14. Comando `/mvnets` (`command/MvnetsCommand`)
 
 Subcomandos: `help`, `info`, `guide`, `devices` (abiertos) y `give <id> [n]`, `doctor`, `stats`,
 `inspect`, `repair`, `recipes`, `reload` (**`multiversenets.admin`**). El autocompletado sugiere
-subcomandos, `en|es|both` para `guide` y los ids de dispositivo para `give` (`type.id()`, p. ej.
+subcomandos, `en|es` para `guide` (abre `GuideMenu`) y los ids de dispositivo para `give` (`type.id()`, p. ej.
 `mvn_controller`; `give` también acepta la forma sin prefijo).
 
 ## 15. API pública (`api/MultiverseNetsAPI`)
@@ -415,6 +445,7 @@ Todas las lecturas pasan por `Settings` sobre `plugin.getConfig()` (se refresca 
 | `greedyCapacity()` | `greedy.capacity` | 262.144 | ≥ 1 |
 | `barrelCapacity()` | `barrel.capacity` | 2.000.000.000 | ≥ 1 |
 | `fluidCellCapacity()` | `fluids.cell-capacity-mb` | 64.000 | ≥ 1.000 |
+| `fluidDramCapacity()` | `fluids.dram-capacity-mb` | 512.000 | ≥ 1.000 |
 | `maxBlueprints()` | `crafter.max-recipes` | 18 | 1 – 18 |
 | `vacuumRadius()` | `vacuum.radius` | 4.0 | ≥ 1.0 |
 | `rakeUses()` | `rake.uses` | 250 | ≥ 1 |
@@ -436,3 +467,23 @@ Todas las lecturas pasan por `Settings` sobre `plugin.getConfig()` (se refresca 
 **Capacidades de celda** (`cells.capacities`, lista de `long`): por defecto `[65536, 262144, 1048576,
 16777216, 268435456, 2000000000]`. Clave ausente o vacía → `65536 × 2^(nivel−1)`; un nivel no
 declarado usa el último, con un aviso único en consola (`SettingsCellCapacityTest`).
+
+## 19. GeneticChickengineering (`compat/ChickenGenetics`)
+
+Lee los pollos de bolsillo directamente de su PDC, sin depender del addon:
+`geneticchickengineering:gce_pocket_chicken_dna` (`int[7]`: seis estados de gen 0 = aa, 1 = Aa,
+3 = AA, más "conocido"), `gce_pocket_chicken_adapter` (JSON, `baby`) y `gce_expanded_species` (especies
+especiales, nivel 7-9). `read(item)` devuelve producto (`TYPE:<tipo>` o `SPECIES:<id>`), nivel (genes
+recesivos), fuerza de ADN (`6 − recesivos − mixtos`), puro, conocido y adulto, igual que el
+`PocketChickenData` del addon. `matches(blob, item)` aplica las reglas del clasificador (todas deben
+cumplirse; por defecto aceptan cualquier pollo y lo que no es un pollo nunca pasa).
+
+## 20. Comparación de ítems (`util/StackUtils`)
+
+`itemsMatch(a, b)` es una comparación estricta (material, clase de meta, datos por subtipo, custom
+model data, PDC, encantamientos, flags, lore, nombre) con una alternativa para ítems con datos de
+plugin: dos ítems con el mismo PDC no vacío, encantamientos y daño cuyo nombre y lore se leen igual
+como texto plano son el mismo ítem. Eso permite que un Infinity Barrel vuelva a aceptar un ítem de
+Slimefun cuyo nombre se guardó con otra estructura de componentes. `pdcMatches` compara todos los
+tipos de tag primitivos y de array y los contenedores anidados; un tipo que no sabe comparar cuenta
+como distinto (antes contaba como igual, y fundía pollos de bolsillo con distinto ADN).

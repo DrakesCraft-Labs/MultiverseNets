@@ -267,6 +267,14 @@ public class DeviceInteractions {
                 new LiquidPumpMenu(plugin, player, block).openMenu();
                 return true;
             }
+            case MVN_DRAM_BAY -> {
+                new com.chagui68.multiversenets.gui.DramBayMenu(plugin, player, block).openMenu();
+                return true;
+            }
+            case MVN_CHICKEN_SORTER -> {
+                new com.chagui68.multiversenets.gui.ChickenSorterMenu(plugin, player, block).openMenu();
+                return true;
+            }
             case MVN_REQUEST_TERMINAL -> {
                 Network net = manager.networkAt(block);
                 if (net == null) {
@@ -388,27 +396,29 @@ public class DeviceInteractions {
         new TerminalMenu(plugin, player, net).openMenu();
     }
 
-    public void installCacheModule(Player player, Block block, NodeBlob blob, DeviceType cacheType, ItemStack held) {
-        int tier = cacheType.cacheTier();
-        if (blob == null) {
-            blob = NodeStore.get(block);
-        }
-        if (blob == null) return;
-        if (blob.virtualCacheTier >= tier) {
-            player.sendMessage(Text.msg("This Controller already has " + cacheType.display() + " or higher installed.", NamedTextColor.RED));
+    /**
+     * EN: Right-click on an empty DRAM Bay with a memory module: installs one module from the
+     * hand, bringing in whatever stock the module carries.
+     *
+     * ES: Clic derecho en un DRAM Bay vacío con un módulo de memoria: instala un módulo de la mano
+     * con el stock que lleve.
+     */
+    public void installMemoryModule(Player player, Block block, NodeBlob blob, ItemStack held) {
+        if (blob == null || !com.chagui68.multiversenets.net.MemoryModules.install(blob, held)) {
             return;
         }
-        if (DeviceType.parse(blob.typeName) != DeviceType.MVN_CONTROLLER) {
-            return;
-        }
-        blob.virtualCacheTier = tier;
         NodeStore.put(block, blob);
-        if (player.getGameMode() != org.bukkit.GameMode.CREATIVE) {
-            held.subtract(1);
+        DeviceType type = Items.typeOf(held);
+        ItemStack hand = player.getInventory().getItemInMainHand();
+        if (hand.getAmount() > 1) {
+            hand.setAmount(hand.getAmount() - 1);
+            player.getInventory().setItemInMainHand(hand);
+        } else {
+            player.getInventory().setItemInMainHand(null);
         }
         player.playSound(block.getLocation(), org.bukkit.Sound.BLOCK_BEACON_POWER_SELECT, 1.0f, 1.2f);
-        player.sendMessage(Text.msg("Installed " + cacheType.display() + "! Virtual Cache capacity: "
-                + Items.formatAmount(Settings.virtualCacheCapacity(tier)) + " items.", NamedTextColor.GREEN));
+        player.sendMessage(Text.msg("Installed " + (type == null ? "module" : type.display()) + " in the DRAM Bay.",
+                NamedTextColor.GREEN));
         Network net = manager.networkAt(block);
         if (net != null) {
             net.storage().invalidate();

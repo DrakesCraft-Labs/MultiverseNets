@@ -22,7 +22,7 @@ MultiverseNets/
 │   │   │   │                #   (ProtectionBridge + one provider per protection plugin)
 │   │   │   ├─ craft/        # Blueprints, RecipeData and atomic crafting (CraftingSupport)
 │   │   │   ├─ gui/          # Every inventory menu (MenuHolder base + one class per device)
-│   │   │   ├─ item/         # DeviceType (every device), Items (items, lore, recipes), GuideBook
+│   │   │   ├─ item/         # DeviceType (every device), Items (items, lore, recipes), GuideContent
 │   │   │   ├─ listen/       # BlockListener (events), DeviceInteractions (what each device opens),
 │   │   │   │                #   CraftingListener (recipe book, cell upgrades in the crafting table)
 │   │   │   ├─ net/          # Network, NetworkManager, NetworkTicker, NetworkStorage,
@@ -46,18 +46,20 @@ MultiverseNets/
 ## Key folder details
 - **`api/`** – `MultiverseNetsAPI`: a thin, null-safe facade other plugins use to `extract`,
   `insert` and `count` items in the network that owns a given block.
-- **`compat/`** – `SlimefunBridge` (reflection-only Slimefun integration) and land protection:
+- **`compat/`** – `SlimefunBridge` (reflection-only Slimefun integration), `ChickenGenetics` (reads
+  GeneticChickengineering pocket chickens from their PDC) and land protection:
   `ProtectionBridge` plus `ProtectionStonesProvider`, `WorldGuardProvider`/`WorldGuardRegions`,
   `LandsProvider`, `TownyProvider` and `GriefPreventionProvider`. Each provider is one file.
 - **`gui/`** – One menu per device (`TerminalMenu`, `FilterMenu`, `CellMenu`, `BarrelMenu`,
   `GreedyMenu`, `CrafterMenu`, `EncoderMenu`, `SfEncoderMenu`, `CraftingGridMenu`,
   `RequestTerminalMenu`, `QuotaLimiterMenu`, `FluidCellMenu`, `LiquidPumpMenu`, `MonitorMenu`,
-  `ControllerMenu`, `QuantumWorkbenchMenu`), the `MenuHolder` base, the `GuiListener` dupe guard and
+  `ControllerMenu`, `QuantumWorkbenchMenu`, `DramBayMenu`, `ChickenSorterMenu`, `GuideMenu`), the `MenuHolder` base, the `GuiListener` dupe guard and
   `ChatPrompts`.
-- **`item/`** – `DeviceType` (enumeration of the 43 devices, modules and tools), `Items` (item
-  creation, lore, PDC helpers and the 43 recipes) and `GuideBook` (the in-game guide book).
+- **`item/`** – `DeviceType` (enumeration of the 46 devices, modules and tools), `Items` (item
+  creation, lore, PDC helpers and the 46 recipes) and `GuideContent` (the guide text, EN/ES).
 - **`net/`** – Network core: topology (`Network`), registry (`NetworkManager`), the heartbeat
-  (`NetworkTicker`), item and fluid storage, the controller hologram and throughput tracking.
+  (`NetworkTicker`), item and fluid storage, `MemoryModules` (DRAM Bay install/eject with the stock),
+  the controller hologram and throughput tracking.
 - **`persist/`** – `NodeBlob` (serializable node state) and `NodeStore` (chunk PDC storage, the
   controller registry and the decode cache).
 - **`src/main/resources/`** – `config.yml` (fully commented in English and Spanish) and `plugin.yml`.

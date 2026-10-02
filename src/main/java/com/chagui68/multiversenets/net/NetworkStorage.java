@@ -20,13 +20,13 @@ import java.util.function.Predicate;
 /**
  * [EN] Network Storage Engine
  * Aggregated storage engine combining:
- * 1. CPU Virtual Cache (T1-T5 on Controller) - High-speed internal memory
+ * 1. Memory modules (T1-T5 in DRAM Bays; a legacy module inside the Controller still counts)
  * 2. Quantum Cells (T1-T6) & Infinity Barrels
  * 3. External Slimefun Barrels (Native integration via SlimefunBridge)
  * 4. Dedicated Greedy Cells (Output buffers / sinks)
  *
  * [ES] Motor de Almacenamiento Agregado de Red
- * Combina Caché Virtual de CPU en el Controlador, Celdas Cuánticas, Barriles de Slimefun y Celdas Greedy.
+ * Combina los módulos de memoria de los DRAM Bays, Celdas Cuánticas, Barriles de Slimefun y Celdas Greedy.
  */
 public class NetworkStorage {
 
@@ -72,6 +72,7 @@ public class NetworkStorage {
 
     private final Network network;
     private final List<CellRef> cells = new ArrayList<>();
+    private final List<Long> bays = new ArrayList<>();
     private long boundVersion = -1;
     private List<View> viewCache;
     private long viewCacheAt;
@@ -91,10 +92,13 @@ public class NetworkStorage {
             return;
         }
         cells.clear();
+        bays.clear();
         synchronized (network.nodes()) {
             for (var entry : network.nodes().entrySet()) {
                 DeviceType type = entry.getValue();
-                if (type.isCell()) {
+                if (type == DeviceType.MVN_DRAM_BAY) {
+                    bays.add(entry.getKey());
+                } else if (type.isCell()) {
                     cells.add(new CellRef(entry.getKey(), type.cellTier(), false, false));
                 } else if (type == DeviceType.MVN_GREEDY_CELL) {
                     cells.add(new CellRef(entry.getKey(), 0, true, false));
@@ -107,23 +111,45 @@ public class NetworkStorage {
         viewCache = null;
     }
 
-    private VirtualCacheState loadVirtualCache() {
-        long ctrlPos = network.controllerPos();
-        int cx = PosUtil.unpackX(ctrlPos) >> 4;
-        int cz = PosUtil.unpackZ(ctrlPos) >> 4;
-        if (!network.world().isChunkLoaded(cx, cz)) {
-            return null;
+    /**
+     * EN: Every item memory module of the network: one per DRAM Bay holding a cache module, plus
+     * the module of a Controller built before the DRAM Bay existed (it keeps working until it is
+     * moved to a bay).
+     *
+     * ES: Todos los módulos de memoria de ítems de la red: uno por DRAM Bay con módulo de caché,
+     * más el módulo de un Controlador anterior al DRAM Bay (sigue funcionando hasta moverlo).
+     */
+    private List<VirtualCacheState> loadVirtualCaches() {
+        List<VirtualCacheState> caches = new ArrayList<>();
+        addVirtualCache(caches, network.controllerPos(), false);
+        for (long pos : bays) {
+            addVirtualCache(caches, pos, true);
         }
-        Block ctrlBlock = network.block(ctrlPos);
-        NodeBlob blob = NodeStore.canonical(ctrlBlock);
+        return caches;
+    }
+
+    private void addVirtualCache(List<VirtualCacheState> caches, long pos, boolean bay) {
+        int cx = PosUtil.unpackX(pos) >> 4;
+        int cz = PosUtil.unpackZ(pos) >> 4;
+        if (!network.world().isChunkLoaded(cx, cz)) {
+            return;
+        }
+        Block block = network.block(pos);
+        NodeBlob blob = NodeStore.canonical(block);
         if (blob == null || blob.virtualCacheTier <= 0) {
-            return null;
+            return;
+        }
+        if (bay) {
+            DeviceType module = MemoryModules.installed(blob);
+            if (DeviceType.parse(blob.typeName) != DeviceType.MVN_DRAM_BAY || module == null || !module.isCacheModule()) {
+                return;
+            }
         }
         long cap = Settings.virtualCacheCapacity(blob.virtualCacheTier);
         if (cap <= 0) {
-            return null;
+            return;
         }
-        return new VirtualCacheState(ctrlBlock, blob, cap);
+        caches.add(new VirtualCacheState(block, blob, cap));
     }
 
     private List<Block> loadSfBarrels() {
@@ -182,7 +208,7 @@ public class NetworkStorage {
         return states;
     }
 
-    private void flush(List<CellState> states, VirtualCacheState vCache) {
+    private void flush(List<CellState> states, List<VirtualCacheState> vCaches) {
         boolean anyDirty = false;
         for (CellState state : states) {
             if (state.dirty) {
@@ -190,9 +216,11 @@ public class NetworkStorage {
                 anyDirty = true;
             }
         }
-        if (vCache != null && vCache.dirty) {
-            NodeStore.put(vCache.block, vCache.blob);
-            anyDirty = true;
+        for (VirtualCacheState vCache : vCaches) {
+            if (vCache.dirty) {
+                NodeStore.put(vCache.block, vCache.blob);
+                anyDirty = true;
+            }
         }
         if (anyDirty) {
             viewCache = null;
@@ -200,7 +228,8 @@ public class NetworkStorage {
     }
 
     public synchronized long remainingQuota(ItemStack item) {
-        return remainingQuota(item, load(), loadVirtualCache(), loadSfBarrels());
+        List<CellState> states = load();
+        return remainingQuota(item, states, loadVirtualCaches(), loadSfBarrels());
     }
 
     /**
@@ -208,7 +237,7 @@ public class NetworkStorage {
      * que un deposito no vuelva a leer y deserializar cada celda solo para calcular su cuota.
      */
     private long remainingQuota(ItemStack item, List<CellState> states,
-                                VirtualCacheState vCache, List<Block> sfBarrels) {
+                                List<VirtualCacheState> vCaches, List<Block> sfBarrels) {
         if (item == null || item.getType().isAir()) {
             return Long.MAX_VALUE;
         }
@@ -240,7 +269,7 @@ public class NetworkStorage {
         if (!hasLimiter) {
             return Long.MAX_VALUE;
         }
-        long currentTotal = count(i -> StackUtils.itemsMatch(i, item), states, vCache, sfBarrels);
+        long currentTotal = count(i -> StackUtils.itemsMatch(i, item), states, vCaches, sfBarrels);
         return Math.max(0, minAllowed - currentTotal);
     }
 
@@ -252,10 +281,10 @@ public class NetworkStorage {
         // llamar a count(), que re-deserializaba cada blob, y un deposito pagaba tres lecturas por
         // celda en lugar de una.
         List<CellState> states = load();
-        VirtualCacheState vCache = loadVirtualCache();
+        List<VirtualCacheState> vCaches = loadVirtualCaches();
         List<Block> sfBarrels = loadSfBarrels();
 
-        long quotaHeadroom = remainingQuota(item, states, vCache, sfBarrels);
+        long quotaHeadroom = remainingQuota(item, states, vCaches, sfBarrels);
         if (quotaHeadroom <= 0) {
             return item.getAmount();
         }
@@ -280,8 +309,9 @@ public class NetworkStorage {
             }
         }
 
-        // 2. CPU Virtual Cache (matching existing sample)
-        if (remaining > 0 && vCache != null) {
+        // 2. Memory modules (matching existing sample)
+        for (VirtualCacheState vCache : vCaches) {
+            if (remaining <= 0) break;
             long space = vCache.capacity - vCache.blob.totalVirtualAmount();
             if (space > 0 && vCache.blob.indexOfVirtualSample(item) >= 0) {
                 long take = Math.min(space, remaining);
@@ -317,8 +347,9 @@ public class NetworkStorage {
             }
         }
 
-        // 5. CPU Virtual Cache (empty / new item space)
-        if (remaining > 0 && vCache != null) {
+        // 5. Memory modules (empty / new item space)
+        for (VirtualCacheState vCache : vCaches) {
+            if (remaining <= 0) break;
             long space = vCache.capacity - vCache.blob.totalVirtualAmount();
             if (space > 0) {
                 long take = Math.min(space, remaining);
@@ -370,7 +401,7 @@ public class NetworkStorage {
             }
         }
 
-        flush(states, vCache);
+        flush(states, vCaches);
         return (int) (remaining + rejectedByQuota);
     }
 
@@ -406,13 +437,16 @@ public class NetworkStorage {
             return null;
         }
         List<CellState> states = load();
-        VirtualCacheState vCache = loadVirtualCache();
+        List<VirtualCacheState> vCaches = loadVirtualCaches();
         List<Block> sfBarrels = loadSfBarrels();
         ItemStack result = null;
         long got = 0;
 
-        // Pass 0: Controller CPU Virtual Cache (ultra-fast L1-Quantum memory)
-        if (vCache != null && vCache.blob.virtualSamples != null) {
+        // Pass 0: Memory modules (DRAM Bays and a legacy Controller cache)
+        for (VirtualCacheState vCache : vCaches) {
+            if (got >= want || vCache.blob.virtualSamples == null) {
+                continue;
+            }
             for (int i = 0; i < vCache.blob.virtualSamples.size(); i++) {
                 ItemStack sample = vCache.blob.virtualSamples.get(i);
                 Long amount = vCache.blob.virtualAmounts.get(i);
@@ -508,7 +542,7 @@ public class NetworkStorage {
             }
         }
 
-        flush(states, vCache);
+        flush(states, vCaches);
         if (result == null || got <= 0) {
             return null;
         }
@@ -521,13 +555,17 @@ public class NetworkStorage {
     }
 
     public synchronized long count(Predicate<ItemStack> matcher) {
-        return count(matcher, load(), loadVirtualCache(), loadSfBarrels());
+        List<CellState> states = load();
+        return count(matcher, states, loadVirtualCaches(), loadSfBarrels());
     }
 
     private long count(Predicate<ItemStack> matcher, List<CellState> states,
-                       VirtualCacheState vCache, List<Block> sfBarrels) {
+                       List<VirtualCacheState> vCaches, List<Block> sfBarrels) {
         long total = 0;
-        if (vCache != null && vCache.blob.virtualSamples != null) {
+        for (VirtualCacheState vCache : vCaches) {
+            if (vCache.blob.virtualSamples == null) {
+                continue;
+            }
             for (int i = 0; i < vCache.blob.virtualSamples.size(); i++) {
                 ItemStack sample = vCache.blob.virtualSamples.get(i);
                 Long amt = vCache.blob.virtualAmounts.get(i);
@@ -569,9 +607,12 @@ public class NetworkStorage {
         }
         Map<Material, List<View>> buckets = new EnumMap<>(Material.class);
 
-        // Virtual Cache
-        VirtualCacheState vCache = loadVirtualCache();
-        if (vCache != null && vCache.blob.virtualSamples != null) {
+        // Memory modules
+        List<CellState> cellStates = load();
+        for (VirtualCacheState vCache : loadVirtualCaches()) {
+            if (vCache.blob.virtualSamples == null) {
+                continue;
+            }
             for (int i = 0; i < vCache.blob.virtualSamples.size(); i++) {
                 ItemStack sample = vCache.blob.virtualSamples.get(i);
                 Long amt = vCache.blob.virtualAmounts.get(i);
@@ -582,7 +623,7 @@ public class NetworkStorage {
         }
 
         // Cells
-        for (CellState state : load()) {
+        for (CellState state : cellStates) {
             if (state.greedy) {
                 if (state.blob.greedySamples != null && state.blob.greedyAmounts != null) {
                     for (int i = 0; i < state.blob.greedySamples.size(); i++) {

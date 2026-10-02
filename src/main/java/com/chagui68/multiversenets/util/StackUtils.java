@@ -18,6 +18,7 @@ import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.inventory.meta.SuspiciousStewMeta;
 import org.bukkit.inventory.meta.TropicalFishBucketMeta;
 
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -59,6 +60,73 @@ public final class StackUtils {
         if (a.getType() != b.getType()) {
             return false;
         }
+        return strictMatch(a, b, checkLore) || sameCustomItem(a, b, checkLore);
+    }
+
+    /**
+     * EN: Items from Slimefun and other plugins are identified by their PersistentDataContainer
+     * (the item id lives there). Saving one inside a node and loading it back can change how its
+     * name and lore are stored (a component with explicit styles instead of legacy text) or drop a
+     * hide flag, so the stored sample no longer matched the very item it came from: an Infinity
+     * Barrel refused to take back what it had just handed out. Two items with the same non-empty
+     * data container, enchantments, damage and visible text are the same item.
+     *
+     * ES: Los ítems de Slimefun y de otros plugins se identifican por su PersistentDataContainer
+     * (ahí vive su id). Guardar uno en un nodo y volver a leerlo puede cambiar cómo se guardan su
+     * nombre y su lore (un componente con estilos explícitos en vez de texto legacy) o perder un
+     * flag de ocultar, así que la muestra guardada dejaba de coincidir con el propio ítem: un
+     * Infinity Barrel rechazaba lo que acababa de entregar. Dos ítems con el mismo contenedor de
+     * datos no vacío, encantamientos, daño y texto visible son el mismo ítem.
+     */
+    private static boolean sameCustomItem(ItemStack a, ItemStack b, boolean checkLore) {
+        if (!a.hasItemMeta() || !b.hasItemMeta()) {
+            return false;
+        }
+        ItemMeta am = a.getItemMeta();
+        ItemMeta bm = b.getItemMeta();
+        if (am == null || bm == null) {
+            return false;
+        }
+        var apdc = am.getPersistentDataContainer();
+        var bpdc = bm.getPersistentDataContainer();
+        if (apdc.isEmpty() || bpdc.isEmpty() || !pdcMatches(apdc, bpdc)) {
+            return false;
+        }
+        if (!am.getEnchants().equals(bm.getEnchants())) {
+            return false;
+        }
+        if (am instanceof Damageable ad && bm instanceof Damageable bd && ad.getDamage() != bd.getDamage()) {
+            return false;
+        }
+        if (!plain(am.hasDisplayName() ? am.displayName() : null)
+                .equals(plain(bm.hasDisplayName() ? bm.displayName() : null))) {
+            return false;
+        }
+        if (checkLore) {
+            List<net.kyori.adventure.text.Component> al = am.hasLore() ? am.lore() : null;
+            List<net.kyori.adventure.text.Component> bl = bm.hasLore() ? bm.lore() : null;
+            int an = al == null ? 0 : al.size();
+            int bn = bl == null ? 0 : bl.size();
+            if (an != bn) {
+                return false;
+            }
+            for (int i = 0; i < an; i++) {
+                if (!plain(al.get(i)).equals(plain(bl.get(i)))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static String plain(net.kyori.adventure.text.Component component) {
+        if (component == null) {
+            return "";
+        }
+        return net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(component);
+    }
+
+    private static boolean strictMatch(ItemStack a, ItemStack b, boolean checkLore) {
         boolean aMeta = a.hasItemMeta();
         boolean bMeta = b.hasItemMeta();
         if (aMeta != bMeta) {
@@ -257,9 +325,32 @@ public final class StackUtils {
                 return java.util.Arrays.equals(a.get(key, org.bukkit.persistence.PersistentDataType.BYTE_ARRAY),
                         b.get(key, org.bukkit.persistence.PersistentDataType.BYTE_ARRAY));
             }
+            if (a.has(key, org.bukkit.persistence.PersistentDataType.INTEGER_ARRAY)) {
+                return java.util.Arrays.equals(a.get(key, org.bukkit.persistence.PersistentDataType.INTEGER_ARRAY),
+                        b.get(key, org.bukkit.persistence.PersistentDataType.INTEGER_ARRAY));
+            }
+            if (a.has(key, org.bukkit.persistence.PersistentDataType.LONG_ARRAY)) {
+                return java.util.Arrays.equals(a.get(key, org.bukkit.persistence.PersistentDataType.LONG_ARRAY),
+                        b.get(key, org.bukkit.persistence.PersistentDataType.LONG_ARRAY));
+            }
+            if (a.has(key, org.bukkit.persistence.PersistentDataType.SHORT)) {
+                return Objects.equals(a.get(key, org.bukkit.persistence.PersistentDataType.SHORT),
+                        b.get(key, org.bukkit.persistence.PersistentDataType.SHORT));
+            }
+            if (a.has(key, org.bukkit.persistence.PersistentDataType.FLOAT)) {
+                return Objects.equals(a.get(key, org.bukkit.persistence.PersistentDataType.FLOAT),
+                        b.get(key, org.bukkit.persistence.PersistentDataType.FLOAT));
+            }
+            if (a.has(key, org.bukkit.persistence.PersistentDataType.TAG_CONTAINER)) {
+                return b.has(key, org.bukkit.persistence.PersistentDataType.TAG_CONTAINER)
+                        && pdcMatches(a.get(key, org.bukkit.persistence.PersistentDataType.TAG_CONTAINER),
+                        b.get(key, org.bukkit.persistence.PersistentDataType.TAG_CONTAINER));
+            }
         } catch (IllegalArgumentException ignored) {
         }
-        return true;
+        // Un tipo que no sabemos comparar no se da por igual: antes devolvia true y dos pollos de
+        // GeneticChickengineering con distinto ADN (un int[]) se fundian en un solo stack.
+        return false;
     }
 
     /**

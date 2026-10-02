@@ -16,7 +16,7 @@ import java.util.Map;
 /**
  * [EN] Network Fluid Storage Engine
  * Manages aggregated fluid storage (Water, Lava, Milk, Honey, Powder Snow, etc.) across
- * all connected Quantum Fluid Cells (MVN_FLUID_CELL) on a network.
+ * all connected Quantum Fluid Cells (MVN_FLUID_CELL) and Fluid DRAM Modules (in DRAM Bays).
  *
  * [ES] Motor de Almacenamiento de Fluidos de Red
  * Gestiona el almacenamiento agregado de líquidos en todas las Celdas Cuánticas de Fluidos conectadas.
@@ -40,8 +40,23 @@ public class NetworkFluidStorage {
     }
 
     private List<FluidCellRef> loadCells() {
+        return load(DeviceType.MVN_FLUID_CELL);
+    }
+
+    /** DRAM Bays holding a Fluid DRAM Module. */
+    private List<FluidCellRef> loadDrams() {
         List<FluidCellRef> list = new ArrayList<>();
-        network.forEach(DeviceType.MVN_FLUID_CELL, (pos, type) -> {
+        for (FluidCellRef ref : load(DeviceType.MVN_DRAM_BAY)) {
+            if (MemoryModules.installed(ref.blob) == DeviceType.MVN_FLUID_DRAM) {
+                list.add(ref);
+            }
+        }
+        return list;
+    }
+
+    private List<FluidCellRef> load(DeviceType type) {
+        List<FluidCellRef> list = new ArrayList<>();
+        network.forEach(type, (pos, t) -> {
             int cx = PosUtil.unpackX(pos) >> 4;
             int cz = PosUtil.unpackZ(pos) >> 4;
             if (!network.world().isChunkLoaded(cx, cz)) {
@@ -70,6 +85,14 @@ public class NetworkFluidStorage {
                 totals.merge(type, ref.blob.fluidAmount, Long::sum);
             }
         }
+        for (FluidCellRef ref : loadDrams()) {
+            for (int i = 0; i < ref.blob.dramFluids.size(); i++) {
+                long amount = ref.blob.dramFluidAmounts.get(i);
+                if (amount > 0) {
+                    totals.merge(ref.blob.dramFluids.get(i).toUpperCase(Locale.ROOT), amount, Long::sum);
+                }
+            }
+        }
         return totals;
     }
 
@@ -88,17 +111,22 @@ public class NetworkFluidStorage {
                 total += ref.blob.fluidAmount;
             }
         }
+        for (FluidCellRef ref : loadDrams()) {
+            total += ref.blob.dramFluidAmount(target);
+        }
         return total;
     }
 
     /**
      * EN: Deposits a volume of fluid, all or nothing. Every caller (pump, terminal, input slot)
      * consumes a whole bucket, bottle or source block only when the result is 0, so a partial fill
-     * used to keep part of the fluid in the cells AND the bucket in the player's hand.
+     * used to keep part of the fluid in the cells AND the bucket in the player's hand. Order: cells
+     * that already hold this fluid, then Fluid DRAM Modules, then empty cells.
      *
      * ES: Deposita un volumen de fluido, todo o nada. Cada llamante (bomba, terminal, ranura de
      * entrada) solo consume el cubo, la botella o el bloque fuente si el resultado es 0, así que un
-     * llenado parcial dejaba parte del fluido en las celdas Y el cubo en la mano del jugador.
+     * llenado parcial dejaba parte del fluido en las celdas Y el cubo en la mano del jugador. Orden:
+     * celdas que ya tienen este fluido, luego Fluid DRAM Modules, luego celdas vacías.
      *
      * @param fluidType Fluid type name (e.g. "WATER", "LAVA", "MILK", "HONEY")
      * @param amountMb  Volume to deposit in millibuckets (mB)
@@ -110,9 +138,11 @@ public class NetworkFluidStorage {
         }
         String target = fluidType.toUpperCase(Locale.ROOT);
         long capacity = Settings.fluidCellCapacity();
+        long dramCapacity = Settings.fluidDramCapacity();
         long remaining = amountMb;
         List<FluidCellRef> cells = loadCells();
-        if (spaceFor(target, cells, capacity) < amountMb) {
+        List<FluidCellRef> drams = loadDrams();
+        if (spaceFor(target, cells, capacity) + dramSpace(drams, dramCapacity) < amountMb) {
             return amountMb;
         }
 
@@ -130,7 +160,19 @@ public class NetworkFluidStorage {
             }
         }
 
-        // Pass 2: Fill empty cells
+        // Pass 2: Fluid DRAM Modules (any mix of fluids up to their total capacity)
+        for (FluidCellRef ref : drams) {
+            if (remaining <= 0) break;
+            long space = Math.max(0, dramCapacity - ref.blob.totalDramFluid());
+            if (space > 0) {
+                long toAdd = Math.min(space, remaining);
+                ref.blob.addDramFluid(target, toAdd);
+                remaining -= toAdd;
+                NodeStore.put(ref.block, ref.blob);
+            }
+        }
+
+        // Pass 3: Fill empty cells
         for (FluidCellRef ref : cells) {
             if (remaining <= 0) break;
             if (ref.blob.fluidAmount <= 0 || ref.blob.fluidType == null) {
@@ -157,8 +199,16 @@ public class NetworkFluidStorage {
         return space;
     }
 
+    private static long dramSpace(List<FluidCellRef> drams, long capacity) {
+        long space = 0L;
+        for (FluidCellRef ref : drams) {
+            space += Math.max(0, capacity - ref.blob.totalDramFluid());
+        }
+        return space;
+    }
+
     /**
-     * Withdraws a volume of fluid from cells containing it.
+     * Withdraws a volume of fluid from cells (and Fluid DRAM Modules) containing it.
      *
      * @param fluidType Fluid type name
      * @param amountMb  Maximum volume to withdraw in millibuckets (mB)
@@ -187,19 +237,29 @@ public class NetworkFluidStorage {
                 NodeStore.put(ref.block, ref.blob);
             }
         }
+        for (FluidCellRef ref : loadDrams()) {
+            if (needed <= 0) break;
+            long taken = ref.blob.removeDramFluid(target, needed);
+            if (taken > 0) {
+                needed -= taken;
+                extracted += taken;
+                NodeStore.put(ref.block, ref.blob);
+            }
+        }
 
         return extracted;
     }
 
     /**
-     * @return Total capacity of all connected fluid cells combined in millibuckets (mB).
+     * @return Total capacity of all connected fluid cells and Fluid DRAM Modules in millibuckets (mB).
      */
     public synchronized long totalCapacity() {
-        return (long) loadCells().size() * Settings.fluidCellCapacity();
+        return (long) loadCells().size() * Settings.fluidCellCapacity()
+                + (long) loadDrams().size() * Settings.fluidDramCapacity();
     }
 
     /**
-     * @return Total fluid stored across all fluid cells in millibuckets (mB).
+     * @return Total fluid stored across all fluid cells and Fluid DRAM Modules in millibuckets (mB).
      */
     public synchronized long totalStored() {
         long sum = 0L;
@@ -207,6 +267,9 @@ public class NetworkFluidStorage {
             if (ref.blob.fluidType != null && ref.blob.fluidAmount > 0) {
                 sum += ref.blob.fluidAmount;
             }
+        }
+        for (FluidCellRef ref : loadDrams()) {
+            sum += ref.blob.totalDramFluid();
         }
         return sum;
     }

@@ -42,23 +42,27 @@ Things to know:
 - A test that places a device by hand must also store its blob
   (`NodeStore.put(block, NodeBlob.create(type.name()))`); without it the block is not a node.
 - MockBukkit does not implement `Display.setBillboard` or `HumanEntity.openWorkbench`. The ticker
-  catches hologram failures, so ticker tests run normally; the two tests that call those APIs
-  directly (`FluidAndRequesterTest.testHologramRedesignNoFlowOrRouted`,
-  `RecipeTest.prepareCraftUpgradesCellWithCargoSeamlessly`) are reported as **skipped**.
+  catches hologram failures, so ticker tests run normally; the one test that calls the hologram API
+  directly (`FluidAndRequesterTest.testHologramRedesignNoFlowOrRouted`) is reported as **skipped**.
+  Crafting tests open a `server.createInventory(player, InventoryType.WORKBENCH)` instead of
+  `openWorkbench`.
 - `src/test/java/dev/espi/protectionstones/PSRegion.java` is a stub of the ProtectionStones API that
   the provider tests load by reflection.
 
-## 3. Overview: 30 classes, 235 tests
+## 3. Overview: 35 classes, 260 tests
 
 | Class (package `com.chagui68.multiversenets` unless stated) | Tests | Covers |
 | --- | --- | --- |
 | `BlockFlowsTest` | 24 | Break/place with embedded state, pistons, explosions, wireless binding, rake, wrench, sneaking guard, dimensions, bridge linking from the Transmitter item, cable status. |
 | `BlueprintDupeTest` | 3 | Encoder Blueprints are never duplicated (two viewers, breaking with the menu open); installing a Blueprint consumes it and *Clear All* returns it. |
 | `CellGuiTest` | 9 | Quantum Cell menu: template, quick deposit, withdrawal, capacity, no duplication when the ticker runs. |
-| `CrafterGuiTest` | 10 | Crafter menu: install/uninstall/clear, Slimefun crafters accept only Slimefun Blueprints. |
+| `ChickenSorterTest` | 3 | GeneticChickengineering genes read like the addon (product, tier, strength, purity, age, special species); every rule must pass; the sorter moves only matching chickens, only while running, and never other items. |
+| `CrafterGuiTest` | 10 | Crafter menu: install/uninstall/clear; Slimefun crafters accept Slimefun and vanilla Blueprints, standard crafters refuse Slimefun ones. |
+| `DramBayTest` | 5 | A module in a DRAM Bay stores items; an ejected module moves its stock to another network; breaking the bay drops the module with its stock; the Fluid DRAM holds several fluids and travels with them; a controller no longer takes modules and hands back a legacy one with its items. |
 | `DeviceTypeTest` | 7 | `DeviceType` classification: filterable devices, Greedy Cell is not a cell, hand items, directional devices, request and Slimefun crafters. |
 | `FilterGuiTest` | 15 | Filter menu: add/remove templates, whitelist/blacklist, shift-click, faces, clear. |
-| `FluidAndRequesterTest` | 16 | Fluid storage and fluid cell quick interaction, Liquid Pump, terminal fluid page, Request Terminal (orders, chat amount, recursive chains, ignores Auto-Crafters, Slimefun Request Crafter), Slimefun Auto-Crafter, guide book command. |
+| `FluidAndRequesterTest` | 13 | Fluid storage and fluid cell quick interaction, Liquid Pump, terminal fluid page, Request Terminal (orders, chat amount, recursive chains, ignores Auto-Crafters, Slimefun Request Crafter), Slimefun Auto-Crafter. |
+| `GuideMenuTest` | 6 | Every device is documented in both languages and its recipe is found; `/mvnets guide en|es` opens the menu (no book); navigation to a device shows its real recipe; the language toggle keeps the page; device ingredients open their own page; nothing can be taken out. |
 | `GrabberQuotaTest` | 8 | `extractMatching`: honours the full per-cycle quota (including HT), merges slots of one item, leaves other items alone. |
 | `GreedyCellTest` | 8 | Greedy Cell multi-item storage, shared capacity, menu and terminal integration. |
 | `GuiDupeGuardTest` | 3 | `GuiListener` cancels dangerous clicks (also in cell and barrel menus); shift-click deposits never duplicate. |
@@ -69,12 +73,14 @@ Things to know:
 | `PluginResourcesTest` | 3 | `plugin.yml` and `config.yml` on the classpath; version sanity check. |
 | `PosUtilTest` | 2 | Coordinate packing round-trips, including world borders and negative Y. |
 | `QuantumWorkbenchTest` | 2 | Cell upgrade keeps the cargo; ingredients are returned on close. |
-| `RecipeTest` | 7 | Every recipe registered once, cable and cell recipes craft, a cell with cargo is upgraded keeping it. |
+| `RecipeTest` | 7 | Every recipe registered once, cable and cell recipes craft, a cell with cargo matches its upgrade recipe and keeps the cargo. |
+| `RecipeValidationTest` | 5 | Device ingredients are tracked per recipe; a plain material cannot stand in for a device; cell and module upgrades keep their cargo; a fluid cell that still holds fluid is refused; devices never feed vanilla recipes. |
+| `ReportedIssuesTest` | 8 | Advanced Pusher never loses items (one stack per slot); a multi-item whitelist leaves room for every ingredient; blacklisted items stay in the network; nothing goes into an Infinity Barrel's block inventory; hoppers never touch a device; custom items match after their name is stored differently; the barrel takes back a custom item it handed out; the Slimefun Recipe Encoder keeps its Blueprints. |
 | `SettingsCellCapacityTest` | 9 | `Settings` defaults and edge cases (capacities, clamps, null config). |
 | `SlimefunBridgeTest` | 5 | The Slimefun bridge is inert and never throws without Slimefun. |
 | `ToolsTest` | 3 | Wrench and Rake are hand tools; the Receiver is filterable; filters default to whitelist. |
 | `TransmissionFixesTest` | 13 | Item and fluid transmission: all-or-nothing fluid deposits, the pump never duplicates fluid, bridge with template-only filter, bridge never drains Greedy Cells, a device shared by two controllers works once per cycle, partial crafting results are undone, wrench pastes exact templates, rake returns the device, filters/face/transit buffer survive break and place, transit buffers above 99 units are saved without crashing. |
-| `UpgradedFeaturesTest` | 6 | CPU Virtual Cache, Router, per-chunk node limit, grabber transit buffer, cache kept on break, creative breaking drops nothing. |
+| `UpgradedFeaturesTest` | 6 | Legacy controller memory module, Router, per-chunk node limit, grabber transit buffer, cache kept on break, creative breaking drops nothing. |
 | `compat.NetworkOwnershipTest` | 9 | A network runs inside its owner's claim; other networks and a null owner are strangers; public land stays open; broken or unwired providers grant nothing; owner answers never leak between networks. |
 | `compat.ProtectionStonesProviderTest` | 18 | The ProtectionStones provider against the real API shape (`PSRegion.fromLocation*`, exact signatures), owner/member certification, fail-closed behaviour; WorldGuard region lookup fails safe. |
 | `compat.ProtectionWhitelistTest` | 15 | Protection defaults and `exempt-locations` parsing and geometry; the bridge is inert without providers. |

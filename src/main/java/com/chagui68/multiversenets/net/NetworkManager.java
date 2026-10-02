@@ -12,6 +12,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.inventory.FurnaceInventory;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
@@ -279,7 +280,7 @@ public class NetworkManager {
         return candidate.getType() == filterTemplate.getType() && cdType == null && cdSf == null;
     }
 
-    private static boolean matchesMaterialOrId(String entry, ItemStack candidate) {
+    public static boolean matchesMaterialOrId(String entry, ItemStack candidate) {
         if (entry == null || candidate == null) {
             return false;
         }
@@ -316,7 +317,10 @@ public class NetworkManager {
         }
         ItemStack result = null;
         int got = 0;
-        for (int i = 0; i < inv.getSize() && got < max; i++) {
+        for (int i : extractSlots(inv)) {
+            if (got >= max) {
+                break;
+            }
             ItemStack it = inv.getItem(i);
             if (it == null || it.getType().isAir() || !pred.test(it)) {
                 continue;
@@ -332,6 +336,7 @@ public class NetworkManager {
                 inv.setItem(i, null);
             } else {
                 it.setAmount(left);
+                inv.setItem(i, it);
             }
             got += take;
         }
@@ -348,11 +353,134 @@ public class NetworkManager {
      * ES: Inserta un ItemStack en un inventario vanilla y devuelve la cantidad sobrante.
      */
     public static int insertInto(Inventory inv, ItemStack stack) {
-        Map<Integer, ItemStack> overflow = inv.addItem(stack);
-        int left = 0;
-        for (ItemStack over : overflow.values()) {
-            left += over.getAmount();
+        if (stack == null || stack.getType().isAir() || stack.getAmount() <= 0) {
+            return 0;
         }
-        return left;
+        if (inv == null) {
+            return stack.getAmount();
+        }
+        // Por trozos de un stack como maximo. Un pusher saca 128 (o 1.024) unidades de golpe, y
+        // addItem con mas de un stack podia dejar en una ranura mas de lo que el item admite:
+        // el servidor recortaba la ranura y el exceso desaparecia de la red.
+        int perStack = maxPerSlot(inv, stack);
+        int remaining = stack.getAmount();
+        while (remaining > 0) {
+            int chunk = Math.min(perStack, remaining);
+            ItemStack part = stack.clone();
+            part.setAmount(chunk);
+            int left = 0;
+            for (ItemStack over : inv.addItem(part).values()) {
+                left += over.getAmount();
+            }
+            remaining -= chunk - left;
+            if (left > 0) {
+                break;
+            }
+        }
+        return remaining;
+    }
+
+    /**
+     * EN: Inserts {@code amount} units of {@code sample} the way a Pusher should: never more than
+     * one stack per slot, never into a furnace's result slot, and, when {@code kinds} &gt; 1, never
+     * letting one item type take more than its share of the slots. A whitelist of three
+     * ingredients into a 9-slot dispenser leaves three slots for each, so the first ingredient
+     * cannot flood the machine and lock the recipe out. {@code face} is the direction from the
+     * pusher to this inventory; a furnace fed from above gets everything in its input slot, from
+     * any other side fuel goes to the fuel slot.
+     *
+     * ES: Inserta {@code amount} unidades de {@code sample} como debe hacerlo un Pusher: nunca más
+     * de un stack por ranura, nunca en la ranura de resultado de un horno y, con {@code kinds} &gt; 1,
+     * sin que un tipo de ítem ocupe más que su parte de las ranuras. Una whitelist de tres
+     * ingredientes hacia un dispensador de 9 ranuras deja tres para cada uno, así el primero no
+     * llena la máquina y bloquea la receta. {@code face} es la dirección del pusher hacia este
+     * inventario: un horno alimentado desde arriba lo recibe todo en la entrada; desde otro lado el
+     * combustible va a su ranura.
+     *
+     * @return units that did not fit / unidades que no cupieron
+     */
+    public static int insertSmart(Inventory inv, ItemStack sample, int amount, BlockFace face, int kinds) {
+        if (sample == null || sample.getType().isAir() || amount <= 0) {
+            return 0;
+        }
+        if (inv == null) {
+            return amount;
+        }
+        int[] slots = insertSlots(inv, sample, face);
+        if (slots.length == 0) {
+            return amount;
+        }
+        int perSlot = maxPerSlot(inv, sample);
+        int share = kinds > 1 ? Math.max(1, slots.length / kinds) : Integer.MAX_VALUE;
+        int remaining = amount;
+        int occupied = 0;
+        // 1) Completar stacks que ya son de este item.
+        for (int slot : slots) {
+            ItemStack current = inv.getItem(slot);
+            if (current == null || current.getType().isAir() || !StackUtils.itemsMatch(current, sample)) {
+                continue;
+            }
+            occupied++;
+            int room = perSlot - current.getAmount();
+            if (room <= 0 || remaining <= 0) {
+                continue;
+            }
+            int add = Math.min(room, remaining);
+            current.setAmount(current.getAmount() + add);
+            inv.setItem(slot, current);
+            remaining -= add;
+        }
+        // 2) Ranuras vacias, sin pasar de la parte que le toca a este tipo.
+        for (int slot : slots) {
+            if (remaining <= 0 || occupied >= share) {
+                break;
+            }
+            ItemStack current = inv.getItem(slot);
+            if (current != null && !current.getType().isAir()) {
+                continue;
+            }
+            int add = Math.min(perSlot, remaining);
+            inv.setItem(slot, StackUtils.getAsQuantity(sample, add));
+            occupied++;
+            remaining -= add;
+        }
+        return remaining;
+    }
+
+    private static int maxPerSlot(Inventory inv, ItemStack sample) {
+        return Math.max(1, Math.min(sample.getMaxStackSize(), inv.getMaxStackSize()));
+    }
+
+    private static int[] allSlots(Inventory inv) {
+        int size = inv.getStorageContents().length;
+        int[] slots = new int[size];
+        for (int i = 0; i < size; i++) {
+            slots[i] = i;
+        }
+        return slots;
+    }
+
+    /** Ranuras donde un Pusher puede dejar este item. Hornos: entrada o combustible, nunca resultado. */
+    static int[] insertSlots(Inventory inv, ItemStack sample, BlockFace face) {
+        if (inv instanceof FurnaceInventory) {
+            if (face != BlockFace.DOWN && sample.getType().isFuel()) {
+                return new int[]{1};
+            }
+            return new int[]{0};
+        }
+        return allSlots(inv);
+    }
+
+    /** Ranuras de las que un Grabber puede sacar. De un horno, solo el resultado. */
+    static int[] extractSlots(Inventory inv) {
+        if (inv instanceof FurnaceInventory) {
+            return new int[]{2};
+        }
+        int size = inv.getSize();
+        int[] slots = new int[size];
+        for (int i = 0; i < size; i++) {
+            slots[i] = i;
+        }
+        return slots;
     }
 }

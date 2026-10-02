@@ -204,6 +204,7 @@ public class NetworkTicker {
         forEachWorked(net, DeviceType.MVN_RECEIVER, pos -> bridgeOnce(net, pos, base));
         forEachWorked(net, DeviceType.MVN_TRANSMITTER, pos -> transmitOnce(net, pos, base));
         forEachWorked(net, DeviceType.MVN_LIQUID_PUMP, pos -> pumpTick(net, pos));
+        forEachWorked(net, DeviceType.MVN_CHICKEN_SORTER, pos -> chickenSortOnce(net, pos));
     }
 
     private NodeBlob blobOf(Network net, long pos) {
@@ -250,10 +251,10 @@ public class NetworkTicker {
      */
     private ItemStack streamToPushers(Network net, ItemStack stack) {
         if (stack == null || stack.getAmount() <= 0) return null;
+        int[] remaining = {stack.getAmount()};
         for (DeviceType pusherType : List.of(DeviceType.MVN_PUSHER_HT, DeviceType.MVN_PUSHER)) {
-            final ItemStack currentStack = stack;
             net.forEach(pusherType, (pos, type) -> {
-                if (currentStack.getAmount() <= 0) return;
+                if (remaining[0] <= 0) return;
                 NodeBlob pBlob = blobOf(net, pos);
                 if (pBlob == null) return;
                 boolean hasItems = pBlob.filterItems != null && !pBlob.filterItems.isEmpty();
@@ -262,29 +263,19 @@ public class NetworkTicker {
                     return; // In whitelist mode, empty filter must not push items
                 }
                 Predicate<ItemStack> pPred = NetworkManager.filterPredicate(pBlob);
-                if (!pPred.test(currentStack)) return;
+                if (!pPred.test(stack)) return;
                 Block pBlock = net.block(pos);
+                int kinds = filterKinds(pBlob);
                 for (BlockFace face : facesFor(pBlob)) {
-                    Block target = pBlock.getRelative(face);
-                    // El desvio de sobrantes es un pusher mas: la misma puerta de proteccion que
-                    // pushOnce, o el sobrante de un grabber acabaria dentro del cofre de otro.
-                    if (denied(net, target)) {
-                        continue;
-                    }
-                    if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
-                        int unhoused = SlimefunBridge.insert(target, currentStack);
-                        currentStack.setAmount(unhoused);
-                        if (unhoused <= 0) return;
-                    } else if (isPotentialContainer(target.getType()) && target.getState() instanceof InventoryHolder holder) {
-                        int unhoused = NetworkManager.insertInto(holder.getInventory(), currentStack);
-                        currentStack.setAmount(unhoused);
-                        if (unhoused <= 0) return;
-                    }
+                    // El desvio de sobrantes es un pusher mas: la misma puerta de proteccion y las
+                    // mismas reglas de insercion que pushOnce.
+                    remaining[0] = insertToTarget(net, pBlock, face, stack, remaining[0], kinds);
+                    if (remaining[0] <= 0) return;
                 }
             });
-            if (stack.getAmount() <= 0) return null;
+            if (remaining[0] <= 0) return null;
         }
-        return stack.getAmount() > 0 ? stack : null;
+        return StackUtils.getAsQuantity(stack, remaining[0]);
     }
 
     /**
@@ -367,13 +358,11 @@ public class NetworkTicker {
                         extracted.setAmount(leftover);
                         ItemStack unrouted = streamToPushers(net, extracted);
                         if (unrouted != null && unrouted.getAmount() > 0) {
-                            int unhoused = SlimefunBridge.insert(target, unrouted);
-                            if (unhoused > 0) {
-                                unrouted.setAmount(unhoused);
-                                blob.setTransit(unrouted);
-                                NodeStore.put(self, blob);
-                                moved -= unhoused;
-                            }
+                            // Al bufer de transito, nunca de vuelta a la maquina: insert() usa las
+                            // ranuras de ENTRADA y el producto se volvia a procesar.
+                            blob.setTransit(unrouted);
+                            NodeStore.put(self, blob);
+                            moved -= unrouted.getAmount();
                         }
                     }
                     if (moved > 0) {
@@ -400,13 +389,11 @@ public class NetworkTicker {
                     extracted.setAmount(leftover);
                     ItemStack unrouted = streamToPushers(net, extracted);
                     if (unrouted != null && unrouted.getAmount() > 0) {
-                        int sinCasa = NetworkManager.insertInto(inv, unrouted);
-                        if (sinCasa > 0) {
-                            unrouted.setAmount(sinCasa);
-                            blob.setTransit(unrouted);
-                            NodeStore.put(self, blob);
-                            moved -= sinCasa;
-                        }
+                        // Igual que con Slimefun: al bufer, no al origen (en un horno acabaria en
+                        // la ranura de entrada).
+                        blob.setTransit(unrouted);
+                        NodeStore.put(self, blob);
+                        moved -= unrouted.getAmount();
                     }
                 }
                 if (moved > 0) {
@@ -461,81 +448,293 @@ public class NetworkTicker {
         }
 
         Block self = net.block(pos);
-        // Pre-check: Ensure at least one adjacent face has a container before withdrawing items
-        boolean hasTargetContainer = false;
+        // Solo las caras con un contenedor real: nunca otro nodo de la red (un Infinity Barrel es un
+        // barril vanilla por dentro y lo que se metia ahi quedaba oculto), nunca tierra ajena.
+        List<BlockFace> targets = new ArrayList<>();
         for (BlockFace face : facesFor(blob)) {
-            Block target = self.getRelative(face);
-            if (denied(net, target)) {
-                continue;
-            }
-            if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
-                hasTargetContainer = true;
-                break;
-            }
-            if (isPotentialContainer(target.getType()) && target.getState() instanceof InventoryHolder) {
-                hasTargetContainer = true;
-                break;
+            if (isPushTarget(net, self.getRelative(face))) {
+                targets.add(face);
             }
         }
-        if (!hasTargetContainer) {
+        if (targets.isEmpty()) {
             backoffCycles.put(pos, Math.min(30, backoff + 1));
             return;
         }
 
-        Predicate<ItemStack> pred = NetworkManager.filterPredicate(blob);
-        ItemStack stack = net.storage().withdraw(pred, rate, -1L, false);
-        if (stack == null) {
-            backoffCycles.put(pos, Math.min(30, backoff + 1));
-            return;
-        }
-        int initialAmount = stack.getAmount();
-        for (BlockFace face : facesFor(blob)) {
-            Block target = self.getRelative(face);
-            Material mat = target.getType();
-            if (denied(net, target)) {
-                continue;
-            }
-
-            // 1. Slimefun machine compatibility FIRST
-            if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
-                int before = stack.getAmount();
-                int unhoused = SlimefunBridge.insert(target, stack);
-                stack.setAmount(Math.max(0, Math.min(unhoused, before)));
-                if (stack.getAmount() <= 0) {
+        int kinds = filterKinds(blob);
+        int budget = rate;
+        int deliveredTotal = 0;
+        List<ItemStack> tried = new ArrayList<>();
+        for (Predicate<ItemStack> base : pushPredicates(pos, blob)) {
+            // Una whitelist de varias entradas se recorre entrada a entrada (empezando cada ciclo
+            // por la siguiente) para que todos los ingredientes lleguen a la maquina. Un filtro
+            // unico prueba hasta 4 tipos distintos: si el primero no cabe, otro aun puede entrar.
+            int attempts = kinds > 1 ? 1 : 4;
+            for (int attempt = 0; attempt < attempts && budget > 0; attempt++) {
+                Predicate<ItemStack> pred = base.and(item -> notTried(tried, item));
+                ItemStack stack = net.storage().withdraw(pred, budget, -1L, false);
+                if (stack == null) {
                     break;
                 }
-                continue;
-            }
-
-            // 2. Vanilla container fallback
-            if (isPotentialContainer(mat) && target.getState() instanceof InventoryHolder holder) {
-                int leftover = NetworkManager.insertInto(holder.getInventory(), stack);
-                stack.setAmount(leftover);
-                if (leftover <= 0) {
-                    break;
+                tried.add(StackUtils.getAsQuantity(stack, 1));
+                int initialAmount = stack.getAmount();
+                int left = initialAmount;
+                for (BlockFace face : targets) {
+                    left = insertToTarget(net, self, face, stack, left, kinds);
+                    if (left <= 0) {
+                        break;
+                    }
                 }
-                continue;
+                int delivered = initialAmount - left;
+                deliveredTotal += delivered;
+                budget -= delivered;
+                if (left > 0) {
+                    returnToNetwork(net, self, StackUtils.getAsQuantity(stack, left));
+                }
+            }
+            if (budget <= 0) {
+                break;
             }
         }
-        int delivered = initialAmount - stack.getAmount();
-        if (delivered > 0) {
+        if (deliveredTotal > 0) {
             backoffCycles.remove(pos);
-            net.throughput().recordFlow(pos, delivered);
+            net.throughput().recordFlow(pos, deliveredTotal);
         } else {
             backoffCycles.put(pos, Math.min(30, backoff + 1));
         }
-        if (stack.getAmount() > 0) {
-            int leftover = net.storage().deposit(stack);
-            if (leftover > 0) {
-                stack.setAmount(leftover);
-                // Safe buffer: do not drop items on ground if transitBuffer can hold them
-                if (blob.addTransit(stack)) {
-                    NodeStore.put(self, blob);
-                } else {
-                    dropAt(self, stack);
+    }
+
+    /** Lo que un pusher saco y no pudo entregar vuelve a la red; si no cabe, a su bufer de transito. */
+    private void returnToNetwork(Network net, Block self, ItemStack stack) {
+        int leftover = net.storage().deposit(stack);
+        if (leftover <= 0) {
+            return;
+        }
+        ItemStack rest = StackUtils.getAsQuantity(stack, leftover);
+        // Safe buffer: do not drop items on ground if transitBuffer can hold them
+        NodeBlob blob = NodeStore.get(self);
+        if (blob != null && blob.addTransit(rest)) {
+            NodeStore.put(self, blob);
+        } else {
+            dropAt(self, rest);
+        }
+    }
+
+    private static boolean notTried(List<ItemStack> tried, ItemStack item) {
+        for (ItemStack t : tried) {
+            if (StackUtils.itemsMatch(t, item)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * EN: Entries of a whitelist (0 for a blacklist). With more than one, a Pusher hands each entry
+     * its share of the target's slots and serves them in turn.
+     *
+     * ES: Entradas de una whitelist (0 para una blacklist). Con más de una, el Pusher reparte las
+     * ranuras del destino entre ellas y las sirve por turnos.
+     */
+    static int filterKinds(NodeBlob blob) {
+        if (blob == null || blob.filterBlacklist) {
+            return 0;
+        }
+        if (blob.filterItems != null && !blob.filterItems.isEmpty()) {
+            int n = 0;
+            for (ItemStack t : blob.filterItems) {
+                if (t != null && !t.getType().isAir()) {
+                    n++;
+                }
+            }
+            return n;
+        }
+        return blob.filterMaterials == null ? 0 : blob.filterMaterials.size();
+    }
+
+    private final java.util.Map<Long, Integer> pushRotation = new java.util.HashMap<>();
+
+    /**
+     * Una whitelist de varias entradas da un predicado por entrada, empezando cada ciclo por la
+     * siguiente; cualquier otro filtro es un unico predicado.
+     */
+    private List<Predicate<ItemStack>> pushPredicates(long pos, NodeBlob blob) {
+        List<Predicate<ItemStack>> preds = new ArrayList<>();
+        if (filterKinds(blob) > 1) {
+            if (blob.filterItems != null && !blob.filterItems.isEmpty()) {
+                for (ItemStack t : blob.filterItems) {
+                    if (t != null && !t.getType().isAir()) {
+                        preds.add(item -> item != null && NetworkManager.matchesFilter(t, item));
+                    }
+                }
+            } else {
+                for (String entry : blob.filterMaterials) {
+                    preds.add(item -> NetworkManager.matchesMaterialOrId(entry, item));
+                }
+            }
+            int start = Math.floorMod(pushRotation.merge(pos, 1, Integer::sum), preds.size());
+            java.util.Collections.rotate(preds, -start);
+            return preds;
+        }
+        preds.add(NetworkManager.filterPredicate(blob));
+        return preds;
+    }
+
+    /** Un bloque al que un pusher puede entregar: contenedor o maquina, no un nodo, no ajeno. */
+    private static boolean isPushTarget(Network net, Block target) {
+        if (NodeStore.hasNode(target) || denied(net, target)) {
+            return false;
+        }
+        if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
+            return true;
+        }
+        return isPotentialContainer(target.getType()) && target.getState() instanceof InventoryHolder;
+    }
+
+    /**
+     * Entrega {@code amount} unidades de {@code sample} al bloque en {@code face} y devuelve lo que
+     * no cupo. Maquinas de Slimefun primero, luego contenedores vanilla.
+     */
+    private static int insertToTarget(Network net, Block self, BlockFace face, ItemStack sample,
+                                      int amount, int kinds) {
+        if (amount <= 0) {
+            return 0;
+        }
+        Block target = self.getRelative(face);
+        if (!isPushTarget(net, target)) {
+            return amount;
+        }
+        if (Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target)) {
+            int left = SlimefunBridge.insert(target, StackUtils.getAsQuantity(sample, amount), kinds);
+            return Math.max(0, Math.min(amount, left));
+        }
+        if (target.getState() instanceof InventoryHolder holder) {
+            return NetworkManager.insertSmart(holder.getInventory(), sample, amount, face, kinds);
+        }
+        return amount;
+    }
+
+    /** Pocket chickens are one of a kind (each carries its own DNA): this many per cycle at most. */
+    private static final int CHICKENS_PER_CYCLE = 16;
+
+    /**
+     * EN: Genetic Chicken Sorter. Only GeneticChickengineering pocket chickens that meet every rule
+     * of the sorter move. Push: from the network into the faced block (never another network node).
+     * Pull: from the faced block into the network; what the network cannot take waits in the
+     * sorter's transit buffer. A stopped sorter does nothing, so a fresh one cannot empty a
+     * network before it is configured.
+     *
+     * ES: Genetic Chicken Sorter. Solo se mueven los pollos de bolsillo de GeneticChickengineering
+     * que cumplen todas las reglas. Push: de la red al bloque al que mira (nunca a otro nodo).
+     * Pull: de ese bloque a la red; lo que la red no admite espera en el búfer de tránsito. Parado
+     * no hace nada, así uno recién colocado no vacía la red antes de configurarlo.
+     */
+    private void chickenSortOnce(Network net, long pos) {
+        NodeBlob blob = blobOf(net, pos);
+        if (blob == null || !blob.chickenActive) {
+            return;
+        }
+        Block self = net.block(pos);
+        if (blob.hasTransit()) {
+            int stuck = net.storage().deposit(blob.transitStack());
+            if (stuck > 0) {
+                ItemStack pending = blob.transitStack();
+                pending.setAmount(stuck);
+                blob.setTransit(pending);
+                NodeStore.put(self, blob);
+                return;
+            }
+            blob.setTransit(null);
+            NodeStore.put(self, blob);
+        }
+        int backoff = backoffCycles.getOrDefault(pos, 0);
+        if (backoff > 0 && (backoff % 3 != 0)) {
+            backoffCycles.put(pos, backoff + 1);
+            return;
+        }
+        Predicate<ItemStack> rules = item -> com.chagui68.multiversenets.compat.ChickenGenetics.matches(blob, item);
+        int moved = blob.chickenPull ? pullChickens(net, self, blob, rules) : pushChickens(net, self, blob, rules);
+        if (moved > 0) {
+            backoffCycles.remove(pos);
+            net.throughput().recordFlow(pos, moved);
+        } else {
+            backoffCycles.put(pos, Math.min(30, backoff + 1));
+        }
+    }
+
+    private int pushChickens(Network net, Block self, NodeBlob blob, Predicate<ItemStack> rules) {
+        List<BlockFace> targets = new ArrayList<>();
+        for (BlockFace face : facesFor(blob)) {
+            if (isPushTarget(net, self.getRelative(face))) {
+                targets.add(face);
+            }
+        }
+        if (targets.isEmpty()) {
+            return 0;
+        }
+        int moved = 0;
+        List<ItemStack> tried = new ArrayList<>();
+        for (int i = 0; i < CHICKENS_PER_CYCLE && moved < CHICKENS_PER_CYCLE; i++) {
+            ItemStack chicken = net.storage().withdraw(rules.and(item -> notTried(tried, item)),
+                    CHICKENS_PER_CYCLE - moved, -1L, false);
+            if (chicken == null) {
+                break;
+            }
+            tried.add(StackUtils.getAsQuantity(chicken, 1));
+            int left = chicken.getAmount();
+            for (BlockFace face : targets) {
+                left = insertToTarget(net, self, face, chicken, left, 0);
+                if (left <= 0) {
+                    break;
+                }
+            }
+            moved += chicken.getAmount() - left;
+            if (left > 0) {
+                returnToNetwork(net, self, StackUtils.getAsQuantity(chicken, left));
+            }
+        }
+        return moved;
+    }
+
+    private int pullChickens(Network net, Block self, NodeBlob blob, Predicate<ItemStack> rules) {
+        int moved = 0;
+        for (BlockFace face : facesFor(blob)) {
+            Block target = self.getRelative(face);
+            if (NodeStore.hasNode(target) || denied(net, target)) {
+                continue;
+            }
+            boolean slimefun = Settings.compatSlimefun() && SlimefunBridge.isAvailable() && SlimefunBridge.isMachine(target);
+            Inventory inv = null;
+            if (!slimefun) {
+                if (!isPotentialContainer(target.getType()) || !(target.getState() instanceof InventoryHolder holder)) {
+                    continue;
+                }
+                inv = holder.getInventory();
+            }
+            while (moved < CHICKENS_PER_CYCLE) {
+                ItemStack chicken = slimefun
+                        ? SlimefunBridge.extract(target, rules, CHICKENS_PER_CYCLE - moved)
+                        : NetworkManager.extractMatching(inv, rules, CHICKENS_PER_CYCLE - moved);
+                if (chicken == null) {
+                    break;
+                }
+                moved += chicken.getAmount();
+                int leftover = net.storage().deposit(chicken);
+                if (leftover > 0) {
+                    // La red esta llena: el pollo espera en el bufer y el clasificador se detiene
+                    // hasta poder entregarlo (se reintenta al principio del siguiente ciclo).
+                    NodeBlob fresh = NodeStore.get(self);
+                    ItemStack rest = StackUtils.getAsQuantity(chicken, leftover);
+                    if (fresh != null && fresh.addTransit(rest)) {
+                        NodeStore.put(self, fresh);
+                    } else {
+                        dropAt(self, rest);
+                    }
+                    return moved - leftover;
                 }
             }
         }
+        return moved;
     }
 
     /**

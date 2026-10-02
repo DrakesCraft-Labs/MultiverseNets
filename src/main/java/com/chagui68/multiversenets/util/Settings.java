@@ -362,4 +362,13 @@ public final class Settings {
     public static long fluidCellCapacity() {
         return cfg != null ? Math.max(1000L, cfg.getLong("fluids.cell-capacity-mb", 64000L)) : 64000L;
     }
+
+    /**
+     * EN: Total millibuckets a Fluid DRAM Module holds, shared by every fluid inside it.
+     *
+     * ES: Milicubos totales que guarda un Fluid DRAM Module, compartidos por todos sus fluidos.
+     */
+    public static long fluidDramCapacity() {
+        return cfg != null ? Math.max(1000L, cfg.getLong("fluids.dram-capacity-mb", 512000L)) : 512000L;
+    }
 }

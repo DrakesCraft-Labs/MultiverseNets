@@ -99,7 +99,13 @@ public enum DeviceType {
     /** Slimefun automated recipe crafter / Crafteador automático de recetas de Slimefun */
     MVN_SF_CRAFTER(Material.CRYING_OBSIDIAN, "Slimefun Auto-Crafter", true, -1),
     /** Slimefun on-demand crafting chamber / Cámara de crafteo bajo demanda de Slimefun */
-    MVN_SF_REQUEST_CRAFTER(Material.PURPUR_PILLAR, "Slimefun Request Crafter", true, -1);
+    MVN_SF_REQUEST_CRAFTER(Material.PURPUR_PILLAR, "Slimefun Request Crafter", true, -1),
+    /** Network block that holds one memory module (items or fluids) / Bloque de red que aloja un modulo de memoria */
+    MVN_DRAM_BAY(Material.WAXED_COPPER_BULB, "DRAM Bay", true, -1),
+    /** Fluid-only memory module for the DRAM Bay / Modulo de memoria exclusivo para fluidos */
+    MVN_FLUID_DRAM(Material.HEART_OF_THE_SEA, "Fluid DRAM Module", false, -1),
+    /** Sorts GeneticChickengineering pocket chickens by their genes / Clasifica pollos de GeneticChickengineering por genes */
+    MVN_CHICKEN_SORTER(Material.HAY_BLOCK, "Genetic Chicken Sorter", true, -1);
 
     private final Material material;
     private final String display;
@@ -241,6 +247,14 @@ public enum DeviceType {
     public boolean isCacheModule() {
         return this == MVN_CACHE_L1 || this == MVN_CACHE_L2 || this == MVN_CACHE_L3
                 || this == MVN_CACHE_DRAM || this == MVN_CACHE_QUANTUM;
+    }
+
+    /**
+     * @return true if the item goes into a DRAM Bay (an item cache module or the Fluid DRAM) /
+     *         true si el item va en un DRAM Bay (modulo de cache de items o el Fluid DRAM)
+     */
+    public boolean isMemoryModule() {
+        return isCacheModule() || this == MVN_FLUID_DRAM;
     }
 
     /**

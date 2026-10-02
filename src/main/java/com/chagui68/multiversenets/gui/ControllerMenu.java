@@ -3,6 +3,7 @@ package com.chagui68.multiversenets.gui;
 import com.chagui68.multiversenets.MultiverseNets;
 import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.item.Items;
+import com.chagui68.multiversenets.net.MemoryModules;
 import com.chagui68.multiversenets.net.Network;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
@@ -88,7 +89,7 @@ public class ControllerMenu extends MenuHolder {
         };
         ItemStack item = new ItemStack(mat);
         var meta = item.getItemMeta();
-        meta.displayName(Component.text("CPU Virtual Storage", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
+        meta.displayName(Component.text("Legacy Memory Module", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
         List<Component> lore = new ArrayList<>();
         lore.add(Component.text("Tier: " + tierName + (tier > 0 ? " (T" + tier + ")" : ""), NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
         if (tier > 0) {
@@ -96,9 +97,12 @@ public class ControllerMenu extends MenuHolder {
             lore.add(Component.text("Capacity: " + Items.formatAmount(cap) + " items", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
             lore.add(Component.text("Stored: " + Items.formatAmount(total) + " (" + String.format("%.1f", pct) + "%)", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
             lore.add(Component.text("Item Types: " + (blob.virtualSamples != null ? blob.virtualSamples.size() : 0), NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.empty());
+            lore.add(Component.text("Click: take the module out WITH its items", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("and install it in a DRAM Bay.", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
         } else {
-            lore.add(Component.text("Right-click controller with a Cache Module", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("to install virtual storage.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("Memory modules now go in a DRAM Bay", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("connected to this network.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
         }
         meta.lore(lore);
         item.setItemMeta(meta);
@@ -130,7 +134,18 @@ public class ControllerMenu extends MenuHolder {
     @Override
     protected void click(InventoryClickEvent event) {
         int slot = event.getRawSlot();
-        if (slot == 15) {
+        if (slot == 11) {
+            // Controladores anteriores al DRAM Bay: el modulo sale con sus items para llevarlo a un bay.
+            NodeBlob blob = NodeStore.get(block);
+            ItemStack module = MemoryModules.ejectControllerCache(blob);
+            if (module != null) {
+                NodeStore.put(block, blob);
+                network.storage().invalidate();
+                giveOrDrop(module);
+                player.sendMessage(Text.msg("Module taken out with its items. Install it in a DRAM Bay.", NamedTextColor.GREEN));
+                draw();
+            }
+        } else if (slot == 15) {
             player.closeInventory();
             new TerminalMenu(plugin, player, network).openMenu();
         } else if (slot == 22) {

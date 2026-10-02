@@ -48,7 +48,7 @@ public final class Items {
         switch (type) {
             case MVN_CONTROLLER -> {
                 lore.add(Component.text("Central brain powering and coordinating the network.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-                lore.add(Component.text("Accepts CPU Cache modules to expand network throughput.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Memory modules go in a DRAM Bay connected to the network.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_CABLE -> {
                 lore.add(Component.text("Digital conduit connecting devices across the network.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
@@ -106,8 +106,8 @@ public final class Items {
                 lore.add(Component.text("Automated crafting machine driven by installed recipe Blueprints.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_SF_CRAFTER -> {
-                lore.add(Component.text("Automated crafting machine driven by Slimefun recipe Blueprints.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-                lore.add(Component.text("Compatible with recipes from Slimefun Recipe Encoder.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Automated crafting machine driven by recipe Blueprints.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Accepts Slimefun AND vanilla Blueprints.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_ENCODER -> {
                 lore.add(Component.text("Encodes standard crafting recipes onto blank Blueprints.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
@@ -163,14 +163,28 @@ public final class Items {
                 lore.add(Component.text("Holds blueprints for batch crafting jobs (does not auto-craft).", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
             }
             case MVN_SF_REQUEST_CRAFTER -> {
-                lore.add(Component.text("On-demand Slimefun crafting unit managed via the Request Terminal.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-                lore.add(Component.text("Holds Slimefun blueprints for on-demand batch requests.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("On-demand crafting unit managed via the Request Terminal.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Holds Slimefun and vanilla blueprints for batch requests.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_DRAM_BAY -> {
+                lore.add(Component.text("Holds one memory module: its stock becomes network storage.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Eject the module to carry its whole stock to another network.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_FLUID_DRAM -> {
+                lore.add(Component.text("Fluid-only memory module for a DRAM Bay; several fluids at once.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Capacity: " + formatAmount(Settings.fluidDramCapacity()) + " mB ("
+                        + (Settings.fluidDramCapacity() / 1000) + " Buckets)", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Keeps its fluids when taken out of the bay.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+            }
+            case MVN_CHICKEN_SORTER -> {
+                lore.add(Component.text("Sorts GeneticChickengineering pocket chickens by their genes.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                lore.add(Component.text("Filter by product, tier, DNA strength, purity, DNA and age.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
             }
             default -> {
                 if (type.isCacheModule()) {
-                    lore.add(Component.text("Expands Controller memory capacity and network throughput.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+                    lore.add(Component.text("Item memory module for a DRAM Bay.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
                     lore.add(Component.text("Capacity: " + formatAmount(capacityOf(type)) + " items", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
-                    lore.add(Component.text("Right-click Controller to install/upgrade.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
+                    lore.add(Component.text("Keeps its items when taken out of the bay.", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false));
                 }
             }
         }
@@ -601,7 +615,7 @@ public final class Items {
             shaped(plugin, "cell_t" + tier, create(cur), r -> {
                 r.shape("DDD", "DPD", "DDD");
                 r.setIngredient('D', Material.DIAMOND);
-                r.setIngredient('P', new org.bukkit.inventory.RecipeChoice.ExactChoice(create(prevFinal)));
+                device(r, 'P', prevFinal);
             });
         }
         shaped(plugin, "grabber", create(DeviceType.MVN_GRABBER), r -> {
@@ -696,7 +710,7 @@ public final class Items {
         shaped(plugin, "router", create(DeviceType.MVN_ROUTER), r -> {
             r.shape(" L ", " C ", " R ");
             r.setIngredient('L', Material.LIGHTNING_ROD);
-            r.setIngredient('C', new org.bukkit.inventory.RecipeChoice.ExactChoice(create(DeviceType.MVN_CABLE)));
+            device(r, 'C', DeviceType.MVN_CABLE);
             r.setIngredient('R', Material.REDSTONE_BLOCK);
         });
         shaped(plugin, "cache_l1", create(DeviceType.MVN_CACHE_L1), r -> {
@@ -708,25 +722,25 @@ public final class Items {
             r.shape("GLG", "LPL", "GLG");
             r.setIngredient('G', Material.GOLD_INGOT);
             r.setIngredient('L', Material.LAPIS_LAZULI);
-            r.setIngredient('P', new org.bukkit.inventory.RecipeChoice.ExactChoice(create(DeviceType.MVN_CACHE_L1)));
+            device(r, 'P', DeviceType.MVN_CACHE_L1);
         });
         shaped(plugin, "cache_l3", create(DeviceType.MVN_CACHE_L3), r -> {
             r.shape("DAD", "APA", "DAD");
             r.setIngredient('D', Material.DIAMOND);
             r.setIngredient('A', Material.AMETHYST_SHARD);
-            r.setIngredient('P', new org.bukkit.inventory.RecipeChoice.ExactChoice(create(DeviceType.MVN_CACHE_L2)));
+            device(r, 'P', DeviceType.MVN_CACHE_L2);
         });
         shaped(plugin, "cache_dram", create(DeviceType.MVN_CACHE_DRAM), r -> {
             r.shape("NEN", "EPE", "NEN");
             r.setIngredient('N', Material.NETHERITE_INGOT);
             r.setIngredient('E', Material.ENDER_EYE);
-            r.setIngredient('P', new org.bukkit.inventory.RecipeChoice.ExactChoice(create(DeviceType.MVN_CACHE_L3)));
+            device(r, 'P', DeviceType.MVN_CACHE_L3);
         });
         shaped(plugin, "cache_quantum", create(DeviceType.MVN_CACHE_QUANTUM), r -> {
             r.shape("NSN", "SPS", "NSN");
             r.setIngredient('N', Material.NETHERITE_BLOCK);
             r.setIngredient('S', Material.NETHER_STAR);
-            r.setIngredient('P', new org.bukkit.inventory.RecipeChoice.ExactChoice(create(DeviceType.MVN_CACHE_DRAM)));
+            device(r, 'P', DeviceType.MVN_CACHE_DRAM);
         });
         shaped(plugin, "crafting_grid", create(DeviceType.MVN_CRAFTING_GRID), r -> {
             r.shape("CRC", "RGR", "CRC");
@@ -810,10 +824,84 @@ public final class Items {
                 r.setIngredient('L', Material.LECTERN);
             });
         }
+        // El bloque que aloja los modulos de memoria: hierro, cuarzo y redstone alrededor de un
+        // bloque de cobre (el material del propio bay).
+        shaped(plugin, "dram_bay", create(DeviceType.MVN_DRAM_BAY), r -> {
+            r.shape("IQI", "RCR", "IQI");
+            r.setIngredient('I', Material.IRON_INGOT);
+            r.setIngredient('Q', Material.QUARTZ);
+            r.setIngredient('R', Material.REDSTONE);
+            r.setIngredient('C', Material.COPPER_BLOCK);
+        });
+        // Dos celdas de fluidos vacias (64 cubos cada una) mas diamantes y cubos dan un modulo de
+        // 512 cubos: compensa frente a 8 celdas, pero no es gratis.
+        shaped(plugin, "fluid_dram", create(DeviceType.MVN_FLUID_DRAM), r -> {
+            r.shape("DBD", "FEF", "DBD");
+            r.setIngredient('D', Material.DIAMOND);
+            r.setIngredient('B', Material.BUCKET);
+            r.setIngredient('E', Material.ENDER_EYE);
+            device(r, 'F', DeviceType.MVN_FLUID_CELL);
+        });
+        shaped(plugin, "chicken_sorter", create(DeviceType.MVN_CHICKEN_SORTER), r -> {
+            r.shape("FEF", "CPC", "FEF");
+            r.setIngredient('F', Material.FEATHER);
+            r.setIngredient('E', Material.EGG);
+            r.setIngredient('C', Material.COMPARATOR);
+            device(r, 'P', DeviceType.MVN_PUSHER_HT);
+        });
         plugin.getLogger().info("Registered " + recipeCount() + " crafting recipes with Bukkit.");
     }
 
     private static final List<NamespacedKey> RECIPE_KEYS = new ArrayList<>();
+
+    /**
+     * EN: MultiverseNets devices a recipe takes as ingredients, with how many of each. The
+     * ingredient is registered as its plain material so the server always matches the recipe
+     * (a cell that carries cargo, or a module whose lore changed, no longer matched an exact-item
+     * ingredient), and {@code CraftingListener} then checks that every such slot really holds
+     * that device.
+     *
+     * ES: Dispositivos de MultiverseNets que una receta usa como ingredientes, con cuántos de cada
+     * uno. El ingrediente se registra como su material simple para que el servidor siempre case la
+     * receta (una celda con carga, o un módulo cuyo lore cambió, ya no casaba con un ingrediente de
+     * ítem exacto), y {@code CraftingListener} comprueba que cada ranura tenga de verdad ese
+     * dispositivo.
+     */
+    private static final java.util.Map<NamespacedKey, java.util.Map<DeviceType, Integer>> DEVICE_INGREDIENTS =
+            new java.util.HashMap<>();
+    private static final java.util.Map<Character, DeviceType> PENDING_DEVICES = new java.util.HashMap<>();
+    /** Which grid character of a recipe is a device, for the in-game guide. */
+    private static final java.util.Map<NamespacedKey, java.util.Map<Character, DeviceType>> DEVICE_CHARS =
+            new java.util.HashMap<>();
+    /** Recipes that upgrade a cell or a memory module: the ingredient's stored cargo moves to the result. */
+    private static final java.util.Set<String> UPGRADE_RECIPES = java.util.Set.of(
+            "cell_t2", "cell_t3", "cell_t4", "cell_t5", "cell_t6",
+            "cache_l2", "cache_l3", "cache_dram", "cache_quantum");
+
+    private static void device(ShapedRecipe recipe, char key, DeviceType type) {
+        recipe.setIngredient(key, new org.bukkit.inventory.RecipeChoice.MaterialChoice(type.material()));
+        PENDING_DEVICES.put(key, type);
+    }
+
+    /** Devices (and how many) a recipe of this plugin needs; empty when it takes none. */
+    public static java.util.Map<DeviceType, Integer> deviceIngredients(NamespacedKey key) {
+        synchronized (RECIPE_KEYS) {
+            return DEVICE_INGREDIENTS.getOrDefault(key, java.util.Map.of());
+        }
+    }
+
+    /** The device a recipe's grid character stands for, or null when it is a plain material. */
+    public static DeviceType deviceIngredientAt(NamespacedKey key, char c) {
+        synchronized (RECIPE_KEYS) {
+            java.util.Map<Character, DeviceType> chars = DEVICE_CHARS.get(key);
+            return chars == null ? null : chars.get(c);
+        }
+    }
+
+    /** True for the cell and memory-module tier upgrades, which keep the ingredient's cargo. */
+    public static boolean isUpgradeRecipe(NamespacedKey key) {
+        return key != null && UPGRADE_RECIPES.contains(key.getKey());
+    }
 
     /**
      * @return Total count of registered recipe keys.
@@ -862,7 +950,27 @@ public final class Items {
         } catch (Throwable ignored) {
         }
         ShapedRecipe recipe = new ShapedRecipe(nk, result);
-        def.define(recipe);
+        java.util.Map<DeviceType, Integer> devices = new java.util.EnumMap<>(DeviceType.class);
+        synchronized (RECIPE_KEYS) {
+            PENDING_DEVICES.clear();
+            def.define(recipe);
+            for (String row : recipe.getShape()) {
+                for (char c : row.toCharArray()) {
+                    DeviceType type = PENDING_DEVICES.get(c);
+                    if (type != null) {
+                        devices.merge(type, 1, Integer::sum);
+                    }
+                }
+            }
+            if (devices.isEmpty()) {
+                DEVICE_INGREDIENTS.remove(nk);
+                DEVICE_CHARS.remove(nk);
+            } else {
+                DEVICE_INGREDIENTS.put(nk, devices);
+                DEVICE_CHARS.put(nk, new java.util.HashMap<>(PENDING_DEVICES));
+            }
+            PENDING_DEVICES.clear();
+        }
         try {
             boolean ok = Bukkit.addRecipe(recipe);
             if (!ok) {

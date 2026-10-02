@@ -106,6 +106,101 @@ public class NodeBlob implements Serializable {
     public ItemStack encoderBlank;
     /** EN: Retained encoded blueprint output inside Recipe Encoder / ES: Plano codificado guardado en la salida. */
     public ItemStack encoderOutput;
+    /**
+     * EN: DRAM Bay only: DeviceType name of the installed memory module, or null when empty. An
+     * item module keeps its stock in {@link #virtualSamples}/{@link #virtualAmounts} with
+     * {@link #virtualCacheTier} set to the module tier; the Fluid DRAM uses {@link #dramFluids}.
+     * ES: Solo DRAM Bay: nombre del DeviceType del módulo instalado, o null si está vacío. Un módulo
+     * de ítems guarda su stock en {@link #virtualSamples}/{@link #virtualAmounts} con
+     * {@link #virtualCacheTier} igual a su nivel; el Fluid DRAM usa {@link #dramFluids}.
+     */
+    public String installedModule;
+    /** EN: Fluid DRAM: fluid names / ES: Fluid DRAM: nombres de fluido. */
+    public List<String> dramFluids = new ArrayList<>();
+    /** EN: Fluid DRAM: millibuckets per fluid / ES: Fluid DRAM: mB por fluido. */
+    public List<Long> dramFluidAmounts = new ArrayList<>();
+    /** EN: Chicken Sorter: running / ES: Clasificador de pollos: activo. */
+    public boolean chickenActive;
+    /** EN: Chicken Sorter: true = pull into the network, false = push out / ES: true = importar, false = exportar. */
+    public boolean chickenPull;
+    /** EN: Chicken Sorter: accepted products (TYPE:n or SPECIES:id), empty = any / ES: productos aceptados, vacío = cualquiera. */
+    public List<String> chickenProducts = new ArrayList<>();
+    /** EN: Chicken Sorter: lowest tier accepted (null = 0) / ES: nivel mínimo (null = 0). */
+    public Integer chickenMinTier;
+    /** EN: Chicken Sorter: highest tier accepted (null = no limit) / ES: nivel máximo (null = sin límite). */
+    public Integer chickenMaxTier;
+    /** EN: Chicken Sorter: ANY, KNOWN or UNKNOWN DNA / ES: ADN ANY, KNOWN o UNKNOWN. */
+    public String chickenKnown;
+    /** EN: Chicken Sorter: ANY, ADULT or BABY / ES: ANY, ADULT o BABY. */
+    public String chickenAge;
+    /** EN: Chicken Sorter: lowest DNA strength accepted (0-6) / ES: fuerza de ADN mínima (0-6). */
+    public int chickenMinStrength;
+    /** EN: Chicken Sorter: only chickens without mixed (Aa) genes / ES: solo pollos sin genes mixtos (Aa). */
+    public boolean chickenPureOnly;
+
+    public long totalDramFluid() {
+        long total = 0;
+        if (dramFluidAmounts != null) {
+            for (Long amt : dramFluidAmounts) {
+                if (amt != null) {
+                    total += amt;
+                }
+            }
+        }
+        return total;
+    }
+
+    public long dramFluidAmount(String fluid) {
+        int idx = indexOfDramFluid(fluid);
+        return idx < 0 ? 0 : dramFluidAmounts.get(idx);
+    }
+
+    public int indexOfDramFluid(String fluid) {
+        if (fluid == null || dramFluids == null) {
+            return -1;
+        }
+        for (int i = 0; i < dramFluids.size(); i++) {
+            if (fluid.equalsIgnoreCase(dramFluids.get(i))) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    public void addDramFluid(String fluid, long amount) {
+        if (fluid == null || amount <= 0) {
+            return;
+        }
+        if (dramFluids == null) {
+            dramFluids = new ArrayList<>();
+        }
+        if (dramFluidAmounts == null) {
+            dramFluidAmounts = new ArrayList<>();
+        }
+        int idx = indexOfDramFluid(fluid);
+        if (idx >= 0) {
+            dramFluidAmounts.set(idx, dramFluidAmounts.get(idx) + amount);
+        } else {
+            dramFluids.add(fluid.toUpperCase(java.util.Locale.ROOT));
+            dramFluidAmounts.add(amount);
+        }
+    }
+
+    public long removeDramFluid(String fluid, long amount) {
+        int idx = indexOfDramFluid(fluid);
+        if (idx < 0 || amount <= 0) {
+            return 0;
+        }
+        long current = dramFluidAmounts.get(idx);
+        long take = Math.min(current, amount);
+        if (current - take <= 0) {
+            dramFluids.remove(idx);
+            dramFluidAmounts.remove(idx);
+        } else {
+            dramFluidAmounts.set(idx, current - take);
+        }
+        return take;
+    }
 
     /**
      * EN: Returns the combined sum of all items stored in the Greedy Cell.

@@ -131,6 +131,11 @@ fluids:
   # [EN] Storage capacity in millibuckets (mB) per Quantum Fluid Cell (64,000 mB = 64 Buckets).
   # [ES] Capacidad de almacenamiento en mB por Celda Cuántica de Fluidos (64,000 mB = 64 Cubos).
   cell-capacity-mb: 64000
+  # [EN] Capacity in mB of a Fluid DRAM Module (installed in a DRAM Bay). One module holds
+  #      several fluids at once; this is the total for all of them (512,000 mB = 512 Buckets).
+  # [ES] Capacidad en mB de un Fluid DRAM Module (se instala en un DRAM Bay). Un módulo guarda
+  #      varios fluidos a la vez; este es el total entre todos (512.000 mB = 512 Cubos).
+  dram-capacity-mb: 512000
   # [EN] Liquid Pumps always drain one whole source block (1,000 mB) per transfer cycle
   #      (network.op-interval-ticks.transfer); there is no separate pump rate.
   # [ES] Las Bombas de Líquidos drenan un bloque fuente entero (1.000 mB) por ciclo de
@@ -158,8 +163,14 @@ cells:
   capacities: [65536, 262144, 1048576, 16777216, 268435456, 2000000000]
 
 # -------------------------------------------------------------------------------------
-#  CPU Virtual Cache / Caché Virtual de CPU (Controller Storage)
+#  Memory Modules / Módulos de Memoria (DRAM Bay)
 # -------------------------------------------------------------------------------------
+# [EN] Item capacity of each memory module tier. Modules are installed in a DRAM Bay; when a
+#      module is taken out it keeps its items, and they appear in whatever network it is
+#      installed in next. Old Controllers that still hold a module keep working.
+# [ES] Capacidad en ítems de cada nivel de módulo de memoria. Los módulos se instalan en un DRAM
+#      Bay; al sacar un módulo conserva sus ítems, que aparecen en la red donde se instale. Los
+#      Controladores antiguos que aún tienen un módulo siguen funcionando.
 virtual-cache:
   tier-1: 2048
   tier-2: 8192

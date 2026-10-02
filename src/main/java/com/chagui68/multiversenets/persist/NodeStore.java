@@ -180,6 +180,15 @@ public final class NodeStore {
         if (blob.virtualAmounts == null) {
             blob.virtualAmounts = new ArrayList<>();
         }
+        if (blob.dramFluids == null) {
+            blob.dramFluids = new ArrayList<>();
+        }
+        if (blob.dramFluidAmounts == null) {
+            blob.dramFluidAmounts = new ArrayList<>();
+        }
+        if (blob.chickenProducts == null) {
+            blob.chickenProducts = new ArrayList<>();
+        }
         if (("GREEDY_CELL".equals(blob.typeName) || "MVN_GREEDY_CELL".equals(blob.typeName))
                 && blob.cellSample != null && blob.cellAmount > 0) {
             if (blob.greedySamples.isEmpty()) {

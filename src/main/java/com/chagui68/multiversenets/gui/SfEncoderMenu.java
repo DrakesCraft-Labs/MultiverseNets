@@ -45,6 +45,26 @@ public class SfEncoderMenu extends MenuHolder {
     public void openMenu() {
         open(45, Component.text("Slimefun Recipe Encoder", NamedTextColor.DARK_PURPLE)
                 .decoration(TextDecoration.ITALIC, false));
+        // Igual que el Recipe Encoder: los planos guardados pasan del bloque al menu y el bloque
+        // queda vacio hasta que se cierre, asi solo existen en un sitio a la vez.
+        NodeBlob blob = NodeStore.get(block);
+        if (blob == null) {
+            return;
+        }
+        boolean moved = false;
+        if (blob.encoderBlank != null && !blob.encoderBlank.getType().isAir()) {
+            inv.setItem(BLANK_SLOT, blob.encoderBlank.clone());
+            blob.encoderBlank = null;
+            moved = true;
+        }
+        if (blob.encoderOutput != null && !blob.encoderOutput.getType().isAir()) {
+            inv.setItem(OUTPUT_SLOT, blob.encoderOutput.clone());
+            blob.encoderOutput = null;
+            moved = true;
+        }
+        if (moved) {
+            NodeStore.put(block, blob);
+        }
     }
 
     @Override
@@ -216,12 +236,38 @@ public class SfEncoderMenu extends MenuHolder {
 
     @Override
     protected void onClose(InventoryCloseEvent event) {
-        for (int slot : new int[]{BLANK_SLOT, OUTPUT_SLOT}) {
-            ItemStack content = inv.getItem(slot);
-            if (content != null && !content.getType().isAir()) {
-                inv.setItem(slot, null);
-                giveOrDrop(content);
+        // Los planos se quedan guardados en el bloque al salir, no vuelven al jugador: asi no hay
+        // que traer planos en blanco cada vez que se usa el codificador.
+        ItemStack b = inv.getItem(BLANK_SLOT);
+        ItemStack o = inv.getItem(OUTPUT_SLOT);
+        inv.setItem(BLANK_SLOT, null);
+        inv.setItem(OUTPUT_SLOT, null);
+        NodeBlob blob = NodeStore.get(block);
+        if (blob == null) {
+            giveIfPresent(b);
+            giveIfPresent(o);
+            return;
+        }
+        if (b != null && !b.getType().isAir()) {
+            if (blob.encoderBlank == null) {
+                blob.encoderBlank = b.clone();
+            } else {
+                giveOrDrop(b);
             }
+        }
+        if (o != null && !o.getType().isAir()) {
+            if (blob.encoderOutput == null) {
+                blob.encoderOutput = o.clone();
+            } else {
+                giveOrDrop(o);
+            }
+        }
+        NodeStore.put(block, blob);
+    }
+
+    private void giveIfPresent(ItemStack stack) {
+        if (stack != null && !stack.getType().isAir()) {
+            giveOrDrop(stack);
         }
     }
 

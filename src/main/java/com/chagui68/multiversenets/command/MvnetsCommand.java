@@ -2,7 +2,6 @@ package com.chagui68.multiversenets.command;
 
 import com.chagui68.multiversenets.MultiverseNets;
 import com.chagui68.multiversenets.item.DeviceType;
-import com.chagui68.multiversenets.item.GuideBook;
 import com.chagui68.multiversenets.item.Items;
 import com.chagui68.multiversenets.net.Network;
 import com.chagui68.multiversenets.net.NetworkStorage;
@@ -73,8 +72,8 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage(Component.text("=== MultiverseNets ===", NamedTextColor.AQUA));
-        sender.sendMessage(Component.text("/mvnets guide [en|es|both]", NamedTextColor.YELLOW)
-                .append(Component.text(" - Receive official guide book (English or Español).", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/mvnets guide [en|es]", NamedTextColor.YELLOW)
+                .append(Component.text(" - Open the guide: every device, its recipe and how it works.", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/mvnets devices", NamedTextColor.YELLOW)
                 .append(Component.text(" - List of devices.", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/mvnets give <id> [n]", NamedTextColor.YELLOW)
@@ -93,69 +92,35 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
                 .append(Component.text(" - Synchronize and inspect all crafting recipes.", NamedTextColor.GRAY)));
     }
 
+    /**
+     * EN: Opens the guide menu (it replaced the written book). Language: the argument, or the
+     * player's client language when there is none; the menu itself can switch at any time.
+     *
+     * ES: Abre el menú de la guía (sustituyó al libro escrito). Idioma: el argumento, o el idioma
+     * del cliente si no hay; el propio menú puede cambiarlo en cualquier momento.
+     */
     private void guide(CommandSender sender, String[] args) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(Text.msg("Only players can receive the guide book.", NamedTextColor.RED));
+            sender.sendMessage(Text.msg("Only players can open the guide.", NamedTextColor.RED));
             return;
         }
-
-        boolean requestedSpanish = false;
-        boolean requestedBoth = false;
-
+        boolean spanish;
         if (args.length >= 2) {
             String sub = args[1].toLowerCase(Locale.ROOT);
-            if (sub.equals("es") || sub.equals("spanish") || sub.equals("español")) {
-                requestedSpanish = true;
+            if (sub.equals("es") || sub.equals("spanish") || sub.equals("español") || sub.equals("espanol")) {
+                spanish = true;
             } else if (sub.equals("en") || sub.equals("english") || sub.equals("inglés") || sub.equals("ingles")) {
-                requestedSpanish = false;
-            } else if (sub.equals("both") || sub.equals("all") || sub.equals("ambas") || sub.equals("ambos")) {
-                requestedBoth = true;
+                spanish = false;
             } else {
-                sender.sendMessage(Text.msg("Unknown language. Use: /mvnets guide [en|es|both]", NamedTextColor.RED));
+                sender.sendMessage(Text.msg("Unknown language. Use: /mvnets guide [en|es]", NamedTextColor.RED));
                 return;
             }
         } else {
-            // Auto-detect player client locale
             java.util.Locale loc = player.locale();
-            if (loc != null && loc.getLanguage().equalsIgnoreCase("es")) {
-                requestedSpanish = true;
-            }
+            spanish = loc != null && loc.getLanguage().equalsIgnoreCase("es");
         }
-
-        if (requestedBoth) {
-            ItemStack bookEn = GuideBook.createEnglishBook();
-            ItemStack bookEs = GuideBook.createSpanishBook();
-            giveItem(player, bookEn);
-            giveItem(player, bookEs);
-            player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_BOOK_PAGE_TURN, 1f, 1f);
-            player.sendMessage(Text.msg("Received both MultiverseNets Guide books (English & Español)!", NamedTextColor.GREEN));
-            return;
-        }
-
-        if (requestedSpanish) {
-            ItemStack book = GuideBook.createSpanishBook();
-            giveItem(player, book);
-            player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_BOOK_PAGE_TURN, 1f, 1f);
-            player.sendMessage(Component.text("¡Has recibido la Guía de MultiverseNets (Español)!", NamedTextColor.GREEN)
-                    .append(Component.text(" (Usa ", NamedTextColor.GRAY))
-                    .append(Component.text("/mvnets guide en", NamedTextColor.YELLOW))
-                    .append(Component.text(" para inglés)", NamedTextColor.GRAY)));
-        } else {
-            ItemStack book = GuideBook.createEnglishBook();
-            giveItem(player, book);
-            player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_BOOK_PAGE_TURN, 1f, 1f);
-            player.sendMessage(Component.text("You received the MultiverseNets Guide Book (English)!", NamedTextColor.GREEN)
-                    .append(Component.text(" (Use ", NamedTextColor.GRAY))
-                    .append(Component.text("/mvnets guide es", NamedTextColor.YELLOW))
-                    .append(Component.text(" for Spanish)", NamedTextColor.GRAY)));
-        }
-    }
-
-    private void giveItem(Player player, ItemStack item) {
-        var leftovers = player.getInventory().addItem(item);
-        for (ItemStack rem : leftovers.values()) {
-            player.getWorld().dropItemNaturally(player.getLocation(), rem);
-        }
+        new com.chagui68.multiversenets.gui.GuideMenu(plugin, player, spanish).openMenu();
+        player.playSound(player.getLocation(), org.bukkit.Sound.ITEM_BOOK_PAGE_TURN, 1f, 1f);
     }
 
     private void sendInfo(CommandSender sender) {
@@ -377,7 +342,7 @@ public class MvnetsCommand implements CommandExecutor, TabCompleter {
             return out;
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("guide")) {
-            List<String> list = List.of("en", "es", "both");
+            List<String> list = List.of("en", "es");
             List<String> out = new ArrayList<>();
             for (String s : list) {
                 if (s.startsWith(args[1].toLowerCase(Locale.ROOT))) {

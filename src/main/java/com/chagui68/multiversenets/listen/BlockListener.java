@@ -47,7 +47,6 @@ import java.util.List;
  */
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
-import com.chagui68.multiversenets.util.StackUtils;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -150,6 +149,13 @@ public class BlockListener implements Listener {
             if (Settings.compatSlimefun() && SlimefunBridge.isAvailable()) {
                 SlimefunBridge.unregisterCell(block);
             }
+        }
+        // El modulo de un DRAM Bay sale como item con todo su stock, tambien en creativo: el
+        // stock es del jugador, no del bloque.
+        ItemStack module = type == DeviceType.MVN_DRAM_BAY
+                ? com.chagui68.multiversenets.net.MemoryModules.eject(blob) : null;
+        if (module != null) {
+            block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), module);
         }
         if (blob.encoderBlank != null && !blob.encoderBlank.getType().isAir()) {
             block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), blob.encoderBlank);
@@ -254,7 +260,17 @@ public class BlockListener implements Listener {
                 && blob.txWorld == null
                 && (blob.fluidType == null || blob.fluidAmount <= 0)
                 && blob.pumpMode == null
-                && blob.pumpFluid == null;
+                && blob.pumpFluid == null
+                && blob.installedModule == null
+                && !blob.chickenActive
+                && !blob.chickenPull
+                && (blob.chickenProducts == null || blob.chickenProducts.isEmpty())
+                && blob.chickenMinTier == null
+                && blob.chickenMaxTier == null
+                && blob.chickenKnown == null
+                && blob.chickenAge == null
+                && blob.chickenMinStrength <= 0
+                && !blob.chickenPureOnly;
     }
 
     /**
@@ -303,6 +319,15 @@ public class BlockListener implements Listener {
         actual.fluidAmount = loaded.fluidAmount;
         actual.pumpMode = loaded.pumpMode;
         actual.pumpFluid = loaded.pumpFluid;
+        actual.chickenActive = loaded.chickenActive;
+        actual.chickenPull = loaded.chickenPull;
+        actual.chickenProducts = loaded.chickenProducts != null ? new ArrayList<>(loaded.chickenProducts) : new ArrayList<>();
+        actual.chickenMinTier = loaded.chickenMinTier;
+        actual.chickenMaxTier = loaded.chickenMaxTier;
+        actual.chickenKnown = loaded.chickenKnown;
+        actual.chickenAge = loaded.chickenAge;
+        actual.chickenMinStrength = loaded.chickenMinStrength;
+        actual.chickenPureOnly = loaded.chickenPureOnly;
         if (loaded.txWorld != null) {
             actual.txWorld = loaded.txWorld;
             actual.txX = loaded.txX;
@@ -426,9 +451,16 @@ public class BlockListener implements Listener {
             return;
         }
 
-        if (type == DeviceType.MVN_CONTROLLER && heldType != null && heldType.isCacheModule()) {
+        if (type == DeviceType.MVN_CONTROLLER && heldType != null && heldType.isMemoryModule()) {
             event.setCancelled(true);
-            interactions.installCacheModule(player, block, blob, heldType, held);
+            player.sendMessage(Text.msg("Memory modules go in a DRAM Bay connected to the network.", NamedTextColor.YELLOW));
+            return;
+        }
+
+        if (type == DeviceType.MVN_DRAM_BAY && heldType != null && heldType.isMemoryModule()
+                && com.chagui68.multiversenets.net.MemoryModules.installed(blob) == null) {
+            event.setCancelled(true);
+            interactions.installMemoryModule(player, block, blob, held);
             return;
         }
 
@@ -483,6 +515,8 @@ public class BlockListener implements Listener {
         }
         // El rastrillo desmonta y RECUPERA el nodo, como en Networks: antes ponia el bloque en aire
         // y el dispositivo (con su filtro o sus planos) se perdia sin dejar nada.
+        ItemStack module = type == DeviceType.MVN_DRAM_BAY
+                ? com.chagui68.multiversenets.net.MemoryModules.eject(blob) : null;
         ItemStack recovered = createDropItem(type, blob);
         if (type.isCell() && Settings.compatSlimefun() && SlimefunBridge.isAvailable()) {
             SlimefunBridge.unregisterCell(block);
@@ -492,6 +526,11 @@ public class BlockListener implements Listener {
         manager.invalidateNear(block);
         if (player.getGameMode() != org.bukkit.GameMode.CREATIVE) {
             for (ItemStack overflow : player.getInventory().addItem(recovered).values()) {
+                player.getWorld().dropItemNaturally(player.getLocation(), overflow);
+            }
+        }
+        if (module != null) {
+            for (ItemStack overflow : player.getInventory().addItem(module).values()) {
                 player.getWorld().dropItemNaturally(player.getLocation(), overflow);
             }
         }
@@ -675,64 +714,40 @@ public class BlockListener implements Listener {
         event.blockList().removeIf(block -> NodeStore.chunkHasNodes(block.getChunk()) && NodeStore.hasNode(block));
     }
 
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    /**
+     * EN: Hoppers (and hopper minecarts) never interact with a network device, in either
+     * direction. The event is only cancelled, never used to move items by hand: Paper shrinks the
+     * hopper's slot to the moved amount while the event runs, so the old code that called
+     * {@code removeItem} on the hopper here wiped the whole stack and stored only one item.
+     *
+     * ES: Las tolvas (y las vagonetas con tolva) nunca interactúan con un dispositivo de la red, en
+     * ningún sentido. El evento solo se cancela, nunca se usa para mover ítems a mano: Paper reduce
+     * la ranura de la tolva a la cantidad movida mientras dura el evento, así que el código antiguo
+     * que llamaba a {@code removeItem} aquí borraba el stack entero y guardaba un solo ítem.
+     */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onInventoryMoveItem(InventoryMoveItemEvent event) {
-        org.bukkit.inventory.Inventory dest = event.getDestination();
-        org.bukkit.inventory.Inventory src = event.getSource();
-
-        // 1. Hopper pushing into MultiverseNets node
-        if (dest.getHolder() instanceof org.bukkit.block.BlockState state) {
-            Block block = state.getBlock();
-            if (NodeStore.hasNode(block)) {
-                NodeBlob blob = NodeStore.get(block);
-                if (blob != null && DeviceType.parse(blob.typeName) == DeviceType.MVN_INFINITY_BARREL) {
-                    event.setCancelled(true);
-                    ItemStack moving = event.getItem();
-                    if (moving != null && !moving.getType().isAir()) {
-                        if (blob.cellSample == null || StackUtils.itemsMatch(blob.cellSample, moving)) {
-                            var leftover = src.removeItem(moving);
-                            int taken = moving.getAmount() - (leftover.isEmpty() ? 0 : leftover.values().stream().mapToInt(ItemStack::getAmount).sum());
-                            if (taken > 0) {
-                                if (blob.cellSample == null) {
-                                    blob.cellSample = moving.clone();
-                                    blob.cellSample.setAmount(1);
-                                    blob.cellAmount = taken;
-                                } else {
-                                    blob.cellAmount += taken;
-                                }
-                                NodeStore.put(block, blob);
-                            }
-                        }
-                    }
-                    return;
-                }
-                // Block hopper from injecting items into any other MultiverseNets block state
-                event.setCancelled(true);
-                return;
-            }
+        if (isNodeInventory(event.getDestination()) || isNodeInventory(event.getSource())) {
+            event.setCancelled(true);
         }
+    }
 
-        // 2. Hopper pulling from MultiverseNets node
-        if (src.getHolder() instanceof org.bukkit.block.BlockState state) {
-            Block block = state.getBlock();
-            if (NodeStore.hasNode(block)) {
-                NodeBlob blob = NodeStore.get(block);
-                if (blob != null && DeviceType.parse(blob.typeName) == DeviceType.MVN_INFINITY_BARREL) {
-                    event.setCancelled(true);
-                    if (blob.cellSample != null && blob.cellAmount > 0) {
-                        ItemStack one = blob.cellSample.clone();
-                        one.setAmount(1);
-                        var unhoused = dest.addItem(one);
-                        if (unhoused.isEmpty()) {
-                            blob.cellAmount--;
-                            NodeStore.put(block, blob);
-                        }
-                    }
-                    return;
-                }
-                // Block hopper from extracting items from any other MultiverseNets block state
-                event.setCancelled(true);
-            }
+    private static boolean isNodeInventory(org.bukkit.inventory.Inventory inventory) {
+        if (inventory == null) {
+            return false;
         }
+        // getHolder(false) evita copiar el estado del bloque en cada movimiento de tolva.
+        org.bukkit.inventory.InventoryHolder holder;
+        try {
+            holder = inventory.getHolder(false);
+        } catch (RuntimeException unsupported) {
+            holder = inventory.getHolder();
+        }
+        if (!(holder instanceof org.bukkit.block.BlockState state)) {
+            // Vagonetas, cofres dobles y demas: ningun nodo de la red es uno de ellos.
+            return false;
+        }
+        Block block = state.getBlock();
+        return NodeStore.chunkHasNodes(block.getChunk()) && NodeStore.hasNode(block);
     }
 }

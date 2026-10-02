@@ -44,7 +44,7 @@ class RecipeTest {
                 "encoder", "sf_encoder", "crafting_grid", "blueprint", "configurator", "rake",
                 "quantum_workbench", "infinity_barrel", "limiter",
                 "fluid_cell", "liquid_pump", "request_terminal", "request_crafter",
-                "sf_crafter", "sf_request_crafter"
+                "sf_crafter", "sf_request_crafter", "dram_bay", "fluid_dram", "chicken_sorter"
         };
         for (String key : keys) {
             NamespacedKey nk = new NamespacedKey(plugin, key);
@@ -103,12 +103,12 @@ class RecipeTest {
             }
         }
         Recipe recipe = Bukkit.getCraftingRecipe(matrix, Bukkit.getWorlds().get(0));
-        assertNotNull(recipe, "Crafting matrix should match cell_t2 recipe with exact choice");
+        assertNotNull(recipe, "Crafting matrix should match cell_t2 recipe");
         assertEquals(Material.ORANGE_TERRACOTTA, recipe.getResult().getType());
     }
 
     @Test
-    void craftCellT2FailsInVanillaMatrixIfCellHasCargo() {
+    void craftCellT2MatchesACellWithCargo() {
         ItemStack cellT1 = Items.create(DeviceType.MVN_CELL_T1);
         var meta = cellT1.getItemMeta();
         meta.getPersistentDataContainer().set(Keys.CELL_CARGO, org.bukkit.persistence.PersistentDataType.STRING, "cargo");
@@ -123,7 +123,10 @@ class RecipeTest {
             }
         }
         Recipe recipe = Bukkit.getCraftingRecipe(matrix, Bukkit.getWorlds().get(0));
-        assertNull(recipe, "ExactChoice should not match a cell with cargo in vanilla matrix");
+        // The cell is a plain-material ingredient now, so a loaded cell matches and the server
+        // consumes the ingredients; CraftingListener moves the cargo to the result.
+        assertNotNull(recipe, "a cell with cargo still matches the upgrade recipe");
+        assertEquals(Material.ORANGE_TERRACOTTA, recipe.getResult().getType());
     }
 
     @Test
@@ -148,7 +151,9 @@ class RecipeTest {
         }
 
         org.mockbukkit.mockbukkit.entity.PlayerMock player = server.addPlayer();
-        org.bukkit.inventory.CraftingInventory inv = (org.bukkit.inventory.CraftingInventory) player.openWorkbench(null, true).getTopInventory();
+        org.bukkit.inventory.CraftingInventory inv = (org.bukkit.inventory.CraftingInventory)
+                server.createInventory(player, org.bukkit.event.inventory.InventoryType.WORKBENCH);
+        player.openInventory(inv);
         inv.setMatrix(matrix);
 
         com.chagui68.multiversenets.listen.CraftingListener listener = new com.chagui68.multiversenets.listen.CraftingListener(plugin);

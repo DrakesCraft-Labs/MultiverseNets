@@ -548,20 +548,68 @@ public final class SlimefunBridge {
     }
 
     public static int insert(Block block, ItemStack stack) {
+        return insert(block, stack, 0);
+    }
+
+    /**
+     * EN: Inserts into the machine's input slots, one stack per slot at most. Slimefun's own
+     * {@code pushItem} drops the whole stack into the first empty slot, so a Pusher's 128 or 1,024
+     * units ended up as one over-sized slot and everything above a stack was lost. With
+     * {@code kinds} &gt; 1 (a whitelist of several ingredients), one item type never takes more
+     * than its share of the input slots, so the other ingredients still fit.
+     *
+     * ES: Inserta en las ranuras de entrada de la máquina, como mucho un stack por ranura. El
+     * {@code pushItem} de Slimefun mete el stack entero en la primera ranura vacía, así que las
+     * 128 o 1.024 unidades de un Pusher quedaban en una ranura sobredimensionada y todo lo que
+     * pasaba de un stack se perdía. Con {@code kinds} &gt; 1 (whitelist de varios ingredientes), un
+     * tipo nunca ocupa más que su parte de las ranuras de entrada.
+     *
+     * @return units that did not fit / unidades que no cupieron
+     */
+    public static int insert(Block block, ItemStack stack, int kinds) {
         Object menu = menuOf(block);
         if (menu == null || stack == null || stack.getAmount() <= 0) {
             return stack == null ? 0 : stack.getAmount();
         }
+        int remaining = stack.getAmount();
         try {
-            int[] slots = getTransportSlots(menu, flowInsert, stack);
-            if (slots.length == 0) return stack.getAmount();
-
-            Object excess = mPushItem.invoke(menu, stack.clone(), slots);
-            if (excess == null) return 0;
-            return excess instanceof ItemStack rem ? rem.getAmount() : 0;
+            ItemStack sample = stack.clone();
+            sample.setAmount(1);
+            int[] slots = getTransportSlots(menu, flowInsert, sample);
+            if (slots.length == 0) return remaining;
+            int perSlot = Math.max(1, Math.min(stack.getMaxStackSize(), 64));
+            int share = kinds > 1 ? Math.max(1, slots.length / kinds) : Integer.MAX_VALUE;
+            int occupied = 0;
+            for (int slot : slots) {
+                Object raw = mGetItemInSlot.invoke(menu, slot);
+                if (!(raw instanceof ItemStack current) || current.getType().isAir()
+                        || !StackUtils.itemsMatch(current, sample)) {
+                    continue;
+                }
+                occupied++;
+                int room = perSlot - current.getAmount();
+                if (room <= 0 || remaining <= 0) continue;
+                int add = Math.min(room, remaining);
+                ItemStack merged = current.clone();
+                merged.setAmount(current.getAmount() + add);
+                mReplaceExistingItem.invoke(menu, slot, merged);
+                remaining -= add;
+            }
+            for (int slot : slots) {
+                if (remaining <= 0 || occupied >= share) break;
+                Object raw = mGetItemInSlot.invoke(menu, slot);
+                if (raw instanceof ItemStack current && !current.getType().isAir()) continue;
+                int add = Math.min(perSlot, remaining);
+                ItemStack placed = sample.clone();
+                placed.setAmount(add);
+                mReplaceExistingItem.invoke(menu, slot, placed);
+                occupied++;
+                remaining -= add;
+            }
+            return remaining;
         } catch (ReflectiveOperationException | RuntimeException error) {
             logError(block, error);
-            return stack.getAmount();
+            return remaining;
         }
     }
 

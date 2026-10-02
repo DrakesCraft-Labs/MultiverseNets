@@ -189,7 +189,7 @@ class CrafterGuiTest {
     }
 
     @Test
-    void slimefunCrafterRejectsVanillaBlueprint() {
+    void slimefunCrafterAcceptsVanillaBlueprint() {
         Block sfCrafter = placeSfCrafter();
         ItemStack vanillaBp = createSampleBlueprint();
         player.getInventory().setItem(0, vanillaBp);
@@ -201,7 +201,7 @@ class CrafterGuiTest {
         server.getPluginManager().callEvent(shift);
 
         NodeBlob blob = NodeStore.get(sfCrafter);
-        assertTrue(blob.blueprintData.isEmpty(), "Slimefun Crafter must reject vanilla blueprints");
+        assertEquals(1, blob.blueprintData.size(), "Slimefun Crafter must also accept vanilla blueprints");
     }
 
     @Test

@@ -22,7 +22,7 @@ MultiverseNets/
 │   │   │   │                #   (ProtectionBridge + un provider por plugin de protección)
 │   │   │   ├─ craft/        # Blueprints, RecipeData y crafteo atómico (CraftingSupport)
 │   │   │   ├─ gui/          # Todos los menús (base MenuHolder + una clase por dispositivo)
-│   │   │   ├─ item/         # DeviceType (todos los dispositivos), Items (ítems, lore, recetas), GuideBook
+│   │   │   ├─ item/         # DeviceType (todos los dispositivos), Items (ítems, lore, recetas), GuideContent
 │   │   │   ├─ listen/       # BlockListener (eventos), DeviceInteractions (qué abre cada dispositivo),
 │   │   │   │                #   CraftingListener (libro de recetas, mejora de celdas en la mesa)
 │   │   │   ├─ net/          # Network, NetworkManager, NetworkTicker, NetworkStorage,
@@ -46,18 +46,20 @@ MultiverseNets/
 ## Detalle de las carpetas clave
 - **`api/`** – `MultiverseNetsAPI`: fachada fina y null-safe que otros plugins usan para `extract`,
   `insert` y `count` ítems en la red a la que pertenece un bloque.
-- **`compat/`** – `SlimefunBridge` (integración con Slimefun solo por reflexión) y protección de
+- **`compat/`** – `SlimefunBridge` (integración con Slimefun solo por reflexión), `ChickenGenetics`
+  (lee los pollos de GeneticChickengineering desde su PDC) y protección de
   terrenos: `ProtectionBridge` más `ProtectionStonesProvider`, `WorldGuardProvider`/`WorldGuardRegions`,
   `LandsProvider`, `TownyProvider` y `GriefPreventionProvider`. Cada provider es un archivo.
 - **`gui/`** – Un menú por dispositivo (`TerminalMenu`, `FilterMenu`, `CellMenu`, `BarrelMenu`,
   `GreedyMenu`, `CrafterMenu`, `EncoderMenu`, `SfEncoderMenu`, `CraftingGridMenu`,
   `RequestTerminalMenu`, `QuotaLimiterMenu`, `FluidCellMenu`, `LiquidPumpMenu`, `MonitorMenu`,
-  `ControllerMenu`, `QuantumWorkbenchMenu`), la base `MenuHolder`, la protección anti-dupe
+  `ControllerMenu`, `QuantumWorkbenchMenu`, `DramBayMenu`, `ChickenSorterMenu`, `GuideMenu`), la base `MenuHolder`, la protección anti-dupe
   `GuiListener` y `ChatPrompts`.
-- **`item/`** – `DeviceType` (enumeración de los 43 dispositivos, módulos y herramientas), `Items`
-  (creación de ítems, lore, ayudantes de PDC y las 43 recetas) y `GuideBook` (el libro guía del juego).
+- **`item/`** – `DeviceType` (enumeración de los 46 dispositivos, módulos y herramientas), `Items`
+  (creación de ítems, lore, ayudantes de PDC y las 46 recetas) y `GuideContent` (el texto de la guía, EN/ES).
 - **`net/`** – Núcleo de red: topología (`Network`), registro (`NetworkManager`), el latido
-  (`NetworkTicker`), almacenamiento de ítems y fluidos, holograma del controlador y medición de flujo.
+  (`NetworkTicker`), almacenamiento de ítems y fluidos, `MemoryModules` (instalar/expulsar módulos del
+  DRAM Bay con su stock), holograma del controlador y medición de flujo.
 - **`persist/`** – `NodeBlob` (estado serializable de un nodo) y `NodeStore` (almacenamiento en el PDC
   del chunk, registro de controladores y caché de decodificación).
 - **`src/main/resources/`** – `config.yml` (comentado en inglés y español) y `plugin.yml`.

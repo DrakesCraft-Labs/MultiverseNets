@@ -7,6 +7,12 @@ de transferencia (`network.op-interval-ticks.transfer`, 5 ticks).
 > En las cuadrículas, `·` marca un hueco vacío. Todo ítem se puede dar también con `/mvnets give <id>`.
 > Volver al [índice de la wiki](README.md).
 
+> **Dispositivos como ingredientes.** Cuando una receta pide otro dispositivo (celda anterior, módulo
+> anterior, cable, celda de fluidos, Advanced Pusher) tiene que ser ese dispositivo: el material simple
+> de debajo (terracota, lingote de cobre, vidrio, ladrillos de prismarina, pistón) no vale. Las mejoras
+> de celdas y módulos conservan la carga del ingrediente; cualquier otra receta rechaza un dispositivo
+> que aún guarde algo. Ningún dispositivo sirve como ingrediente de una receta vanilla.
+
 ---
 
 ## 🖥️ Núcleo y acceso
@@ -24,8 +30,9 @@ I I I
 - **Resultado**: 1× Controlador de Red (Magnetita)
 - **Función**: Raíz de la red. Cada escaneo empieza aquí y recorre todos los bloques de MultiverseNets
   conectados. Quien lo coloca pasa a ser el **dueño** de la red (lo usa la protección de terrenos).
-  Muestra un holograma con estado, número de nodos y totales almacenados, y puede llevar una **Caché
-  Virtual de CPU** (ver los módulos más abajo). Clic derecho abre su menú de estado. Un solo
+  Muestra un holograma con estado, número de nodos y totales almacenados. Los módulos de memoria van
+  en un **DRAM Bay**, no en el controlador; un controlador que aún tenga un módulo antiguo lo sigue
+  usando y su menú puede sacarlo con sus ítems. Clic derecho abre su menú de estado. Un solo
   controlador por red: un segundo cableado a los mismos cables se reporta como `foreign controller`.
 
 ---
@@ -132,12 +139,31 @@ A S A
 
 ---
 
-### Módulos de Caché Virtual de CPU · `mvn_cache_l1` … `mvn_cache_quantum`
+### DRAM Bay · `mvn_dram_bay`
 
-Se instalan en el **Controlador de Red** haciendo clic derecho con el módulo. Convierten el
-controlador en almacenamiento multi-ítem (cualquier mezcla de tipos). Solo se aceptan mejoras: el
-módulo se consume y el inferior ya instalado no se devuelve. El contenido viaja dentro del ítem del
-controlador al romperlo.
+```
+I Q I
+R C R
+I Q I
+```
+
+> I = **Lingote de hierro** · Q = **Cuarzo** · R = **Redstone** · C = **Bloque de cobre**
+
+- **Resultado**: 1× DRAM Bay (Bombilla de cobre encerada)
+- **Función**: Bloque de red que aloja **un módulo de memoria** (cualquiera de los módulos de ítems de
+  abajo, o el Fluid DRAM). Mientras está instalado, el stock del módulo forma parte de la red. Clic
+  derecho a un bay vacío con un módulo en la mano para instalarlo, o clic derecho para abrir su menú
+  (stock, instalar desde el cursor o con shift+clic, **Eject Module**). Un módulo expulsado conserva
+  todo su stock: instálalo en un DRAM Bay de otra red y el stock aparece allí y desaparece de la
+  primera. Al romper el bay suelta el bay y su módulo (con el stock) por separado.
+
+---
+
+### Módulos de memoria · `mvn_cache_l1` … `mvn_cache_quantum`
+
+Módulos de ítems para el **DRAM Bay**: almacenamiento multi-ítem, cualquier mezcla de tipos, con la
+capacidad de cada nivel en `virtual-cache.tier-1` … `tier-5`. Un módulo conserva sus ítems al sacarlo
+del bay. Cada nivel se craftea con el anterior; mejorar un módulo con ítems los conserva.
 
 #### L1 CPU Cache Module — 2.048 ítems
 
@@ -191,6 +217,24 @@ N S N
 
 ---
 
+### Fluid DRAM Module · `mvn_fluid_dram`
+
+```
+D B D
+F E F
+D B D
+```
+
+> D = **Diamante** · B = **Cubo** · E = **Ojo de ender** · F = **Quantum Fluid Cell** (vacía)
+
+- **Resultado**: 1× Fluid DRAM Module (ítem de mano, Corazón del mar)
+- **Función**: Módulo de memoria **exclusivo para fluidos** para el DRAM Bay. Guarda varios fluidos a
+  la vez, hasta `fluids.dram-capacity-mb` (512.000 mB = 512 cubos) en total, y lo suma al
+  almacenamiento de fluidos de la red. Igual que los módulos de ítems, al sacarlo del bay se lleva sus
+  fluidos a la red donde lo instales.
+
+---
+
 ## 📦 Almacenamiento de ítems
 
 ### Celda Cuántica T1 – T6 · `mvn_cell_t1` … `mvn_cell_t6`
@@ -213,7 +257,7 @@ D P D
 D D D
 ```
 
-> D = **Diamante** · P = **Celda anterior** (ítem exacto)
+> D = **Diamante** · P = **Celda anterior** (con o sin carga)
 
 - **Resultado**: 1× celda del siguiente nivel (terracota: normal, naranja, amarilla, lima, cian, morada)
 - **Función**: Guarda **un tipo de ítem** cada una. Una celda vacía adopta el primer tipo que no tenga
@@ -246,7 +290,8 @@ N D N
 - **Función**: Como una celda, un tipo de ítem, con `barrel.capacity` (2.000.000.000). **Sigue
   registrado** a su ítem cuando se vacía. En su menú, clic en *Set Item* con un ítem en el cursor para
   registrarlo; clic derecho en *Set Item* con el cursor vacío borra el registro (solo si está vacío).
-  Las tolvas pueden meter el ítem registrado y sacarlo de uno en uno.
+  Los ítems con id propio (Slimefun y otros plugins) se reconocen por su id y su texto visible, así
+  lo que sacas siempre vuelve a entrar. Las tolvas no interactúan con él.
 
 ---
 
@@ -372,9 +417,13 @@ I D I
 > I = **Lingote de hierro** · D = **Soltador** · R = **Bloque de redstone**
 
 - **Resultado**: 1× Simple Pusher (Diana)
-- **Función**: Exporta de la red a los contenedores vecinos: hasta 128 ítems de un tipo por ciclo,
-  solo si tiene un contenedor al lado. **Una whitelist vacía no hace nada** (un pusher recién puesto
-  nunca vacía la red); una blacklist vacía exporta cualquier cosa. Lo que no cabe vuelve a la red.
+- **Función**: Exporta de la red a los contenedores vecinos por **las seis caras** (no tiene selector
+  de cara): hasta 128 ítems por ciclo, solo si tiene un contenedor al lado y nunca a otro bloque de la
+  red. **Una whitelist vacía no hace nada** (un pusher recién puesto nunca vacía la red); una
+  **blacklist exporta todo menos lo listado** (lo listado se queda en la red). Como mucho un stack por
+  ranura; una whitelist de varios ítems da a cada uno su parte de las ranuras del destino y los sirve
+  por turnos, así un ingrediente no llena la máquina. A los hornos el combustible va a su ranura y lo
+  demás a la entrada, nunca al resultado. Lo que no cabe vuelve a la red.
 
 ---
 
@@ -387,7 +436,8 @@ D P D
 > D = **Soltador** · P = **Pistón**
 
 - **Resultado**: 1× Advanced Pusher (Pistón)
-- **Función**: Igual que el Simple Pusher ×8 (1.024 por ciclo), con selección de cara.
+- **Función**: Igual que el Simple Pusher ×8 (1.024 por ciclo). Con una cara elegida entrega
+  **solo** a ese lado; úsalo para alimentar una máquina.
 
 ---
 
@@ -527,8 +577,9 @@ E P E
 > E = **Perla de ender** · P = **Papel** · B = **Mesa de encantamientos**
 
 - **Resultado**: 1× Slimefun Recipe Encoder (Mesa de encantamientos)
-- **Función**: Igual que el Recipe Encoder para recetas de Slimefun. Necesita Slimefun. Su receta y su
-  menú solo existen con `sf-encoder.enabled: true`.
+- **Función**: Igual que el Recipe Encoder para recetas de Slimefun. Los Blueprints que dejes en sus
+  ranuras se quedan guardados en el bloque al cerrarlo. Necesita Slimefun. Su receta y su menú solo
+  existen con `sf-encoder.enabled: true`.
 
 ---
 
@@ -561,8 +612,8 @@ R C R
 > R = **Perla de ender** · C = **Obsidiana llorosa** · I = **Lingote de hierro** · T = **Diana**
 
 - **Resultado**: 1× Slimefun Auto-Crafter (Obsidiana llorosa)
-- **Función**: Igual que el Auto-Crafter, solo con Blueprints de Slimefun. `sf-crafter.enabled: false`
-  quita su receta, su menú y su crafteo.
+- **Función**: Igual que el Auto-Crafter y acepta **Blueprints de Slimefun y vanilla**.
+  `sf-crafter.enabled: false` quita su receta, su menú y su crafteo.
 
 ---
 
@@ -593,7 +644,7 @@ R C R
 > R = **Perla de ender** · C = **Pilar de púrpura** · I = **Lingote de hierro** · L = **Atril**
 
 - **Resultado**: 1× Slimefun Request Crafter (Pilar de púrpura)
-- **Función**: Igual que el Request Crafter para Blueprints de Slimefun. Depende de
+- **Función**: Igual que el Request Crafter, con Blueprints de Slimefun y vanilla. Depende de
   `sf-crafter.enabled`.
 
 ---
@@ -630,6 +681,29 @@ C R C
 - **Resultado**: 1× Network Crafting Grid (Mesa de cartografía)
 - **Función**: Una mesa de crafteo que saca los ingredientes de la red de forma transaccional. La
   plantilla se guarda en el bloque; *Craft 1* / *Craft All* te entregan el resultado.
+
+---
+
+## 🐔 GeneticChickengineering
+
+### Genetic Chicken Sorter · `mvn_chicken_sorter`
+
+```
+F E F
+C P C
+F E F
+```
+
+> F = **Pluma** · E = **Huevo** · C = **Comparador** · P = **Advanced Pusher**
+
+- **Resultado**: 1× Genetic Chicken Sorter (Bala de heno)
+- **Función**: Mueve **solo** los pollos de bolsillo del addon GeneticChickengineering, elegidos por
+  sus genes; cualquier otro ítem se ignora. **Push** envía los pollos que cumplen de la red al bloque
+  al que mira; **Pull** los trae de ese bloque a la red (hasta 16 por ciclo). Reglas, todas deben
+  cumplirse: productos aceptados (añade uno haciendo clic con un pollo en el cursor o con shift+clic a
+  uno del inventario; lista vacía = cualquiera), nivel mínimo/máximo, fuerza de ADN mínima, solo genes
+  puros, ADN conocido/desconocido, adulto/bebé. Empieza **parado**, así no puede vaciar una red antes
+  de configurarlo.
 
 ---
 
