@@ -169,4 +169,32 @@ class RecipeTest {
         assertTrue(result.hasItemMeta());
         assertEquals(encodedCargo, result.getItemMeta().getPersistentDataContainer().get(Keys.CELL_CARGO, org.bukkit.persistence.PersistentDataType.STRING));
     }
+
+    @Test
+    void playerTwoByTwoGridIsPaddedForRecipeLookup() {
+        ItemStack a = new ItemStack(Material.OAK_LOG);
+        ItemStack b = new ItemStack(Material.STICK);
+        ItemStack c = new ItemStack(Material.DIAMOND);
+        ItemStack d = Items.create(DeviceType.MVN_CABLE);
+        ItemStack[] grid = com.chagui68.multiversenets.listen.CraftingListener
+                .asThreeByThree(new ItemStack[] {a, b, c, d});
+        assertNotNull(grid);
+        assertEquals(9, grid.length);
+        assertSame(a, grid[0]);
+        assertSame(b, grid[1]);
+        assertSame(c, grid[3]);
+        assertSame(d, grid[4]);
+        assertTrue(grid[2].isEmpty());
+        assertTrue(grid[8].isEmpty());
+        // Before the fix this threw "craftingMatrix must be an array of length 9".
+        assertDoesNotThrow(() -> Bukkit.getCraftingRecipe(grid, Bukkit.getWorlds().get(0)));
+    }
+
+    @Test
+    void unexpectedMatrixSizesSkipRecipeLookup() {
+        assertNull(com.chagui68.multiversenets.listen.CraftingListener.asThreeByThree(new ItemStack[5]));
+        assertNull(com.chagui68.multiversenets.listen.CraftingListener.asThreeByThree(null));
+        ItemStack[] nine = new ItemStack[9];
+        assertSame(nine, com.chagui68.multiversenets.listen.CraftingListener.asThreeByThree(nine));
+    }
 }

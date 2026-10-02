@@ -118,7 +118,10 @@ public class CraftingListener implements Listener {
         }
         Recipe recipe = event.getRecipe();
         if (recipe == null && !found.isEmpty()) {
-            recipe = Bukkit.getCraftingRecipe(matrix, event.getView().getPlayer().getWorld());
+            ItemStack[] grid = asThreeByThree(matrix);
+            if (grid != null) {
+                recipe = Bukkit.getCraftingRecipe(grid, event.getView().getPlayer().getWorld());
+            }
         }
         if (recipe == null) {
             return;
@@ -184,5 +187,33 @@ public class CraftingListener implements Listener {
         meta.lore(lore);
         result.setItemMeta(meta);
         return result;
+    }
+
+    /**
+     * EN: Bukkit.getCraftingRecipe only accepts a 3x3 matrix. The player's own 2x2 grid hands us
+     * 4 slots, which threw IllegalArgumentException on every craft there. The 2x2 is laid out in
+     * the top-left corner of a 3x3; any other size returns null and the lookup is skipped.
+     *
+     * ES: Bukkit.getCraftingRecipe solo acepta una matriz 3x3. La cuadrícula 2x2 del inventario
+     * entrega 4 ranuras y lanzaba IllegalArgumentException en cada crafteo. La 2x2 se coloca en
+     * la esquina superior izquierda de una 3x3; cualquier otro tamaño devuelve null.
+     */
+    public static ItemStack[] asThreeByThree(ItemStack[] matrix) {
+        if (matrix == null) {
+            return null;
+        }
+        if (matrix.length == 9) {
+            return matrix;
+        }
+        if (matrix.length != 4) {
+            return null;
+        }
+        ItemStack[] grid = new ItemStack[9];
+        java.util.Arrays.fill(grid, ItemStack.empty());
+        grid[0] = matrix[0];
+        grid[1] = matrix[1];
+        grid[3] = matrix[2];
+        grid[4] = matrix[3];
+        return grid;
     }
 }
