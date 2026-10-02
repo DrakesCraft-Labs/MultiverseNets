@@ -207,6 +207,13 @@ public class Network {
         // cuelgue de ella si: la red solo tiende cable por tierra que sea suya.
         this.owner = ctrlBlob.owner();
 
+        // Los modulos de memoria ya no van en el Controlador: uno instalado antes del DRAM Bay sale
+        // con su stock y espera en el Terminal como item temporal.
+        if (MemoryModules.migrateControllerCache(ctrlBlob)) {
+            NodeStore.put(block(controllerPos), ctrlBlob);
+            storage.invalidate();
+        }
+
         found.put(controllerPos, DeviceType.MVN_CONTROLLER);
         visited.add(controllerPos);
         queue.add(controllerPos);

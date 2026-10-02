@@ -5,6 +5,8 @@ import com.chagui68.multiversenets.item.Items;
 import com.chagui68.multiversenets.net.Network;
 import com.chagui68.multiversenets.net.NetworkManager;
 import com.chagui68.multiversenets.net.NetworkStorage;
+import com.chagui68.multiversenets.persist.NodeBlob;
+import com.chagui68.multiversenets.persist.NodeStore;
 import com.chagui68.multiversenets.util.Keys;
 import com.chagui68.multiversenets.util.StackUtils;
 import com.chagui68.multiversenets.util.Text;
@@ -56,6 +58,8 @@ public class TerminalMenu extends MenuHolder {
     private final Network network;
     private final ItemStack[] displayedSamples = new ItemStack[54];
     private final java.util.Map<Integer, String> displayedFluids = new java.util.HashMap<>();
+    /** Grid slot → recovered memory module shown there (temporary items from an old Controller). */
+    private final java.util.Map<Integer, ItemStack> displayedRecovered = new java.util.HashMap<>();
     private int page = 0;
     private String query = "";
     private SortOrder sortOrder = SortOrder.MVN_ALPHABETIC;
@@ -91,6 +95,7 @@ public class TerminalMenu extends MenuHolder {
 
         java.util.Arrays.fill(displayedSamples, null);
         displayedFluids.clear();
+        displayedRecovered.clear();
 
         if (showFluids) {
             drawFluids(background);
@@ -101,7 +106,10 @@ public class TerminalMenu extends MenuHolder {
 
     private void drawItems(ItemStack background) {
         List<NetworkStorage.View> list = filteredItems();
-        int pages = Math.max(1, (list.size() + PAGE_SIZE - 1) / PAGE_SIZE);
+        // Los modulos recuperados de un Controlador antiguo van primero, aparte del stock.
+        List<ItemStack> recovered = showOnlyPurged ? List.of() : recoveredModules();
+        int total = recovered.size() + list.size();
+        int pages = Math.max(1, (total + PAGE_SIZE - 1) / PAGE_SIZE);
         if (page >= pages) {
             page = pages - 1;
         }
@@ -109,8 +117,11 @@ public class TerminalMenu extends MenuHolder {
         for (int i = 0; i < DISPLAY_SLOTS.length; i++) {
             int slot = DISPLAY_SLOTS[i];
             int index = start + i;
-            if (index < list.size()) {
-                NetworkStorage.View view = list.get(index);
+            if (index < recovered.size()) {
+                displayedRecovered.put(slot, recovered.get(index));
+                inv.setItem(slot, recoveredIcon(recovered.get(index)));
+            } else if (index - recovered.size() < list.size()) {
+                NetworkStorage.View view = list.get(index - recovered.size());
                 displayedSamples[slot] = view.sample();
                 inv.setItem(slot, gridIcon(view));
             } else {
@@ -152,6 +163,72 @@ public class TerminalMenu extends MenuHolder {
                 inv.setItem(slot, background);
             }
         }
+    }
+
+    private List<ItemStack> recoveredModules() {
+        NodeBlob ctrl = NodeStore.get(network.block(network.controllerPos()));
+        if (ctrl == null || ctrl.recoveredModules == null) {
+            return List.of();
+        }
+        List<ItemStack> out = new ArrayList<>();
+        for (ItemStack module : ctrl.recoveredModules) {
+            if (module != null && !module.getType().isAir()) {
+                out.add(module);
+            }
+        }
+        return out;
+    }
+
+    private ItemStack recoveredIcon(ItemStack module) {
+        ItemStack icon = module.clone();
+        var meta = icon.getItemMeta();
+        List<Component> lore = meta.hasLore() && meta.lore() != null ? new ArrayList<>(meta.lore()) : new ArrayList<>();
+        lore.add(Component.empty());
+        lore.add(Component.text("⏳ TEMPORARY ITEM", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("This module was inside the Controller.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("Its items are kept inside the module.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("Click to take it, then install it", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("in a DRAM Bay.", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+        meta.lore(lore);
+        icon.setItemMeta(meta);
+        return icon;
+    }
+
+    /**
+     * EN: Hands a recovered module to the player (cursor if empty, else inventory). It is looked up
+     * again in the Controller's list, so two viewers can never take the same module.
+     * ES: Entrega un módulo recuperado al jugador (al cursor si está vacío, si no al inventario).
+     * Se busca de nuevo en la lista del Controlador, así dos jugadores nunca se llevan el mismo.
+     */
+    private void takeRecovered(InventoryClickEvent event, ItemStack shown) {
+        org.bukkit.block.Block ctrlBlock = network.block(network.controllerPos());
+        NodeBlob ctrl = NodeStore.get(ctrlBlock);
+        if (ctrl == null || ctrl.recoveredModules == null) {
+            draw();
+            return;
+        }
+        int index = -1;
+        for (int i = 0; i < ctrl.recoveredModules.size(); i++) {
+            ItemStack candidate = ctrl.recoveredModules.get(i);
+            if (candidate != null && candidate.equals(shown)) {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0) {
+            draw();
+            return;
+        }
+        ItemStack module = ctrl.recoveredModules.remove(index);
+        NodeStore.put(ctrlBlock, ctrl);
+        ItemStack cursor = event.getView().getCursor();
+        if (cursor == null || cursor.getType().isAir()) {
+            event.getView().setCursor(module);
+        } else {
+            giveOrDrop(module);
+        }
+        player.sendMessage(Text.msg("Module taken. Install it in a DRAM Bay to bring its items back.", NamedTextColor.GREEN));
+        draw();
     }
 
     private List<NetworkStorage.View> filteredItems() {
@@ -279,6 +356,11 @@ public class TerminalMenu extends MenuHolder {
             long greedyAmt = network.storage().getGreedyStoredAmount(view.sample());
             if (greedyAmt > 0) {
                 lore.add(Component.text("⚡ In Greedy Buffer: " + Items.formatAmount(greedyAmt), NamedTextColor.GREEN)
+                        .decoration(TextDecoration.ITALIC, false));
+            }
+            long memoryAmt = network.storage().getMemoryStoredAmount(view.sample());
+            if (memoryAmt > 0) {
+                lore.add(Component.text("▣ In DRAM: " + Items.formatAmount(memoryAmt), NamedTextColor.AQUA)
                         .decoration(TextDecoration.ITALIC, false));
             }
         } else {
@@ -486,6 +568,8 @@ public class TerminalMenu extends MenuHolder {
                 if (showFluids) {
                     String fluidType = displayedFluids.get(slot);
                     withdrawFluid(event, fluidType);
+                } else if (displayedRecovered.containsKey(slot)) {
+                    takeRecovered(event, displayedRecovered.get(slot));
                 } else {
                     withdrawFromDisplay(event);
                 }
@@ -806,7 +890,7 @@ public class TerminalMenu extends MenuHolder {
                 while (!lore.isEmpty()) {
                     Component last = lore.get(lore.size() - 1);
                     String str = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(last);
-                    if (str.startsWith(AMOUNT_PREFIX) || str.contains("Greedy Buffer") || str.contains("Purger") || str.isBlank()) {
+                    if (str.startsWith(AMOUNT_PREFIX) || str.contains("Greedy Buffer") || str.contains("In DRAM") || str.contains("Purger") || str.isBlank()) {
                         lore.remove(lore.size() - 1);
                     } else {
                         break;

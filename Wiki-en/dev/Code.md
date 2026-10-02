@@ -102,6 +102,7 @@ fields:
 | `txWorld` / `txX` / `txY` / `txZ` | `String` / `int` | Bridge link of a Receiver or Transmitter (the other end). |
 | `greedySamples` / `greedyAmounts` | `List<ItemStack>` / `List<Long>` | Greedy Cell multi-item buffer. |
 | `virtualCacheTier` / `virtualSamples` / `virtualAmounts` | `int` / lists | Item memory module stock: a DRAM Bay with an item module, or a legacy Controller cache. |
+| `recoveredModules` | `List<ItemStack>` | Controller only: modules that were inside it before the DRAM Bay, taken out by `Network.scan()` (`MemoryModules.migrateControllerCache`) with their stock; the Terminal lists them first and hands them out; breaking the controller drops them. |
 | `installedModule` | `String` | DRAM Bay: `DeviceType` name of the installed module, null when empty. |
 | `dramFluids` / `dramFluidAmounts` | `List<String>` / `List<Long>` | DRAM Bay with a Fluid DRAM Module: several fluids (mB). |
 | `chickenActive` / `chickenPull` / `chickenProducts` / `chickenMinTier` / `chickenMaxTier` / `chickenKnown` / `chickenAge` / `chickenMinStrength` / `chickenPureOnly` | various | Genetic Chicken Sorter rules (see §19). |
@@ -318,7 +319,7 @@ Abstract `InventoryHolder`. `open(size, title)` creates the inventory, calls `dr
 | Menu | Size | Usage / details |
 | --- | --- | --- |
 | `TerminalMenu` | 54 | Terminal (block, wireless, transmitter/receiver buttons). Input `INPUT_SLOT=8`, purger view `17`, sort `26`, fluids page `35`, pages `44`/`53`; 48 items per page. Fluid deposits/withdrawals with buckets and bottles. |
-| `ControllerMenu` | 27 | Controller status, router status; slot `11` ejects a legacy memory module with its items. |
+| `ControllerMenu` | 27 | Controller status, router status; slot `11` explains that modules go in a DRAM Bay and how many recovered modules wait in the Terminal. |
 | `DramBayMenu` | 27 | Stats `11`, module `13` (install from cursor/shift-click, or eject), eject `15`. Reads the blob on every click, so two viewers cannot both eject. |
 | `ChickenSorterMenu` | 54 | Products `0–17`, running `27`, push/pull `28`, face `29`, min/max tier `31`/`32`, strength `33`, DNA `34`, age `35`, pure `40`, clear `44`, help `49`. |
 | `MonitorMenu` | 27 | Live diagnostics (refresh task while open). |

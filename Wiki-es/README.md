@@ -48,9 +48,9 @@ Las cantidades son los valores por defecto de `config.yml`; todas se pueden conf
 
 | Dispositivo | id · bloque | Qué hace | Cómo se usa |
 |---|---|---|---|
-| **Controlador de Red** | `mvn_controller` · Magnetita | La raíz de la red. Cada escaneo empieza aquí (en anchura por los bloques conectados, hasta `network.max-nodes`). Guarda a su dueño (quien lo colocó) y muestra un holograma con estado, nodos y totales almacenados. Los módulos de memoria ya **no** van en el controlador: van en un **DRAM Bay**. | Clic derecho: estado y estado del router. Un controlador antiguo que aún tenga un módulo dentro lo sigue usando; en su menú, clic en *Legacy Memory Module* lo saca **con sus ítems** para llevarlo a un DRAM Bay. Un solo controlador por red: un segundo cableado a los mismos cables se reporta como `foreign controller` (ver [Buses compartidos](#buses-compartidos)). |
+| **Controlador de Red** | `mvn_controller` · Magnetita | La raíz de la red. Cada escaneo empieza aquí (en anchura por los bloques conectados, hasta `network.max-nodes`). Guarda a su dueño (quien lo colocó) y muestra un holograma con estado, nodos y totales almacenados. Los módulos de memoria ya **no** van en el controlador: van en un **DRAM Bay**. | Clic derecho: estado y estado del router. No acepta módulos. Un módulo que estaba dentro de un controlador antiguo sale solo **con sus ítems** y espera en el **Terminal** como ítem temporal: haz clic en él y instálalo en un DRAM Bay. Al romper el controlador se suelta cualquier módulo que nadie recogió. Un solo controlador por red: un segundo cableado a los mismos cables se reporta como `foreign controller` (ver [Buses compartidos](#buses-compartidos)). |
 | **Cable de Red** | `mvn_cable` · Vidrio | Conecta dispositivos. Sin lógica propia. | Clic derecho para ver si llega a un controlador (y el tamaño de la red). Con un bloque en la mano, el clic derecho coloca el bloque. |
-| **Terminal de Red** | `mvn_terminal` · Faro | La cuadrícula de almacenamiento: todos los ítems de la red (caché, celdas, barriles, greedy cells, barriles de Slimefun) y una segunda página para fluidos. | Clic izquierdo saca 1, clic derecho un stack, shift+clic al inventario. Shift+clic izquierdo en tus ítems (o déjalos en la ranura de entrada) para guardarlos. Botones de búsqueda, orden y páginas. Los cubos y botellas de miel van al almacenamiento de fluidos. |
+| **Terminal de Red** | `mvn_terminal` · Faro | La cuadrícula de almacenamiento: todos los ítems de la red (caché, celdas, barriles, greedy cells, barriles de Slimefun) y una segunda página para fluidos. | Clic izquierdo saca 1, clic derecho un stack, shift+clic al inventario. Shift+clic izquierdo en tus ítems (o déjalos en la ranura de entrada) para guardarlos. Botones de búsqueda, orden y páginas. Los cubos y botellas de miel van al almacenamiento de fluidos. El lore indica cuánto de un ítem hay en un Greedy Buffer y **en DRAM**. Los módulos recuperados de un controlador antiguo salen primero como ítems temporales. |
 | **Terminal Inalámbrico** | `mvn_wireless_terminal` · ítem (Estrella del Nether) | Abre el Terminal de Red a distancia. | Shift+clic derecho en un Controlador o Terminal para vincularlo, luego clic derecho al aire. Sin **Network Router** solo funciona en el mismo mundo y a `wireless.local-range-without-router` (64) bloques. Nunca durante 10 s tras un combate, y solo si puedes acceder al terreno de la red. |
 | **Network Router** | `mvn_router` · Pararrayos | Quita los límites del Terminal Inalámbrico para su red: cualquier distancia y cualquier mundo. | Conéctalo en cualquier punto de la red. |
 | **Network Monitor** | `mvn_monitor` · Nexo de reaparición | Panel de diagnóstico en vivo: nodos por tipo, uso de almacenamiento, errores. | Clic derecho; se actualiza mientras está abierto. |
@@ -258,8 +258,8 @@ reportan como `foreign controller at x,y,z`. Mientras dure:
   redes (orden estable por mundo y posición del controlador). Antes cada grabber, pusher, purgador,
   bomba y crafter compartido trabajaba dos veces por ciclo.
 * Las celdas compartidas se ven desde ambos terminales.
-* Los DRAM Bays compartidos se ven desde ambas redes, igual que las celdas. El módulo antiguo de un
-  controlador solo lo ve su propia red.
+* Los DRAM Bays compartidos se ven desde ambas redes, igual que las celdas. Un módulo recuperado de un
+  controlador antiguo espera en el Terminal de esa red.
 
 Lo limpio es tener un controlador por red, y usar un par Transmisor/Receptor si de verdad quieres que
 dos redes intercambien ítems.

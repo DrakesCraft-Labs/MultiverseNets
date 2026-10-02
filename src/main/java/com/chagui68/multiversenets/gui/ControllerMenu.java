@@ -2,13 +2,10 @@ package com.chagui68.multiversenets.gui;
 
 import com.chagui68.multiversenets.MultiverseNets;
 import com.chagui68.multiversenets.item.DeviceType;
-import com.chagui68.multiversenets.item.Items;
-import com.chagui68.multiversenets.net.MemoryModules;
 import com.chagui68.multiversenets.net.Network;
 import com.chagui68.multiversenets.persist.NodeBlob;
 import com.chagui68.multiversenets.persist.NodeStore;
 import com.chagui68.multiversenets.util.PosUtil;
-import com.chagui68.multiversenets.util.Settings;
 import com.chagui68.multiversenets.util.Text;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -67,42 +64,27 @@ public class ControllerMenu extends MenuHolder {
         return item;
     }
 
+    /**
+     * EN: Memory modules no longer go in the Controller. This only explains where they go and,
+     * for networks built before the DRAM Bay, how many old modules wait in the Terminal.
+     * ES: Los módulos de memoria ya no van en el Controlador. Esto solo explica dónde van y, en
+     * redes anteriores al DRAM Bay, cuántos módulos antiguos esperan en el Terminal.
+     */
     private ItemStack virtualCacheIcon(NodeBlob blob) {
-        int tier = blob != null ? blob.virtualCacheTier : 0;
-        long total = blob != null ? blob.totalVirtualAmount() : 0;
-        long cap = Settings.virtualCacheCapacity(tier);
-        String tierName = switch (tier) {
-            case 1 -> "L1 CPU Cache";
-            case 2 -> "L2 CPU Cache";
-            case 3 -> "L3 CPU Cache";
-            case 4 -> "System DRAM";
-            case 5 -> "Quantum Cache";
-            default -> "None (Uninstalled)";
-        };
-        Material mat = switch (tier) {
-            case 1 -> Material.COPPER_INGOT;
-            case 2 -> Material.GOLD_INGOT;
-            case 3 -> Material.DIAMOND;
-            case 4 -> Material.NETHERITE_INGOT;
-            case 5 -> Material.NETHER_STAR;
-            default -> Material.GRAY_DYE;
-        };
-        ItemStack item = new ItemStack(mat);
+        int recovered = blob == null || blob.recoveredModules == null ? 0 : blob.recoveredModules.size();
+        int bays = network.count(DeviceType.MVN_DRAM_BAY);
+        ItemStack item = new ItemStack(Material.WAXED_COPPER_BULB);
         var meta = item.getItemMeta();
-        meta.displayName(Component.text("Legacy Memory Module", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
+        meta.displayName(Component.text("Network Memory", NamedTextColor.GOLD).decoration(TextDecoration.ITALIC, false));
         List<Component> lore = new ArrayList<>();
-        lore.add(Component.text("Tier: " + tierName + (tier > 0 ? " (T" + tier + ")" : ""), NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
-        if (tier > 0) {
-            double pct = cap > 0 ? (double) total / cap * 100.0 : 0;
-            lore.add(Component.text("Capacity: " + Items.formatAmount(cap) + " items", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("Stored: " + Items.formatAmount(total) + " (" + String.format("%.1f", pct) + "%)", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("Item Types: " + (blob.virtualSamples != null ? blob.virtualSamples.size() : 0), NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("Memory modules go in a DRAM Bay", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("connected to this network, not here.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+        lore.add(Component.text("DRAM Bays in this network: " + bays, NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
+        if (recovered > 0) {
             lore.add(Component.empty());
-            lore.add(Component.text("Click: take the module out WITH its items", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("and install it in a DRAM Bay.", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
-        } else {
-            lore.add(Component.text("Memory modules now go in a DRAM Bay", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
-            lore.add(Component.text("connected to this network.", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text(recovered + " old module(s) were inside this Controller.", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("They wait in the Terminal as temporary", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
+            lore.add(Component.text("items, with all their items inside.", NamedTextColor.YELLOW).decoration(TextDecoration.ITALIC, false));
         }
         meta.lore(lore);
         item.setItemMeta(meta);
@@ -134,18 +116,7 @@ public class ControllerMenu extends MenuHolder {
     @Override
     protected void click(InventoryClickEvent event) {
         int slot = event.getRawSlot();
-        if (slot == 11) {
-            // Controladores anteriores al DRAM Bay: el modulo sale con sus items para llevarlo a un bay.
-            NodeBlob blob = NodeStore.get(block);
-            ItemStack module = MemoryModules.ejectControllerCache(blob);
-            if (module != null) {
-                NodeStore.put(block, blob);
-                network.storage().invalidate();
-                giveOrDrop(module);
-                player.sendMessage(Text.msg("Module taken out with its items. Install it in a DRAM Bay.", NamedTextColor.GREEN));
-                draw();
-            }
-        } else if (slot == 15) {
+        if (slot == 15) {
             player.closeInventory();
             new TerminalMenu(plugin, player, network).openMenu();
         } else if (slot == 22) {

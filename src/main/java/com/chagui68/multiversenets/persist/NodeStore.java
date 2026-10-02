@@ -180,6 +180,9 @@ public final class NodeStore {
         if (blob.virtualAmounts == null) {
             blob.virtualAmounts = new ArrayList<>();
         }
+        if (blob.recoveredModules == null) {
+            blob.recoveredModules = new ArrayList<>();
+        }
         if (blob.dramFluids == null) {
             blob.dramFluids = new ArrayList<>();
         }

@@ -211,11 +211,11 @@ public final class GuideContent {
                         + "dueño (quien lo colocó) y muestra un holograma con estado, nodos y totales. Un solo "
                         + "controlador por red.",
                 "Place it first, then connect cables and devices. Right-click: status, router and a button to "
-                        + "open the terminal. An old controller that still holds a memory module can eject it from "
-                        + "its menu, with its items, to move it to a DRAM Bay.",
+                        + "open the terminal. It does not take memory modules: they go in a DRAM Bay. A module that "
+                        + "was inside an old controller waits in the Terminal as a temporary item, with its items.",
                 "Colócalo primero y conecta cables y dispositivos. Clic derecho: estado, router y un botón que "
-                        + "abre el terminal. Un controlador antiguo con un módulo de memoria dentro puede expulsarlo "
-                        + "desde su menú, con sus ítems, para llevarlo a un DRAM Bay.");
+                        + "abre el terminal. No acepta módulos de memoria: van en un DRAM Bay. Un módulo que estaba "
+                        + "dentro de un controlador antiguo espera en el Terminal como ítem temporal, con sus ítems.");
         add(DeviceType.MVN_CABLE, Category.CORE, "Cable de Red",
                 "Connects devices. It has no logic of its own: it only carries the network.",
                 "Conecta dispositivos. No tiene lógica propia: solo lleva la red.",
@@ -230,10 +230,13 @@ public final class GuideContent {
                         + "cells, barriles de Slimefun) y una página de fluidos.",
                 "Left-click takes 1, right-click a stack, shift-click to your inventory. Shift-click your items "
                         + "(or drop them in the input slot) to store them. Search, sort and pages. Buckets and honey "
-                        + "bottles go to the fluid storage.",
+                        + "bottles go to the fluid storage. The lore shows how much is in a Greedy Buffer and in "
+                        + "DRAM. Recovered modules from an old controller are shown first: click to take them.",
                 "Clic izquierdo saca 1, clic derecho un stack, shift+clic al inventario. Shift+clic en tus ítems "
                         + "(o déjalos en la ranura de entrada) para guardarlos. Búsqueda, orden y páginas. Cubos y "
-                        + "botellas de miel van al almacenamiento de fluidos.");
+                        + "botellas de miel van al almacenamiento de fluidos. El lore indica cuánto hay en un Greedy "
+                        + "Buffer y en DRAM. Los módulos recuperados de un controlador antiguo salen primero: clic "
+                        + "para recogerlos.");
         add(DeviceType.MVN_WIRELESS_TERMINAL, Category.CORE, "Terminal Inalámbrico",
                 "Opens the Network Terminal from a distance.",
                 "Abre el Terminal de Red a distancia.",

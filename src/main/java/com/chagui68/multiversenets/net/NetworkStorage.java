@@ -681,6 +681,28 @@ public class NetworkStorage {
         return total;
     }
 
+    /** Units of {@code item} held by memory modules (DRAM Bays), for the Terminal's lore. */
+    public synchronized long getMemoryStoredAmount(ItemStack item) {
+        if (item == null) {
+            return 0;
+        }
+        load();
+        long total = 0;
+        for (VirtualCacheState vCache : loadVirtualCaches()) {
+            if (vCache.blob.virtualSamples == null) {
+                continue;
+            }
+            for (int i = 0; i < vCache.blob.virtualSamples.size(); i++) {
+                ItemStack sample = vCache.blob.virtualSamples.get(i);
+                Long amt = vCache.blob.virtualAmounts.get(i);
+                if (sample != null && amt != null && amt > 0 && StackUtils.itemsMatch(sample, item)) {
+                    total += amt;
+                }
+            }
+        }
+        return total;
+    }
+
     public synchronized boolean isItemPurged(ItemStack item) {
         if (item == null || item.getType().isAir()) {
             return false;

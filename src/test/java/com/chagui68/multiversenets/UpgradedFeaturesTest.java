@@ -60,12 +60,13 @@ class UpgradedFeaturesTest {
     @Test
     void testVirtualCacheDepositAndWithdraw() {
         Block ctrl = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
-        NodeBlob blob = NodeStore.get(ctrl);
+        // L1 module (2,048 items) in a DRAM Bay: modules no longer live in the Controller.
+        Block bay = place(1, 64, 0, DeviceType.MVN_DRAM_BAY);
+        NodeBlob blob = NodeStore.get(bay);
         assertNotNull(blob);
-
-        // Upgrade Controller to L1 Cache (2,048 items)
-        blob.virtualCacheTier = 1;
-        NodeStore.put(ctrl, blob);
+        assertTrue(com.chagui68.multiversenets.net.MemoryModules.install(blob,
+                com.chagui68.multiversenets.item.Items.create(DeviceType.MVN_CACHE_L1)));
+        NodeStore.put(bay, blob);
 
         Network net = manager.networkAt(ctrl);
         assertNotNull(net);

@@ -132,6 +132,27 @@ public final class MemoryModules {
         return item;
     }
 
+    /**
+     * EN: Moves a module still installed inside a Controller (from before the DRAM Bay) into the
+     * Controller's recovered-module list, with its whole stock, so it shows up in the Terminal as
+     * a temporary item to collect. True when something moved.
+     *
+     * ES: Pasa un módulo que sigue dentro de un Controlador (de antes del DRAM Bay) a la lista de
+     * módulos recuperados del Controlador, con todo su stock, para que aparezca en el Terminal como
+     * ítem temporal que recoger. True si se movió algo.
+     */
+    public static boolean migrateControllerCache(NodeBlob controller) {
+        ItemStack module = ejectControllerCache(controller);
+        if (module == null) {
+            return false;
+        }
+        if (controller.recoveredModules == null) {
+            controller.recoveredModules = new ArrayList<>();
+        }
+        controller.recoveredModules.add(module);
+        return true;
+    }
+
     private static void clear(NodeBlob blob) {
         blob.installedModule = null;
         blob.virtualCacheTier = 0;

@@ -104,6 +104,7 @@ antiguos) con campos públicos:
 | `txWorld` / `txX` / `txY` / `txZ` | `String` / `int` | Enlace del puente de un Receptor o Transmisor (el otro extremo). |
 | `greedySamples` / `greedyAmounts` | `List<ItemStack>` / `List<Long>` | Búfer multi-ítem de la Greedy Cell. |
 | `virtualCacheTier` / `virtualSamples` / `virtualAmounts` | `int` / listas | Stock de un módulo de memoria de ítems: un DRAM Bay con módulo de ítems, o la caché antigua de un Controlador. |
+| `recoveredModules` | `List<ItemStack>` | Solo Controlador: módulos que estaban dentro antes del DRAM Bay, sacados por `Network.scan()` (`MemoryModules.migrateControllerCache`) con su stock; el Terminal los muestra primero y los entrega; romper el controlador los suelta. |
 | `installedModule` | `String` | DRAM Bay: nombre del `DeviceType` del módulo instalado, null si está vacío. |
 | `dramFluids` / `dramFluidAmounts` | `List<String>` / `List<Long>` | DRAM Bay con Fluid DRAM Module: varios fluidos (mB). |
 | `chickenActive` / `chickenPull` / `chickenProducts` / `chickenMinTier` / `chickenMaxTier` / `chickenKnown` / `chickenAge` / `chickenMinStrength` / `chickenPureOnly` | varios | Reglas del Genetic Chicken Sorter (ver §19). |
@@ -324,7 +325,7 @@ transmisor), `isImporter()`/`isExporter()`, `isDirectional()`, `isRouter()`, `is
 | Menú | Tamaño | Uso / detalles |
 | --- | --- | --- |
 | `TerminalMenu` | 54 | Terminal (bloque, inalámbrico, botones de transmisor/receptor). Entrada `INPUT_SLOT=8`, vista del purgador `17`, orden `26`, página de fluidos `35`, páginas `44`/`53`; 48 ítems por página. Depósito/retirada de fluidos con cubos y botellas. |
-| `ControllerMenu` | 27 | Estado del controlador y del router; la ranura `11` expulsa un módulo de memoria antiguo con sus ítems. |
+| `ControllerMenu` | 27 | Estado del controlador y del router; la ranura `11` explica que los módulos van en un DRAM Bay y cuántos módulos recuperados esperan en el Terminal. |
 | `DramBayMenu` | 27 | Estadísticas `11`, módulo `13` (instalar desde el cursor/shift-clic, o expulsar), expulsar `15`. Lee el blob en cada clic, así dos jugadores no pueden expulsar a la vez. |
 | `ChickenSorterMenu` | 54 | Productos `0–17`, activo `27`, push/pull `28`, cara `29`, nivel mín/máx `31`/`32`, fuerza `33`, ADN `34`, edad `35`, puros `40`, limpiar `44`, ayuda `49`. |
 | `MonitorMenu` | 27 | Diagnóstico en vivo (tarea de refresco mientras está abierto). |

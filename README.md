@@ -56,9 +56,9 @@ Rates are the defaults from `config.yml`; every one of them is configurable (see
 
 | Device | id · block | What it does | How to use it |
 |---|---|---|---|
-| **Network Controller** | `mvn_controller` · Lodestone | The network's root. Every scan starts here (breadth-first through connected blocks, up to `network.max-nodes`). Records its owner (the placer) and shows a floating hologram with status, nodes and stored totals. Memory modules **no longer** go in the controller: they go in a **DRAM Bay**. | Right-click: status and router status. An old controller that still holds a module keeps using it; in its menu, clicking *Legacy Memory Module* takes it out **with its items** so you can move it to a DRAM Bay. Only one controller per network: a second one wired to the same cables is reported as `foreign controller` (see [Shared buses](#shared-buses)). |
+| **Network Controller** | `mvn_controller` · Lodestone | The network's root. Every scan starts here (breadth-first through connected blocks, up to `network.max-nodes`). Records its owner (the placer) and shows a floating hologram with status, nodes and stored totals. Memory modules **no longer** go in the controller: they go in a **DRAM Bay**. | Right-click: status and router status. It does not accept modules. A module that was inside an old controller is taken out automatically **with its items** and waits in the **Terminal** as a temporary item: click it there and install it in a DRAM Bay. Breaking the controller drops any module nobody collected. Only one controller per network: a second one wired to the same cables is reported as `foreign controller` (see [Shared buses](#shared-buses)). |
 | **Network Cable** | `mvn_cable` · Glass | Connects devices. No logic of its own. | Right-click it to see whether it reaches a controller (and the network size). Holding a block while right-clicking places the block instead. |
-| **Network Terminal** | `mvn_terminal` · Beacon | The storage grid: every item in the network (cache, cells, barrels, greedy cells, Slimefun barrels) and a second page for fluids. | Left-click takes 1, right-click a stack, shift+click sends to your inventory. Shift+left-click your items (or drop them in the input slot) to store them. Search, sort and page buttons. Buckets/honey bottles go to fluid storage. |
+| **Network Terminal** | `mvn_terminal` · Beacon | The storage grid: every item in the network (cache, cells, barrels, greedy cells, Slimefun barrels) and a second page for fluids. | Left-click takes 1, right-click a stack, shift+click sends to your inventory. Shift+left-click your items (or drop them in the input slot) to store them. Search, sort and page buttons. Buckets/honey bottles go to fluid storage. The lore shows how much of an item is in a Greedy Buffer and **in DRAM**. Recovered modules from an old controller appear first as temporary items. |
 | **Wireless Terminal** | `mvn_wireless_terminal` · item (Nether Star) | Opens the Network Terminal remotely. | Shift+right-click a Controller or a Terminal to bind it, then right-click in the air. Without a **Network Router** it works only in the same world and within `wireless.local-range-without-router` (64) blocks. Never within 10 s of combat, and only if you may access the network's land. |
 | **Network Router** | `mvn_router` · Lightning Rod | Lifts the Wireless Terminal limits for its network: any distance and any world. | Connect it anywhere in the network. |
 | **Network Monitor** | `mvn_monitor` · Respawn Anchor | Live diagnostic panel: node counts by type, storage usage, errors. | Right-click; it refreshes while open. |
@@ -266,8 +266,8 @@ report it as `foreign controller at x,y,z`. While that lasts:
   networks (stable order by world and controller position). Previously every shared grabber,
   pusher, purger, pump and crafter worked twice per cycle.
 * Shared cells are visible from both terminals.
-* Shared DRAM Bays are visible from both networks, like cells. A controller's legacy module is only
-  seen by its own network.
+* Shared DRAM Bays are visible from both networks, like cells. A module recovered from an old controller
+  waits in that network's Terminal.
 
 The clean fix is to keep one controller per network, and use a Transmitter/Receiver pair if you
 really want two networks to exchange items.

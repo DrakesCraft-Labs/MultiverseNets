@@ -49,7 +49,7 @@ Things to know:
 - `src/test/java/dev/espi/protectionstones/PSRegion.java` is a stub of the ProtectionStones API that
   the provider tests load by reflection.
 
-## 3. Overview: 35 classes, 260 tests
+## 3. Overview: 35 classes, 261 tests
 
 | Class (package `com.chagui68.multiversenets` unless stated) | Tests | Covers |
 | --- | --- | --- |
@@ -58,7 +58,7 @@ Things to know:
 | `CellGuiTest` | 9 | Quantum Cell menu: template, quick deposit, withdrawal, capacity, no duplication when the ticker runs. |
 | `ChickenSorterTest` | 3 | GeneticChickengineering genes read like the addon (product, tier, strength, purity, age, special species); every rule must pass; the sorter moves only matching chickens, only while running, and never other items. |
 | `CrafterGuiTest` | 10 | Crafter menu: install/uninstall/clear; Slimefun crafters accept Slimefun and vanilla Blueprints, standard crafters refuse Slimefun ones. |
-| `DramBayTest` | 5 | A module in a DRAM Bay stores items; an ejected module moves its stock to another network; breaking the bay drops the module with its stock; the Fluid DRAM holds several fluids and travels with them; a controller no longer takes modules and hands back a legacy one with its items. |
+| `DramBayTest` | 7 | A module in a DRAM Bay stores items; an ejected module moves its stock to another network; breaking the bay drops the module with its stock; the Fluid DRAM holds several fluids and travels with them; a controller no longer takes modules; an old controller module waits in the Terminal as a temporary item and goes back with its items; the Terminal lore shows the DRAM amount; breaking a controller drops uncollected modules. |
 | `DeviceTypeTest` | 7 | `DeviceType` classification: filterable devices, Greedy Cell is not a cell, hand items, directional devices, request and Slimefun crafters. |
 | `FilterGuiTest` | 15 | Filter menu: add/remove templates, whitelist/blacklist, shift-click, faces, clear. |
 | `FluidAndRequesterTest` | 13 | Fluid storage and fluid cell quick interaction, Liquid Pump, terminal fluid page, Request Terminal (orders, chat amount, recursive chains, ignores Auto-Crafters, Slimefun Request Crafter), Slimefun Auto-Crafter. |
@@ -80,7 +80,7 @@ Things to know:
 | `SlimefunBridgeTest` | 5 | The Slimefun bridge is inert and never throws without Slimefun. |
 | `ToolsTest` | 3 | Wrench and Rake are hand tools; the Receiver is filterable; filters default to whitelist. |
 | `TransmissionFixesTest` | 13 | Item and fluid transmission: all-or-nothing fluid deposits, the pump never duplicates fluid, bridge with template-only filter, bridge never drains Greedy Cells, a device shared by two controllers works once per cycle, partial crafting results are undone, wrench pastes exact templates, rake returns the device, filters/face/transit buffer survive break and place, transit buffers above 99 units are saved without crashing. |
-| `UpgradedFeaturesTest` | 6 | Legacy controller memory module, Router, per-chunk node limit, grabber transit buffer, cache kept on break, creative breaking drops nothing. |
+| `UpgradedFeaturesTest` | 6 | Memory module in a DRAM Bay, Router, per-chunk node limit, grabber transit buffer, cache kept on break, creative breaking drops nothing. |
 | `compat.NetworkOwnershipTest` | 9 | A network runs inside its owner's claim; other networks and a null owner are strangers; public land stays open; broken or unwired providers grant nothing; owner answers never leak between networks. |
 | `compat.ProtectionStonesProviderTest` | 18 | The ProtectionStones provider against the real API shape (`PSRegion.fromLocation*`, exact signatures), owner/member certification, fail-closed behaviour; WorldGuard region lookup fails safe. |
 | `compat.ProtectionWhitelistTest` | 15 | Protection defaults and `exempt-locations` parsing and geometry; the bridge is inert without providers. |

@@ -115,6 +115,13 @@ public class NodeBlob implements Serializable {
      * {@link #virtualCacheTier} igual a su nivel; el Fluid DRAM usa {@link #dramFluids}.
      */
     public String installedModule;
+    /**
+     * EN: Controller only: memory modules that were installed inside it before the DRAM Bay
+     * existed, taken out with their stock and waiting in the Terminal for a player to collect.
+     * ES: Solo Controlador: módulos de memoria que estaban dentro de él antes del DRAM Bay, sacados
+     * con su stock y esperando en el Terminal a que un jugador los recoja.
+     */
+    public List<ItemStack> recoveredModules = new ArrayList<>();
     /** EN: Fluid DRAM: fluid names / ES: Fluid DRAM: nombres de fluido. */
     public List<String> dramFluids = new ArrayList<>();
     /** EN: Fluid DRAM: millibuckets per fluid / ES: Fluid DRAM: mB por fluido. */

@@ -157,6 +157,16 @@ public class BlockListener implements Listener {
         if (module != null) {
             block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), module);
         }
+        // Modulos recuperados de un Controlador antiguo que nadie recogio del Terminal: salen al
+        // suelo con su stock en vez de perderse con el bloque.
+        if (blob.recoveredModules != null) {
+            for (ItemStack recovered : blob.recoveredModules) {
+                if (recovered != null && !recovered.getType().isAir()) {
+                    block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), recovered);
+                }
+            }
+            blob.recoveredModules = new ArrayList<>();
+        }
         if (blob.encoderBlank != null && !blob.encoderBlank.getType().isAir()) {
             block.getWorld().dropItemNaturally(block.getLocation().add(0.5, 0.5, 0.5), blob.encoderBlank);
             blob.encoderBlank = null;

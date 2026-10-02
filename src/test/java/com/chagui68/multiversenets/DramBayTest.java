@@ -1,6 +1,7 @@
 package com.chagui68.multiversenets;
 
-import com.chagui68.multiversenets.gui.ControllerMenu;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import com.chagui68.multiversenets.gui.DramBayMenu;
 import com.chagui68.multiversenets.item.DeviceType;
 import com.chagui68.multiversenets.item.Items;
@@ -181,33 +182,80 @@ class DramBayTest {
     }
 
     @Test
-    void aControllerNoLongerTakesModulesButCanHandBackAnOldOne() {
+    void anOldControllerModuleWaitsInTheTerminalAsATemporaryItem() {
         Block controller = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
+        Block bay = place(1, 64, 0, DeviceType.MVN_DRAM_BAY);
         Network net = network(controller);
-        ItemStack module = Items.create(DeviceType.MVN_CACHE_L1);
-        rightClick(controller, module);
+        rightClick(controller, Items.create(DeviceType.MVN_CACHE_L1));
         assertEquals(0, NodeStore.get(controller).virtualCacheTier, "right-clicking the controller installs nothing");
 
-        // A controller from before the DRAM Bay with its module and items inside.
+        // A controller from before the DRAM Bay, with its module and items inside.
         NodeBlob blob = NodeStore.get(controller);
         blob.virtualCacheTier = 3;
+        blob.addVirtualItem(new ItemStack(Material.EMERALD), 77);
         NodeStore.put(controller, blob);
-        net.storage().invalidate();
-        assertEquals(0, net.storage().deposit(new ItemStack(Material.EMERALD, 77)));
+
+        net.scan();
+
+        NodeBlob after = NodeStore.get(controller);
+        assertEquals(0, after.virtualCacheTier, "the module no longer lives in the controller");
+        assertEquals(1, after.recoveredModules.size(), "it waits as a recovered module");
+        assertEquals(0, net.storage().count(i -> true), "its items travel inside the module, not in the network");
 
         player.getInventory().clear();
-        new ControllerMenu(plugin, player, net, controller).openMenu();
+        new com.chagui68.multiversenets.gui.TerminalMenu(plugin, player, net).openMenu();
+        ItemStack shown = player.getOpenInventory().getTopInventory().getItem(0);
+        assertEquals(DeviceType.MVN_CACHE_L3, Items.typeOf(shown), "the Terminal shows it first, apart from the stock");
         server.getPluginManager().callEvent(new InventoryClickEvent(player.getOpenInventory(),
-                InventoryType.SlotType.CONTAINER, 11, ClickType.LEFT, InventoryAction.PICKUP_ALL));
+                InventoryType.SlotType.CONTAINER, 0, ClickType.LEFT, InventoryAction.PICKUP_ALL));
 
-        assertEquals(0, NodeStore.get(controller).virtualCacheTier);
-        ItemStack ejected = null;
-        for (ItemStack it : player.getInventory().getContents()) {
-            if (Items.typeOf(it) == DeviceType.MVN_CACHE_L3) {
-                ejected = it;
+        ItemStack taken = player.getOpenInventory().getCursor();
+        assertEquals(DeviceType.MVN_CACHE_L3, Items.typeOf(taken), "clicking it hands the module over");
+        assertTrue(NodeStore.get(controller).recoveredModules.isEmpty(), "and it leaves the Terminal");
+        assertEquals(77L, MemoryModules.cargoOf(taken).totalVirtualAmount());
+        player.setItemOnCursor(null);
+        player.closeInventory();
+
+        rightClick(bay, taken);
+        assertEquals(77, net.storage().count(i -> i.getType() == Material.EMERALD), "installed in a bay, the items are back");
+    }
+
+    @Test
+    void theTerminalTellsHowMuchOfAnItemIsInDram() {
+        Block controller = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
+        Block bay = place(1, 64, 0, DeviceType.MVN_DRAM_BAY);
+        Network net = network(controller);
+        rightClick(bay, Items.create(DeviceType.MVN_CACHE_L1));
+        net.storage().deposit(new ItemStack(Material.DIRT, 10));
+
+        new com.chagui68.multiversenets.gui.TerminalMenu(plugin, player, net).openMenu();
+        ItemStack icon = player.getOpenInventory().getTopInventory().getItem(0);
+        assertNotNull(icon);
+        boolean found = false;
+        for (Component line : icon.getItemMeta().lore()) {
+            String text = PlainTextComponentSerializer.plainText().serialize(line);
+            if (text.contains("In DRAM: 10")) {
+                found = true;
             }
         }
-        assertNotNull(ejected, "the old module comes out as an L3 module");
-        assertEquals(77L, MemoryModules.cargoOf(ejected).totalVirtualAmount());
+        assertTrue(found, "the lore shows the amount kept in DRAM, like the Greedy Buffer line");
+    }
+
+    @Test
+    void breakingAControllerDropsItsUncollectedModules() {
+        Block controller = place(0, 64, 0, DeviceType.MVN_CONTROLLER);
+        Network net = network(controller);
+        NodeBlob blob = NodeStore.get(controller);
+        blob.virtualCacheTier = 1;
+        blob.addVirtualItem(new ItemStack(Material.DIRT), 5);
+        NodeStore.put(controller, blob);
+        net.scan();
+
+        server.getPluginManager().callEvent(new BlockBreakEvent(controller, player));
+
+        boolean dropped = world.getEntities().stream().anyMatch(e -> e instanceof org.bukkit.entity.Item item
+                && Items.typeOf(item.getItemStack()) == DeviceType.MVN_CACHE_L1
+                && MemoryModules.cargoOf(item.getItemStack()) != null);
+        assertTrue(dropped, "the recovered module drops with its items");
     }
 }
