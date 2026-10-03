@@ -1,5 +1,5 @@
 > ⚠️ **CONSOLIDADO EN DRAKES-SUITES (SUITE MULTIVERSE POR CHAGUI68):**  
-> Todo el desarrollo activo y soporte para Paper/Purpur 1.21.11+ se realiza oficialmente en el monorepo [`Drakes-Suites`](https://github.com/DrakesCraft-Labs/Drakes-Suites) dentro del módulo oficial `drakes-multiverse`, preservando la autoría y diseño soberano de **Chagui68**.
+> Todo el desarrollo activo y soporte para Paper/Purpur 1.21.11+ se realiza oficialmente en el monorepo [`Drakes-Suites`](https://github.com/SlimefunNewHorizons/Drakes-Suites) dentro del módulo oficial `drakes-multiverse`, preservando la autoría y diseño soberano de **Chagui68**.
 
 <div align="center">
 
@@ -454,6 +454,6 @@ plugin makes exists there; nothing it uses is marked for removal in those versio
 
 ## 📄 License & Sovereign Authorship
 
-Copyright © 2026 [**Chagui68**](https://github.com/Chagui68) · [**DrakesCraft Labs**](https://github.com/DrakesCraft-Labs).
+Copyright © 2026 [**Chagui68**](https://github.com/Chagui68) · [**Slimefun: New Horizons**](https://github.com/SlimefunNewHorizons).
 
 This project is an **original sovereign creation** engineered by **Chagui68** for the DrakesCraft network. All intellectual authorship belongs to Chagui68. Commercial resale, repackaging in paid setups, or removing creator attribution is strictly prohibited.
