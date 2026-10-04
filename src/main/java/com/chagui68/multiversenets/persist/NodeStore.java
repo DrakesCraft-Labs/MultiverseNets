@@ -14,6 +14,8 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -116,9 +118,11 @@ public final class NodeStore {
 
     public static String encode(NodeBlob blob) {
         try (ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-             BukkitObjectOutputStream out = new BukkitObjectOutputStream(bytes)) {
+             GZIPOutputStream gzip = new GZIPOutputStream(bytes);
+             BukkitObjectOutputStream out = new BukkitObjectOutputStream(gzip)) {
             out.writeObject(blob);
             out.flush();
+            gzip.finish();
             return Base64.getEncoder().encodeToString(bytes.toByteArray());
         } catch (IOException e) {
             throw new IllegalStateException("Could not serialize node", e);
@@ -126,8 +130,11 @@ public final class NodeStore {
     }
 
     public static NodeBlob decode(String data) {
-        try (BukkitObjectInputStream in = new BukkitObjectInputStream(
-                new ByteArrayInputStream(Base64.getDecoder().decode(data)))) {
+        byte[] encoded = Base64.getDecoder().decode(data);
+        try (ByteArrayInputStream bytes = new ByteArrayInputStream(encoded);
+             BukkitObjectInputStream in = new BukkitObjectInputStream(isGzip(encoded)
+                     ? new GZIPInputStream(bytes)
+                     : bytes)) {
             NodeBlob blob = (NodeBlob) in.readObject();
             normalize(blob);
             return blob;
@@ -143,6 +150,10 @@ public final class NodeStore {
             }
             return null;
         }
+    }
+
+    private static boolean isGzip(byte[] encoded) {
+        return encoded.length >= 2 && encoded[0] == (byte) 0x1f && encoded[1] == (byte) 0x8b;
     }
 
     /**
